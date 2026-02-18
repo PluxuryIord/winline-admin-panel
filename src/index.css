@@ -1,0 +1,31 @@
+:root {
+  --color-white: #FFFFFF;
+  --color-blue: #000090;
+  --color-orange: #FF7E00;
+  --color-black: #0A0A14;
+  --color-panel: #12121c; 
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-black);
+  color: var(--color-white);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-black);
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}

@@ -1,0 +1,218 @@
+.layout-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* --- САЙДБАР --- */
+.sidebar {
+  width: 280px;
+  background-color: var(--color-black);
+  /* Еле заметная линия справа, чтобы отделить меню от рабочего поля */
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  /* Убрали нижний padding, чтобы профиль встал ровно */
+  padding: 24px 16px 0 16px; 
+}
+
+/* --- ЛОГОТИП WINLINE --- */
+.logo-area {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+  padding: 0 16px;
+}
+
+.logo-area h2 {
+  font-size: 1.4rem;
+  font-weight: 800; /* Жирный шрифт как у спортивных брендов */
+  color: var(--color-white);
+  text-transform: uppercase; /* Делаем все буквы заглавными */
+  letter-spacing: 1px;
+}
+
+.logo-area span {
+  color: var(--color-orange); /* Фирменный оранжевый акцент */
+}
+
+/* --- МЕНЮ --- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-item {
+  position: relative; /* Важно для абсолютного позиционирования оранжевой полоски */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, 0.7); /* Текст немного приглушен по умолчанию */
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  font-size: 1.0rem;
+  font-weight: 500;
+}
+
+/* 1. Эффект при наведении (hover) */
+.menu-item:hover {
+  background-color: #181722;
+  color: var(--color-white);
+}
+
+/* 2. Эффект активной кнопки (на которой мы сейчас находимся) */
+.menu-item.active {
+  background-color: #181722;
+  color: var(--color-white);
+}
+
+/* Оранжевая полоска слева для активного элемента */
+.menu-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%; /* Немного отступаем сверху и снизу */
+  height: 70%;
+  width: 4px;
+  background-color: var(--color-orange);
+  border-radius: 0 4px 4px 0; /* Закругляем только правые углы полоски */
+}
+
+/* --- ИКОНКИ В МЕНЮ --- */
+.icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  /* Полупрозрачный фон для иконки, чтобы он выделялся на темном фоне меню */
+  background-color: rgba(255, 255, 255, 0.05); 
+  border-radius: 8px;
+  color: var(--color-white); /* Сами иконки белые, как на референсе */
+}
+
+/* Если пункт меню активен, перекрашиваем иконку в оранжевый */
+.menu-item.active .icon-wrapper {
+  color: var(--color-orange);
+  background-color: rgba(255, 126, 0, 0.1); /* Легкое оранжевое свечение на фоне иконки */
+}
+
+
+/* --- ПРОФИЛЬ АДМИНА --- */
+.admin-profile {
+  /* margin-top: auto — это магия Flexbox. Она заставляет этот блок 
+     сдвинуться в самый низ родительского контейнера (.sidebar) */
+  margin-top: auto; 
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-left: -16px; /* Компенсируем padding сайдбара, чтобы линия была на всю ширину */
+  margin-right: -16px;
+  padding-left: 24px; /* Смещаем контент обратно */
+}
+
+.admin-avatar {
+  width: 36px;
+  height: 36px;
+  background-color: #181722;
+  border-radius: 50%; /* Делаем круг */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-white);
+}
+
+.admin-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Занимает всё свободное пространство, чтобы отодвинуть иконку выхода вправо */
+}
+
+.admin-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-white);
+}
+
+.admin-status {
+  font-size: 0.75rem;
+  color: #00ff88; /* Зеленый цвет для статуса "Start" как на референсе */
+}
+
+.logout-icon {
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: color 0.2s;
+  margin-right: 16px;
+}
+
+.logout-icon:hover {
+  color: var(--color-orange);
+}
+
+/* --- ПРАВАЯ ЧАСТЬ (Обертка) --- */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-black);
+}
+
+/* --- ШАПКА --- */
+.header {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 24px;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #00ff88;
+  border-radius: 50%;
+}
+
+.header-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.icon-orange {
+  color: var(--color-orange);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.icon-orange:hover {
+  opacity: 0.8;
+}
+
+/* --- РАБОЧЕЕ ПОЛЕ --- */
+.workspace {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+  background-color: var(--color-black);
+}

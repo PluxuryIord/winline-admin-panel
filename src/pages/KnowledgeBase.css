@@ -1,0 +1,215 @@
+.kb-container {
+  display: flex;
+  gap: 24px;
+  height: calc(100vh - 134px); /* Высота экрана минус шапка и паддинги рабочего поля */
+}
+
+/* ЛЕВАЯ КОЛОНКА: Дерево тем */
+.kb-sidebar {
+  width: 320px;
+  background-color: var(--color-panel);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kb-sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kb-sidebar-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.add-topic-btn {
+  background: transparent;
+  border: 1px solid var(--color-orange);
+  color: var(--color-orange);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-topic-btn:hover {
+  background: var(--color-orange);
+  color: var(--color-white);
+}
+
+.kb-topic-list {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kb-topic-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.kb-topic-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.kb-topic-item.active {
+  background-color: #181722;
+  color: var(--color-white);
+  border-left: 3px solid var(--color-orange);
+}
+
+.kb-subtopics {
+  padding-left: 32px; /* Сдвигаем подтемы правее */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.kb-subtopic-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-subtopic-item:hover {
+  color: var(--color-white);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.kb-subtopic-item.active {
+  color: var(--color-orange);
+  font-weight: 500;
+}
+
+
+/* ПРАВАЯ КОЛОНКА: Контент */
+.kb-content {
+  flex: 1;
+  background-color: var(--color-panel);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kb-content-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.kb-content-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.kb-breadcrumbs {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-edit-btn {
+  background-color: var(--color-orange);
+  color: var(--color-white);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.2s;
+}
+
+.kb-edit-btn:hover {
+  opacity: 0.9;
+}
+
+/* Тело статьи */
+.kb-article {
+  padding: 32px;
+  overflow-y: auto;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.6;
+}
+
+/* Фейковый редактор для презентации */
+.kb-editor {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--color-black);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-white);
+}
+
+.editor-textarea {
+  flex: 1;
+  background-color: transparent;
+  border: none;
+  color: var(--color-white);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
