@@ -1,40 +1,52 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-// Добавили иконку LogOut для кнопки выхода в профиле
-import { Users, MessageSquare, Send, BookOpen, Database, BarChart, Calendar, Settings, Bell, LogOut } from 'lucide-react';
+// Добавили Menu и X для мобильной кнопки
+import { Users, MessageSquare, Send, BookOpen, Database, BarChart, Calendar, Settings, Bell, LogOut, Menu, X } from 'lucide-react';
 import './Layout.css';
 
 export default function Layout() {
-  const menuItems = [
-    { name: 'Пользователи', path: '/users', icon: <Users size={18} /> },
-    { name: 'Чаты', path: '/chats', icon: <MessageSquare size={18} /> },
-    { name: 'Рассылки и контент', path: '/mailings', icon: <Send size={18} /> },
-    { name: 'Сценарии', path: '/scenarios', icon: <BookOpen size={18} /> },
-    { name: 'База знаний', path: '/knowledge', icon: <Database size={18} /> },
-    { name: 'Аналитика', path: '/analytics', icon: <BarChart size={18} /> },
-    { name: 'Работа на ивенте', path: '/events', icon: <Calendar size={18} /> },
-  ];
+  // Состояние для мобильного меню
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Функция для закрытия меню при клике на ссылку (чтобы меню не оставалось висеть)
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
     <div className="layout-container">
-      {/* Левая панель */}
-      <aside className="sidebar">
+      
+      {/* Затемнение фона на мобилках при открытом меню */}
+      {isMobileMenuOpen && (
+        <div className="mobile-overlay" onClick={closeMobileMenu}></div>
+      )}
+
+      {/* Левая панель (добавляем класс open, если стейт true) */}
+      <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         
-        {/* Логотип в стиле Winline */}
         <div className="logo-area">
-          <h2>Admin <span>Panel</span></h2>
+          <h2>Winline <span>Admin</span></h2>
+          {/* Кнопка закрытия меню внутри самого сайдбара (только для мобилок) */}
+          <button className="mobile-close-btn" onClick={closeMobileMenu}>
+            <X size={24} />
+          </button>
         </div>
         
-        {/* Навигация */}
         <nav className="menu">
-          {menuItems.map((item) => (
+          {/* В каждую ссылку добавляем onClick={closeMobileMenu} */}
+          {[
+            { name: 'Пользователи', path: '/users', icon: <Users size={18} /> },
+            { name: 'Чаты', path: '/chats', icon: <MessageSquare size={18} /> },
+            { name: 'Рассылки и контент', path: '/mailings', icon: <Send size={18} /> },
+            { name: 'Сценарии', path: '/scenarios', icon: <BookOpen size={18} /> },
+            { name: 'База знаний', path: '/knowledge', icon: <Database size={18} /> },
+            { name: 'Аналитика', path: '/analytics', icon: <BarChart size={18} /> },
+            { name: 'Работа на ивенте', path: '/events', icon: <Calendar size={18} /> },
+          ].map((item) => (
             <NavLink 
               to={item.path} 
               key={item.path} 
-              // NavLink сам проверяет активна ли ссылка (isActive) 
-              // и добавляет нужные классы
+              onClick={closeMobileMenu}
               className={({ isActive }) => isActive ? "menu-item active" : "menu-item"}
             >
-              {/* Обертка для иконки, чтобы сделать ей фон */}
               <div className="icon-wrapper">
                 {item.icon}
               </div>
@@ -43,7 +55,6 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* Профиль администратора (прижат к низу) */}
         <div className="admin-profile">
           <div className="admin-avatar">AD</div>
           <div className="admin-info">
@@ -51,12 +62,16 @@ export default function Layout() {
           </div>
           <LogOut size={18} className="logout-icon" />
         </div>
-
       </aside>
 
-      {/* Правая часть: Шапка + Рабочее поле */}
+      {/* Правая часть */}
       <div className="main-wrapper">
         <header className="header">
+          {/* Кнопка гамбургера для мобилок (слева в шапке) */}
+          <button className="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(true)}>
+            <Menu size={24} />
+          </button>
+
           <div className="header-actions">
             <Bell size={20} className="icon-orange" />
             <Settings size={20} className="icon-orange" />

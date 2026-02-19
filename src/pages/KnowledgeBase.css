@@ -213,3 +213,39 @@
   resize: none;
   outline: none;
 }
+
+/* === АДАПТАЦИЯ БАЗЫ ЗНАНИЙ ДЛЯ МОБИЛОК === */
+@media (max-width: 768px) {
+  .kb-container {
+    flex-direction: column; /* Ставим колонки друг под друга */
+    height: auto; /* Убираем жесткую высоту */
+    gap: 16px;
+  }
+
+  /* Список тем теперь занимает 100% ширины и имеет ограничение по высоте, чтобы можно было скроллить */
+  .kb-sidebar {
+    width: 100%;
+    max-height: 250px; 
+    flex-shrink: 0;
+  }
+
+  .kb-content {
+    width: 100%;
+    /* Даем минимальную высоту контенту, чтобы редактор выглядел нормально */
+    min-height: 400px; 
+  }
+
+  .kb-content-header {
+    padding: 16px;
+    flex-direction: column; /* Кнопку редактирования переносим под заголовок */
+    gap: 12px;
+  }
+
+  .kb-article, .kb-editor {
+    padding: 16px;
+  }
+
+  .editor-toolbar {
+    flex-wrap: wrap; /* Если кнопок редактора много, они перенесутся на новую строку */
+  }
+}

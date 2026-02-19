@@ -216,3 +216,86 @@
   overflow-y: auto;
   background-color: var(--color-black);
 }
+
+
+/* === АДАПТАЦИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ === */
+
+/* Скрываем мобильные кнопки на больших экранах по умолчанию */
+.mobile-menu-btn,
+.mobile-close-btn,
+.mobile-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  
+  /* Делаем так, чтобы рабочая область занимала 100% ширины */
+  .layout-container {
+    flex-direction: column;
+  }
+
+  /* Показываем кнопку гамбургера в шапке */
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--color-white);
+    cursor: pointer;
+    margin-right: auto; /* Отталкиваем остальные иконки вправо */
+  }
+
+  .header {
+    padding: 0 20px;
+    justify-content: space-between; /* Распределяем гамбургер и иконки по краям */
+  }
+
+  /* Превращаем боковую панель в выезжающую шторку */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%; /* Прячем её за левым краем экрана */
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease-in-out; /* Плавный выезд */
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5); /* Добавляем тень для объема */
+  }
+
+  /* Класс .open добавляется через React, когда мы кликаем на меню */
+  .sidebar.open {
+    left: 0;
+  }
+
+  /* Показываем крестик для закрытия */
+  .mobile-close-btn {
+    display: block;
+    background: transparent;
+    border: none;
+    color: var(--color-white);
+    cursor: pointer;
+    margin-left: auto; /* Прижимаем вправо */
+  }
+
+  .logo-area {
+    margin-bottom: 20px;
+  }
+
+  /* Затемнение остального экрана при открытом меню */
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px); /* Размываем задний фон */
+    z-index: 999; /* Должен быть ниже сайдбара (1000), но выше остального */
+  }
+
+  /* Уменьшаем отступы в рабочем поле, чтобы экономить место на телефоне */
+  .workspace {
+    padding: 16px;
+  }
+}
