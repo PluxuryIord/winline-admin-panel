@@ -1,0 +1,190 @@
+/* Контейнер страницы */
+.analytics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1200px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* === ВЕРХНЯЯ ПАНЕЛЬ С КНОПКАМИ === */
+.analytics-controls {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap; /* Для мобилок */
+  align-items: center;
+  background-color: var(--color-panel);
+  padding: 16px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.control-wrapper {
+  position: relative;
+}
+
+/* Базовый стиль кнопок управления */
+.btn-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background-color: transparent;
+  border: 1px solid var(--color-orange);
+  color: var(--color-orange);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.btn-control:hover {
+  background-color: rgba(255, 126, 0, 0.1);
+}
+
+.btn-control.primary {
+  background-color: var(--color-orange);
+  color: var(--color-white);
+}
+
+.btn-control.primary:hover {
+  background-color: #e67100; /* Чуть темнее при наведении */
+}
+
+/* Вращение иконки при обновлении */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Выпадающие меню (Dropdowns) */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background-color: var(--color-black);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 220px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: popIn 0.2s ease-out;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--color-white);
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: #181722;
+}
+.dropdown-item.active {
+  color: var(--color-orange);
+  background-color: rgba(255, 126, 0, 0.1);
+}
+
+
+/* === КАРТОЧКИ МЕТРИК (Вместо маркированного списка) === */
+
+.metrics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.metric-card {
+  background-color: var(--color-panel);
+  padding: 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 126, 0, 0.3);
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  color: var(--color-orange);
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-white);
+}
+
+/* Маленькая подпись с пояснением формулы */
+.metric-subtext {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Адаптация */
+@media (max-width: 768px) {
+  .analytics-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .btn-control {
+    justify-content: center;
+  }
+  .dropdown-menu {
+    width: 100%;
+  }
+}

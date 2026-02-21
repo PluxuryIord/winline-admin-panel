@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Placeholder from './pages/Placeholder';
-import KnowledgeBase from './pages/KnowledgeBase'; // Импортируем нашу Вики
+import KnowledgeBase from './pages/KnowledgeBase';
+import Analytics from './pages/Analytics'; // Импортируем нашу Вики
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
           {/* Подключаем Базу знаний */}
           <Route path="knowledge" element={<KnowledgeBase />} />
           
-          <Route path="analytics" element={<Placeholder title="Аналитика" />} />
+          <Route path="analytics" element={<Analytics />} />
           <Route path="events" element={<Placeholder title="Работа на ивенте" />} />
         </Route>
       </Routes>
