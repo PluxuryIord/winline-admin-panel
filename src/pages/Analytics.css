@@ -169,22 +169,28 @@
   color: var(--color-white);
 }
 
-/* Маленькая подпись с пояснением формулы */
-.metric-subtext {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-/* Адаптация */
+/* === АДАПТАЦИЯ ДЛЯ МОБИЛОК === */
 @media (max-width: 768px) {
+  
+  .analytics-container {
+    margin-right: 0px; /* Твой фирменный отступ справа для островков */
+  }
+
   .analytics-controls {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: column; /* Ставим кнопки друг под друга */
+    align-items: stretch; /* Растягиваем кнопки на всю ширину */
   }
+
   .btn-control {
-    justify-content: center;
+    justify-content: center; /* Центрируем текст в кнопках */
   }
+
   .dropdown-menu {
-    width: 100%;
+    width: 100%; /* Выпадающее меню тоже на всю ширину */
+  }
+
+  .metrics-grid {
+    /* На узких экранах телефонов принудительно ставим карточки в 1 колонку */
+    grid-template-columns: 1fr; 
   }
 }
