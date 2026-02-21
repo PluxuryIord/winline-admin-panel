@@ -165,6 +165,8 @@
   overflow-y: auto;
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.6;
+  flex: 1;         /* ЗАСТАВЛЯЕМ БЛОК ЗАНЯТЬ ВСЮ ВЫСОТУ */
+  min-height: 0;   /* КРИТИЧЕСКИ ВАЖНО ДЛЯ СКРОЛЛА ВО FLEXBOX */
 }
 
 /* Фейковый редактор для презентации */
@@ -173,7 +175,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: 100%;
+  flex: 1;         /* ЗАСТАВЛЯЕМ БЛОК ЗАНЯТЬ ВСЮ ВЫСОТУ */
+  min-height: 0;   /* КРИТИЧЕСКИ ВАЖНО ДЛЯ СКРОЛЛА ВО FLEXBOX */
 }
 
 .editor-toolbar {
@@ -217,48 +220,57 @@
 
 /* === АДАПТАЦИЯ БАЗЫ ЗНАНИЙ ДЛЯ МОБИЛОК === */
 @media (max-width: 768px) {
+  .kb-container {
+    flex-direction: column; 
+    /* Жестко вычисляем высоту экрана: 100vh минус шапка (70px) и паддинги мобилки (16+16=32px) */
+    height: calc(100vh - 102px); 
+    gap: 16px;
+    margin-right: 15px; /* Твой отличный отступ */
+  }
 
   .html-content img {
     margin: 24px auto;
     border-radius: 12px;
   }
-  /* Чуть уменьшаем заголовки */
+  
   .html-content h3 {
     font-size: 1.3rem;
     margin-top: 32px;
   }
 
-  .kb-container {
-    flex-direction: column; /* Ставим колонки друг под друга */
-    height: auto; /* Убираем жесткую высоту */
-    gap: 16px;
-  }
-
-  /* Список тем теперь занимает 100% ширины и имеет ограничение по высоте, чтобы можно было скроллить */
+  /* Левая панель с темами */
   .kb-sidebar {
     width: 100%;
     max-height: 250px; 
     flex-shrink: 0;
   }
 
+  /* Правая панель с контентом */
   .kb-content {
     width: 100%;
-    /* Даем минимальную высоту контенту, чтобы редактор выглядел нормально */
-    min-height: 400px; 
+    flex: 1; /* Правая часть занимает всю оставшуюся высоту экрана */
+    min-height: 0; /* Обязательно для скролла */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .kb-content-header {
     padding: 16px;
-    flex-direction: column; /* Кнопку редактирования переносим под заголовок */
+    flex-direction: column; 
     gap: 12px;
   }
 
+  /* Сама статья на мобилке */
   .kb-article, .kb-editor {
     padding: 16px;
+    flex: 1; /* Статья растягивается внутри kb-content */
+    min-height: 0;
+    overflow-y: auto; /* Включаем внутренний скролл! */
   }
 
   .editor-toolbar {
-    flex-wrap: wrap; /* Если кнопок редактора много, они перенесутся на новую строку */
+    flex-wrap: wrap; 
   }
 }
 
