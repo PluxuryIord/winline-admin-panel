@@ -2,6 +2,7 @@
   display: flex;
   gap: 24px;
   height: calc(100vh - 134px); /* Высота экрана минус шапка и паддинги рабочего поля */
+  margin-right: 50px; /* <--- Добавили отступ справа */
 }
 
 /* ЛЕВАЯ КОЛОНКА: Дерево тем */
@@ -111,8 +112,8 @@
 .kb-content {
   flex: 1;
   background-color: var(--color-panel);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px; /* Вернули скругление всех 4 углов */
+  border: 1px solid rgba(255, 255, 255, 0.05); /* Вернули рамку */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -216,6 +217,17 @@
 
 /* === АДАПТАЦИЯ БАЗЫ ЗНАНИЙ ДЛЯ МОБИЛОК === */
 @media (max-width: 768px) {
+
+  .html-content img {
+    margin: 24px auto;
+    border-radius: 12px;
+  }
+  /* Чуть уменьшаем заголовки */
+  .html-content h3 {
+    font-size: 1.3rem;
+    margin-top: 32px;
+  }
+
   .kb-container {
     flex-direction: column; /* Ставим колонки друг под друга */
     height: auto; /* Убираем жесткую высоту */
@@ -248,4 +260,97 @@
   .editor-toolbar {
     flex-wrap: wrap; /* Если кнопок редактора много, они перенесутся на новую строку */
   }
+}
+
+
+
+/* === СТИЛИ ДЛЯ HTML КОНТЕНТА (ПРОФЕССИОНАЛЬНОЕ ОФОРМЛЕНИЕ) === */
+
+/* Общий контейнер для текста статьи */
+.html-content {
+  line-height: 1.8; 
+  font-size: 1rem; 
+  color: rgba(255, 255, 255, 0.9);
+  /* Строку max-width полностью убрали */
+}
+
+/* --- АБЗАЦЫ --- */
+.html-content p {
+  /* Большой отступ снизу между абзацами. Текст "дышит". */
+  margin-bottom: 24px; 
+}
+
+/* Выделенный жирный текст (например, термины) */
+.html-content strong {
+  /* Делаем его чисто белым, чтобы он выделялся на фоне основного текста */
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+/* Курсив (например, сноски) */
+.html-content em {
+  /* Делаем его чуть тусклее и меньше, как и положено сноскам */
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+}
+
+
+/* --- ЗАГОЛОВКИ ВНУТРИ СТАТЬИ (H3) --- */
+.html-content h3 {
+  /* Чисто белый цвет для иерархии */
+  color: #FFFFFF;
+  font-size: 1.5rem; /* Крупный размер */
+  font-weight: 700; /* Жирное начертание */
+  /* Огромный отступ сверху, чтобы визуально отделить новый раздел */
+  margin-top: 48px; 
+  margin-bottom: 20px;
+  /* Чуть-чуть сужаем расстояние между буквами для современного вида */
+  letter-spacing: -0.5px; 
+}
+/* Убираем отступ сверху у самого первого заголовка в статье */
+.html-content h3:first-child {
+  margin-top: 0;
+}
+
+
+/* --- СПИСКИ (UL, OL) --- */
+.html-content ul,
+.html-content ol {
+  /* Отступ слева для точек/цифр */
+  padding-left: 24px;
+  /* Отступ снизу после всего списка */
+  margin-bottom: 32px;
+}
+
+.html-content li {
+  /* Расстояние между пунктами списка */
+  margin-bottom: 12px;
+  /* Цвет пунктов чуть светлее основного текста для разнообразия */
+  color: rgba(255, 255, 255, 0.85);
+}
+/* Если внутри пункта списка есть жирный текст, делаем его белым */
+.html-content li strong {
+  color: #FFFFFF;
+}
+
+
+/* --- ИЗОБРАЖЕНИЯ (КРАСИВОЕ ОФОРМЛЕНИЕ) --- */
+.html-content img {
+  display: block;
+  /* Было auto по бокам. Теперь 0 — картинка прижата влево, ровно по тексту */
+  margin: 40px 0; 
+  max-width: 100%; 
+  height: auto; 
+  border-radius: 16px; 
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Эффект при наведении на картинку (необязательно, но стильно) */
+.html-content img:hover {
+  /* Чуть-чуть увеличиваем */
+  transform: scale(1.015);
+  /* Делаем тень еще глубже */
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
 }
