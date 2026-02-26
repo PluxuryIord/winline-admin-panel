@@ -173,24 +173,31 @@
 @media (max-width: 768px) {
   
   .analytics-container {
-    margin-right: 0px; /* Твой фирменный отступ справа для островков */
+    margin-right: 15px;
   }
 
   .analytics-controls {
-    flex-direction: column; /* Ставим кнопки друг под друга */
-    align-items: stretch; /* Растягиваем кнопки на всю ширину */
+    flex-direction: column; 
+    align-items: stretch; 
   }
 
+  /* ИСПРАВЛЕНИЕ: Растягиваем обертки кнопок и убиваем правый отступ у экспорта */
+  .control-wrapper {
+    width: 100%;
+    margin-left: 0 !important; 
+  }
+
+  /* ИСПРАВЛЕНИЕ: Заставляем сами кнопки занимать 100% ширины обертки */
   .btn-control {
-    justify-content: center; /* Центрируем текст в кнопках */
+    width: 100%;
+    justify-content: center; 
   }
 
   .dropdown-menu {
-    width: 100%; /* Выпадающее меню тоже на всю ширину */
+    width: 100%; 
   }
 
   .metrics-grid {
-    /* На узких экранах телефонов принудительно ставим карточки в 1 колонку */
     grid-template-columns: 1fr; 
   }
 }
