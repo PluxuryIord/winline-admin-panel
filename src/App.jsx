@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
-import Placeholder from './pages/Placeholder';
-import KnowledgeBase from './pages/KnowledgeBase';
-import Analytics from './pages/Analytics'; // Импортируем нашу Вики
+import Layout from "./components/Layout/Layout"; 
+import KnowledgeBase from "./pages/KnowledgeBase/KnowledgeBase";
+import Analytics from "./pages/Analytics/Analytics";
+import Placeholder from "./pages/Placeholder";
 
 function App() {
   return (
