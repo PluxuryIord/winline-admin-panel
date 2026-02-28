@@ -1,0 +1,322 @@
+.users-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* --- ВЕРХНЯЯ ПАНЕЛЬ С ФИЛЬТРАМИ И ПОИСКОМ --- */
+.users-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: var(--color-panel);
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.controls-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.search-input {
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-white);
+  padding: 10px 10px 10px 40px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-orange);
+}
+
+.filters-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-white);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.filter-select:focus {
+  border-color: var(--color-orange);
+}
+
+.filter-select option {
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
+/* --- ТАБЛИЦА --- */
+.table-wrapper {
+  background-color: var(--color-panel);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto; 
+  flex: 1;
+}
+
+.winline-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 1100px; /* Сделали еще шире, чтобы дать колонкам воздух */
+}
+
+/* Стили шапки */
+.winline-table thead {
+  background-color: rgba(0, 0, 0, 0.2); /* Выделили шапку легким затемнением */
+}
+
+.winline-table th {
+  padding: 20px 24px; /* Увеличили отступы (было 16) */
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.winline-table th:hover {
+  color: var(--color-white);
+}
+
+/* Стили ячеек */
+.winline-table td {
+  padding: 20px 24px; /* Увеличили отступы (было 16) */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+/* Эффект при наведении на строку */
+.winline-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.winline-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+  /* Легкое подсвечивание рамки снизу */
+  border-bottom-color: rgba(255, 126, 0, 0.2);
+}
+
+/* --- ОФОРМЛЕНИЕ ЯЧЕЙКИ ПОЛЬЗОВАТЕЛЯ (С АВАТАРКОЙ) --- */
+.col-name {
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* Отступ между аватаркой и текстом */
+}
+
+/* Круглая аватарка */
+.user-avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-orange);
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--color-white);
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+.user-tg {
+  color: rgba(255, 255, 255, 0.4); /* Сделали телеграм более тусклым, чтобы имя выделялось */
+  font-size: 0.85rem;
+  transition: color 0.2s;
+}
+
+/* Подсвечиваем TG при наведении на строку */
+.winline-table tbody tr:hover .user-tg {
+  color: var(--color-orange); 
+}
+
+/* Специфичные ячейки */
+.commission-cell {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-white);
+}
+
+.date-cell {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+/* Бейджи статусов */
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px; /* Более круглые края */
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px; /* Чтобы бейджи были одинакового размера */
+}
+
+.status-partner {
+  background-color: rgba(0, 255, 136, 0.1);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.status-guest {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Бейджи тегов */
+.tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-badge {
+  background-color: rgba(255, 126, 0, 0.1);
+  color: var(--color-orange);
+  border: 1px solid rgba(255, 126, 0, 0.2);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer; 
+  transition: all 0.2s;
+}
+
+.tag-badge:hover {
+  background-color: var(--color-orange);
+  color: var(--color-white);
+}
+
+/* Обработка Plus Size имен */
+.col-name {
+  min-width: 250px;
+  max-width: 300px;
+  line-height: 1.4;
+  word-wrap: break-word; /* Позволяем длинным словам переноситься */
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--color-white);
+  display: block;
+}
+
+.user-tg {
+  color: var(--color-orange);
+  font-size: 0.8rem;
+}
+
+/* Бейджи статусов */
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-partner {
+  background-color: rgba(0, 255, 136, 0.1);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.2);
+}
+
+.status-guest {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Бейджи тегов */
+.tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-badge {
+  background-color: rgba(255, 126, 0, 0.1);
+  color: var(--color-orange);
+  border: 1px solid rgba(255, 126, 0, 0.2);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer; /* Показываем, что кликабельно */
+  transition: all 0.2s;
+}
+
+.tag-badge:hover {
+  background-color: var(--color-orange);
+  color: var(--color-black);
+}
+
+/* Адаптация */
+@media (max-width: 768px) {
+  .users-container { margin-right: 15px; }
+  .controls-top-row { flex-direction: column; align-items: stretch; }
+  .search-box { width: 100%; }
+}
