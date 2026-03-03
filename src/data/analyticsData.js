@@ -1,5 +1,5 @@
 export   // Фейковые данные (в будущем прилетят с бэкенда)
-  const stats = {
+  const analyticsStats = {
     totalUsers: 15420,
     partners: 3855,
     guests: 11565,
