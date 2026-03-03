@@ -1,5 +1,5 @@
 // Наши фейковые данные. Здесь мы используем HTML-теги для форматирования.
-export const mockData = [
+export const knowledgeData = [
   {
     id: 1,
     title: 'Обзор личного кабинета',
