@@ -103,7 +103,7 @@
 }
 
 .winline-table th {
-  padding: 20px 24px; /* Увеличили отступы (было 16) */
+  padding: 14px 16px; 
   color: rgba(255, 255, 255, 0.4);
   font-weight: 600;
   font-size: 0.8rem;
@@ -111,7 +111,6 @@
   letter-spacing: 1px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  white-space: nowrap;
   transition: color 0.2s;
 }
 
@@ -121,7 +120,7 @@
 
 /* Стили ячеек */
 .winline-table td {
-  padding: 20px 24px; /* Увеличили отступы (было 16) */
+  padding: 14px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.85);
   font-size: 0.95rem;
@@ -141,8 +140,10 @@
 
 /* --- ОФОРМЛЕНИЕ ЯЧЕЙКИ ПОЛЬЗОВАТЕЛЯ (С АВАТАРКОЙ) --- */
 .col-name {
-  min-width: 200px;
-  max-width: 400px;
+  width: 30%; /* Отдаем имени примерно треть ширины таблицы */
+  line-height: 1.4;
+  word-wrap: break-word; 
+  /* min-width и max-width полностью удалили */
 }
 
 .user-cell {
@@ -206,13 +207,14 @@
 /* Бейджи статусов */
 .status-badge {
   padding: 6px 12px;
-  border-radius: 20px; /* Более круглые края */
+  border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 90px; /* Чтобы бейджи были одинакового размера */
+  /* Жестко центрируем текст внутри плашки */
+  display: inline-block; 
+  text-align: center;
+  min-width: 90px;
+  box-sizing: border-box; /* Чтобы padding не ломал ширину */
 }
 
 .status-partner {
@@ -228,10 +230,11 @@
 }
 
 /* Бейджи тегов */
-.tags-cell {
+.tags-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center; /* Выравниваем теги по центру по вертикали */
 }
 
 .tag-badge {

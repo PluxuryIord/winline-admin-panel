@@ -4,6 +4,7 @@ import {
   Users, UserCheck, UserPlus, MessageCircle, Ban, Share2, FileText, BarChart2
 } from 'lucide-react';
 import './Analytics.css';
+import { analyticsStats as stats } from '../../data/analyticsData';
 
 export default function Analytics() {
   // Состояния для выпадающих меню
@@ -31,17 +32,7 @@ export default function Analytics() {
     setIsExportOpen(false);
   };
 
-  // Фейковые данные (в будущем прилетят с бэкенда)
-  const stats = {
-    totalUsers: 15420,
-    partners: 3855,
-    guests: 11565,
-    blocked: 430,
-    requests: 89200, // Включает меню, чат, ТП, QR
-    newUsers: 1240,
-    channels: 18,
-    posts: 342
-  };
+
 
   // Расчет конверсии по твоей формуле (Все пользователи / Партнеры)
   const conversionRatio = (stats.totalUsers / stats.partners).toFixed(1); 

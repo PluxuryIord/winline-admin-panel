@@ -58,5 +58,29 @@ export const usersData = [
     registrationDate: '2025-11-30',
     commission: 85000,
     tags: ['VIP', 'SEO']
+  },
+  {
+    id: 6,
+    fullName: 'Смирнов Игорь Алексеевич',
+    telegram: '@katya_aff',
+    isPartner: true,
+    entityType: 'Физ. лицо',
+    country: 'Россия',
+    gender: 'Женский',
+    registrationDate: '2025-12-30',
+    commission: 85000,
+    tags: ['VIP']
+  },
+  {
+    id: 7,
+    fullName: 'Троцкий Лев Давидович',
+    telegram: '@katya_aff',
+    isPartner: true,
+    entityType: 'Физ. лицо',
+    country: 'Россия',
+    gender: 'Мужской',
+    registrationDate: '2025-10-30',
+    commission: 85000,
+    tags: ['Новичок', 'SEO']
   }
 ];

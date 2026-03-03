@@ -25,12 +25,11 @@ export default function Users() {
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...usersData];
 
-    // 1. Поиск (по ФИО или Telegram)
+		// 1. Поиск (по ФИО)
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(u => 
-        u.fullName.toLowerCase().includes(q) || 
-        u.telegram.toLowerCase().includes(q)
+        u.fullName.toLowerCase().includes(q)
       );
     }
 
@@ -88,7 +87,7 @@ export default function Users() {
             <input 
               type="text" 
               className="search-input" 
-              placeholder="Поиск по ФИО или Telegram..." 
+              placeholder="Поиск по ФИО..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -143,15 +142,13 @@ export default function Users() {
               <tr key={user.id}>
                 <td style={{ color: 'rgba(255,255,255,0.4)' }}>#{user.id}</td>
                 
-                {/* НОВАЯ КРАСИВАЯ ЯЧЕЙКА С АВАТАРКОЙ */}
                 <td className="col-name">
                   <div className="user-cell">
                     <div className="user-avatar">
-                      {user.fullName.charAt(0)} {/* Берем первую букву имени */}
+                      {user.fullName.charAt(0)}
                     </div>
                     <div className="user-details">
                       <span className="user-name">{user.fullName}</span>
-                      <span className="user-tg">{user.telegram}</span>
                     </div>
                   </div>
                 </td>
@@ -172,16 +169,19 @@ export default function Users() {
                   {user.commission.toLocaleString('ru-RU')} ₽
                 </td>
                 
-                <td className="tags-cell">
-                  {user.tags.map(tag => (
-                    <span 
-                      key={tag} 
-                      className="tag-badge"
-                      onClick={() => handleTagClick(tag)}
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                {/* Убрали класс с td и добавили div.tags-wrapper внутрь */}
+                <td>
+                  <div className="tags-wrapper">
+                    {user.tags.map(tag => (
+                      <span 
+                        key={tag} 
+                        className="tag-badge"
+                        onClick={() => handleTagClick(tag)}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ))}
