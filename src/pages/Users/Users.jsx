@@ -134,7 +134,7 @@ export default function Users() {
               <th onClick={() => handleSort('commission')} style={{ cursor: 'pointer' }}>
                 Комиссия <ArrowUpDown size={12} style={{ marginLeft: 4 }}/>
               </th>
-              <th>Теги (кликните)</th>
+              <th>Теги</th>
             </tr>
           </thead>
 					<tbody>
@@ -159,7 +159,7 @@ export default function Users() {
                   </span>
                 </td>
                 
-                <td style={{ color: 'rgba(255,255,255,0.7)' }}>{user.entityType}</td>
+                <td className="entity-cell">{user.entityType}</td>
                 
                 <td className="date-cell">
                   {new Date(user.registrationDate).toLocaleDateString('ru-RU')}
