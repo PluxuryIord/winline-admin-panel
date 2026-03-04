@@ -206,16 +206,84 @@
   color: var(--color-white);
 }
 
-.editor-textarea {
+/* contentEditable редактор */
+.editor-contenteditable {
   flex: 1;
-  background-color: transparent;
-  border: none;
-  color: var(--color-white);
-  font-family: inherit;
-  font-size: 1rem;
-  line-height: 1.6;
-  resize: none;
+  min-height: 0;
+  overflow-y: auto;
   outline: none;
+  cursor: text;
+  padding: 0;
+}
+
+.editor-contenteditable a {
+  color: var(--color-orange);
+  text-decoration: underline;
+}
+
+/* Разделитель тулбара */
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 8px;
+  align-self: center;
+}
+
+/* Кнопки удаления и добавления подтем (видны по ховеру) */
+.delete-btn,
+.add-sub-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kb-topic-item:hover .delete-btn,
+.kb-topic-item:hover .add-sub-btn,
+.kb-subtopic-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  color: #ff4444;
+}
+
+.add-sub-btn:hover {
+  color: var(--color-orange);
+}
+
+/* Кнопка «Сохранить» */
+.kb-save-btn {
+  background-color: #00ff88;
+  color: #000;
+}
+
+/* Пустое состояние */
+.kb-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.1rem;
+}
+
+/* Спиннер загрузки */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 

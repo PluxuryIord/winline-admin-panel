@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Download, ArrowUpDown } from 'lucide-react';
+import { Search, Download, MessageSquare, ArrowUpDown } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './Users.css';
 
@@ -8,6 +8,8 @@ export default function Users() {
   
   // Состояния фильтров
   const [filterPartner, setFilterPartner] = useState('all'); // all, partner, guest
+  const [filterCountry, setFilterCountry] = useState('all');
+  const [filterGender, setFilterGender] = useState('all');
   const [filterEntity, setFilterEntity] = useState('all'); // all, phys, legal
   const [filterTag, setFilterTag] = useState('all');
   
@@ -19,6 +21,20 @@ export default function Users() {
     const tags = new Set();
     usersData.forEach(user => user.tags.forEach(t => tags.add(t)));
     return Array.from(tags);
+  }, []);
+
+  // Все уникальные страны
+  const allCountries = useMemo(() => {
+    const countries = new Set();
+    usersData.forEach(user => { if (user.country) countries.add(user.country); });
+    return Array.from(countries).sort();
+  }, []);
+
+  // Все уникальные значения пола
+  const allGenders = useMemo(() => {
+    const genders = new Set();
+    usersData.forEach(user => { if (user.gender && user.gender !== '-') genders.add(user.gender); });
+    return Array.from(genders);
   }, []);
 
   // Функция применения фильтров и сортировки
@@ -38,6 +54,12 @@ export default function Users() {
       const isPartner = filterPartner === 'partner';
       result = result.filter(u => u.isPartner === isPartner);
     }
+    if (filterCountry !== 'all') {
+      result = result.filter(u => u.country === filterCountry);
+    }
+    if (filterGender !== 'all') {
+      result = result.filter(u => u.gender === filterGender);
+    }
     if (filterEntity !== 'all') {
       const entity = filterEntity === 'phys' ? 'Физ. лицо' : 'Юр. лицо';
       result = result.filter(u => u.entityType === entity);
@@ -56,7 +78,7 @@ export default function Users() {
     }
 
     return result;
-  }, [search, filterPartner, filterEntity, filterTag, sortConfig]);
+  }, [search, filterPartner, filterCountry, filterGender, filterEntity, filterTag, sortConfig]);
 
   // Смена сортировки при клике на заголовок колонки
   const handleSort = (key) => {
@@ -67,9 +89,9 @@ export default function Users() {
     setSortConfig({ key, direction });
   };
 
-  // Клик по тегу прямо в таблице (быстрая фильтрация)
+  // Клик по тегу прямо в таблице (быстрая фильтрация / снятие)
   const handleTagClick = (tag) => {
-    setFilterTag(tag);
+    setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
   const handleExport = () => {
@@ -104,6 +126,20 @@ export default function Users() {
             <option value="guest">Гость</option>
           </select>
 
+          <select className="filter-select" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
+            <option value="all">Все страны</option>
+            {allCountries.map(country => (
+              <option key={country} value={country}>{country}</option>
+            ))}
+          </select>
+
+          <select className="filter-select" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+            <option value="all">Любой пол</option>
+            {allGenders.map(gender => (
+              <option key={gender} value={gender}>{gender}</option>
+            ))}
+          </select>
+
           <select className="filter-select" value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)}>
             <option value="all">Все лица</option>
             <option value="phys">Физ. лицо</option>
@@ -116,6 +152,24 @@ export default function Users() {
               <option key={tag} value={tag}>{tag}</option>
             ))}
           </select>
+
+          <button
+            className={`btn-sort${sortConfig.key === 'registrationDate' ? ' btn-sort-active' : ''}`}
+            onClick={() => handleSort('registrationDate')}
+          >
+            <ArrowUpDown size={14} />
+            Дата регистрации
+            {sortConfig.key === 'registrationDate' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+          </button>
+
+          <button
+            className={`btn-sort${sortConfig.key === 'commission' ? ' btn-sort-active' : ''}`}
+            onClick={() => handleSort('commission')}
+          >
+            <ArrowUpDown size={14} />
+            Комиссия
+            {sortConfig.key === 'commission' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+          </button>
         </div>
       </div>
 
@@ -124,58 +178,29 @@ export default function Users() {
         <table className="winline-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th className="col-name">Пользователь</th>
-              <th>Статус</th>
-              <th>Тип лица</th>
-              <th onClick={() => handleSort('registrationDate')} style={{ cursor: 'pointer' }}>
-                Дата регистрации <ArrowUpDown size={12} style={{ marginLeft: 4 }}/>
-              </th>
-              <th onClick={() => handleSort('commission')} style={{ cursor: 'pointer' }}>
-                Комиссия <ArrowUpDown size={12} style={{ marginLeft: 4 }}/>
-              </th>
-              <th>Теги (кликните)</th>
+              <th></th>
+              <th></th>
+              <th></th>
             </tr>
           </thead>
-					<tbody>
+          <tbody>
             {filteredAndSortedUsers.map(user => (
               <tr key={user.id}>
-                <td style={{ color: 'rgba(255,255,255,0.4)' }}>#{user.id}</td>
-                
-                <td className="col-name">
+                <td>
                   <div className="user-cell">
                     <div className="user-avatar">
                       {user.fullName.charAt(0)}
                     </div>
-                    <div className="user-details">
-                      <span className="user-name">{user.fullName}</span>
-                    </div>
+                    <span className="user-name">{user.fullName}</span>
                   </div>
                 </td>
 
                 <td>
-                  <span className={`status-badge ${user.isPartner ? 'status-partner' : 'status-guest'}`}>
-                    {user.isPartner ? 'Партнёр' : 'Гость'}
-                  </span>
-                </td>
-                
-                <td style={{ color: 'rgba(255,255,255,0.7)' }}>{user.entityType}</td>
-                
-                <td className="date-cell">
-                  {new Date(user.registrationDate).toLocaleDateString('ru-RU')}
-                </td>
-                
-                <td className="commission-cell">
-                  {user.commission.toLocaleString('ru-RU')} ₽
-                </td>
-                
-                {/* Убрали класс с td и добавили div.tags-wrapper внутрь */}
-                <td>
                   <div className="tags-wrapper">
                     {user.tags.map(tag => (
-                      <span 
-                        key={tag} 
-                        className="tag-badge"
+                      <span
+                        key={tag}
+                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}`}
                         onClick={() => handleTagClick(tag)}
                       >
                         {tag}
@@ -183,11 +208,18 @@ export default function Users() {
                     ))}
                   </div>
                 </td>
+
+                <td>
+                  <button className="btn-chat" onClick={() => alert(`Чат с ${user.fullName}`)}>
+                    <MessageSquare size={16} />
+                    Чат
+                  </button>
+                </td>
               </tr>
             ))}
             {filteredAndSortedUsers.length === 0 && (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+                <td colSpan="3" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
                   Пользователи не найдены
                 </td>
               </tr>
