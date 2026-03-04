@@ -21,11 +21,13 @@ export default function UserProfile() {
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [showEditDropdown, setShowEditDropdown] = useState(false);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState(user?.fullName || '');
 
   const tagDropdownRef = useRef(null);
   const editDropdownRef = useRef(null);
+  const exportDropdownRef = useRef(null);
 
   const allTags = useMemo(() => {
     const tagSet = new Set();
@@ -41,6 +43,9 @@ export default function UserProfile() {
       }
       if (editDropdownRef.current && !editDropdownRef.current.contains(e.target)) {
         setShowEditDropdown(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
+        setShowExportDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -107,6 +112,35 @@ export default function UserProfile() {
   const handleBanUser = () => {
     alert(`Пользователь ${fullName} заблокирован в боте (заглушка)`);
     setShowEditDropdown(false);
+  };
+
+  // --- Export ---
+  const exportTXT = () => {
+    const lines = [
+      `Пользователь: ${fullName}`,
+      `Telegram: ${user.telegram}`,
+      `Статус: ${user.isPartner ? 'Партнёр' : 'Гость'}`,
+      `Тип лица: ${user.entityType}`,
+      `Страна: ${user.country}`,
+      `Пол: ${user.gender}`,
+      `Дата регистрации: ${user.registrationDate}`,
+      `Комиссия: ${user.commission.toLocaleString('ru-RU')} ₽`,
+      `Теги: ${tags.join(', ') || '—'}`,
+      `Комментарий: ${comment || '—'}`,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fullName}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
+
+  const exportPDF = () => {
+    window.print();
+    setShowExportDropdown(false);
   };
 
   return (
@@ -265,9 +299,24 @@ export default function UserProfile() {
           <MessageSquare size={16} /> Чат
         </button>
 
-        <button className="profile-action-btn" onClick={() => alert('Экспорт карточки (заглушка)')}>
-          <Download size={16} /> Экспорт карточки
-        </button>
+        <div className="profile-action-wrapper" ref={exportDropdownRef}>
+          <button
+            className="profile-action-btn"
+            onClick={() => setShowExportDropdown(!showExportDropdown)}
+          >
+            <Download size={16} /> Экспорт карточки <ChevronDown size={14} />
+          </button>
+          {showExportDropdown && (
+            <div className="profile-action-dropdown">
+              <div className="profile-action-dropdown-item" onClick={exportTXT}>
+                <Download size={14} /> Скачать TXT
+              </div>
+              <div className="profile-action-dropdown-item" onClick={exportPDF}>
+                <Download size={14} /> Печать / PDF
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
