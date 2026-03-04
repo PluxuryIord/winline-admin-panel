@@ -1,94 +1,115 @@
-import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, 'data', 'knowledge.db');
+const dataPath = path.join(__dirname, 'data', 'knowledge.json');
 
-const db = new Database(dbPath);
+function readData() {
+  const raw = fs.readFileSync(dataPath, 'utf-8');
+  return JSON.parse(raw);
+}
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+function writeData(data) {
+  fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf-8');
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS articles (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    parent_id  INTEGER DEFAULT NULL,
-    title      TEXT NOT NULL,
-    content    TEXT NOT NULL DEFAULT '',
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (parent_id) REFERENCES articles(id) ON DELETE CASCADE
-  )
-`);
+function nextId(data) {
+  let max = 0;
+  for (const topic of data) {
+    if (topic.id > max) max = topic.id;
+    if (topic.subtopics) {
+      for (const sub of topic.subtopics) {
+        if (sub.id > max) max = sub.id;
+      }
+    }
+  }
+  return max + 1;
+}
 
 export function getAllNested() {
-  const topics = db.prepare(
-    'SELECT * FROM articles WHERE parent_id IS NULL ORDER BY sort_order, id'
-  ).all();
-
-  const subtopics = db.prepare(
-    'SELECT * FROM articles WHERE parent_id IS NOT NULL ORDER BY sort_order, id'
-  ).all();
-
-  const grouped = {};
-  for (const sub of subtopics) {
-    if (!grouped[sub.parent_id]) grouped[sub.parent_id] = [];
-    grouped[sub.parent_id].push(sub);
-  }
-
-  return topics.map(topic => ({
-    ...topic,
-    subtopics: grouped[topic.id] || []
-  }));
+  return readData();
 }
 
 export function getById(id) {
-  return db.prepare('SELECT * FROM articles WHERE id = ?').get(id);
+  const data = readData();
+  for (const topic of data) {
+    if (topic.id === id) return topic;
+    if (topic.subtopics) {
+      const sub = topic.subtopics.find(s => s.id === id);
+      if (sub) return sub;
+    }
+  }
+  return null;
 }
 
 export function create({ title, content = '', parent_id = null }) {
-  const maxOrder = db.prepare(
-    'SELECT COALESCE(MAX(sort_order), -1) as max_order FROM articles WHERE parent_id IS ?'
-  ).get(parent_id);
+  const data = readData();
+  const id = nextId(data);
+  const now = new Date().toISOString();
 
-  const result = db.prepare(
-    'INSERT INTO articles (parent_id, title, content, sort_order) VALUES (?, ?, ?, ?)'
-  ).run(parent_id, title, content, (maxOrder?.max_order ?? -1) + 1);
-
-  return getById(result.lastInsertRowid);
+  if (parent_id) {
+    const parent = data.find(t => t.id === parent_id);
+    if (!parent) throw new Error('Parent not found');
+    const newSub = { id, parent_id, title, content, created_at: now, updated_at: now };
+    if (!parent.subtopics) parent.subtopics = [];
+    parent.subtopics.push(newSub);
+    writeData(data);
+    return newSub;
+  } else {
+    const newTopic = { id, title, content, subtopics: [], created_at: now, updated_at: now };
+    data.push(newTopic);
+    writeData(data);
+    return newTopic;
+  }
 }
 
 export function update(id, { title, content }) {
-  const fields = [];
-  const values = [];
+  const data = readData();
+  const now = new Date().toISOString();
 
-  if (title !== undefined) { fields.push('title = ?'); values.push(title); }
-  if (content !== undefined) { fields.push('content = ?'); values.push(content); }
-
-  if (fields.length === 0) return getById(id);
-
-  fields.push("updated_at = datetime('now')");
-  values.push(id);
-
-  db.prepare(`UPDATE articles SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getById(id);
+  for (const topic of data) {
+    if (topic.id === id) {
+      if (title !== undefined) topic.title = title;
+      if (content !== undefined) topic.content = content;
+      topic.updated_at = now;
+      writeData(data);
+      return topic;
+    }
+    if (topic.subtopics) {
+      const sub = topic.subtopics.find(s => s.id === id);
+      if (sub) {
+        if (title !== undefined) sub.title = title;
+        if (content !== undefined) sub.content = content;
+        sub.updated_at = now;
+        writeData(data);
+        return sub;
+      }
+    }
+  }
+  return null;
 }
 
 export function remove(id) {
-  db.prepare('DELETE FROM articles WHERE id = ?').run(id);
-}
+  const data = readData();
 
-export function isEmpty() {
-  const row = db.prepare('SELECT COUNT(*) as count FROM articles').get();
-  return row.count === 0;
-}
+  // Check if it's a topic
+  const topicIdx = data.findIndex(t => t.id === id);
+  if (topicIdx !== -1) {
+    data.splice(topicIdx, 1);
+    writeData(data);
+    return;
+  }
 
-export function insertWithId({ id, parent_id, title, content, sort_order }) {
-  db.prepare(
-    'INSERT INTO articles (id, parent_id, title, content, sort_order) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, parent_id, title, content, sort_order);
+  // Check subtopics
+  for (const topic of data) {
+    if (topic.subtopics) {
+      const subIdx = topic.subtopics.findIndex(s => s.id === id);
+      if (subIdx !== -1) {
+        topic.subtopics.splice(subIdx, 1);
+        writeData(data);
+        return;
+      }
+    }
+  }
 }
-
-export default db;

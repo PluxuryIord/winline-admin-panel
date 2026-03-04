@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 server/data/knowledge.db
+server/data/knowledge.db-shm
+server/data/knowledge.db-wal
 dist-ssr
 *.local
 
