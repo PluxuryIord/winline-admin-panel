@@ -276,6 +276,99 @@
   font-size: 1.1rem;
 }
 
+/* Тулбар: активная кнопка */
+.toolbar-btn.toolbar-btn-active {
+  background-color: rgba(255, 126, 0, 0.2);
+  color: var(--color-orange);
+}
+
+/* === ТЁМНЫЙ МОДАЛ (замена prompt) === */
+.prompt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.prompt-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 28px;
+  width: 400px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prompt-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-white);
+}
+
+.prompt-input {
+  background: var(--color-black);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  color: var(--color-white);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.prompt-input:focus {
+  border-color: var(--color-orange);
+}
+
+.prompt-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.prompt-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+}
+
+.prompt-btn:hover { opacity: 0.85; }
+
+.prompt-btn-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.prompt-btn-ok {
+  background: var(--color-orange);
+  color: var(--color-white);
+}
+
+.prompt-btn-ok:disabled,
+.prompt-btn-danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.prompt-btn-danger {
+  background: #ff4444;
+  color: var(--color-white);
+}
+
 /* Спиннер загрузки */
 .spin {
   animation: spin 1s linear infinite;

@@ -5,6 +5,7 @@ import {
   ChevronRight, ChevronDown, Loader
 } from 'lucide-react';
 import WysiwygEditor from './WysiwygEditor';
+import PromptModal from './PromptModal';
 import './KnowledgeBase.css';
 
 export default function KnowledgeBase() {
@@ -14,6 +15,7 @@ export default function KnowledgeBase() {
   const [activeItem, setActiveItem] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [modal, setModal] = useState(null);
 
   // Загрузка данных из API
   useEffect(() => {
@@ -75,64 +77,77 @@ export default function KnowledgeBase() {
     setIsEditing(false);
   };
 
-  const handleAddTopic = async () => {
-    const title = prompt('Название новой темы:');
-    if (!title?.trim()) return;
-
-    const res = await fetch('/api/knowledge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), content: '' })
+  const handleAddTopic = () => {
+    setModal({
+      title: 'Название новой темы',
+      placeholder: 'Введите название...',
+      onConfirm: async (title) => {
+        setModal(null);
+        const res = await fetch('/api/knowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, content: '' })
+        });
+        const newTopic = await res.json();
+        const topicWithSubs = { ...newTopic, subtopics: [] };
+        setTopics(prev => [...prev, topicWithSubs]);
+        setActiveItem({ type: 'topic', id: newTopic.id, data: topicWithSubs });
+      }
     });
-    const newTopic = await res.json();
-    const topicWithSubs = { ...newTopic, subtopics: [] };
-    setTopics(prev => [...prev, topicWithSubs]);
-    setActiveItem({ type: 'topic', id: newTopic.id, data: topicWithSubs });
   };
 
-  const handleAddSubtopic = async (e, parentId) => {
+  const handleAddSubtopic = (e, parentId) => {
     e.stopPropagation();
-    const title = prompt('Название подтемы:');
-    if (!title?.trim()) return;
-
-    const res = await fetch('/api/knowledge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), content: '', parent_id: parentId })
+    setModal({
+      title: 'Название подтемы',
+      placeholder: 'Введите название...',
+      onConfirm: async (title) => {
+        setModal(null);
+        const res = await fetch('/api/knowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, content: '', parent_id: parentId })
+        });
+        const newSub = await res.json();
+        setTopics(prev => prev.map(t =>
+          t.id === parentId ? { ...t, subtopics: [...t.subtopics, newSub] } : t
+        ));
+        if (!expandedFolders.includes(parentId)) {
+          setExpandedFolders(prev => [...prev, parentId]);
+        }
+      }
     });
-    const newSub = await res.json();
-    setTopics(prev => prev.map(t =>
-      t.id === parentId ? { ...t, subtopics: [...t.subtopics, newSub] } : t
-    ));
-    if (!expandedFolders.includes(parentId)) {
-      setExpandedFolders(prev => [...prev, parentId]);
-    }
   };
 
-  const handleDelete = async (e, id, type, parentId) => {
+  const handleDelete = (e, id, type, parentId) => {
     e.stopPropagation();
     const label = type === 'topic' ? 'тему и все подтемы' : 'подтему';
-    if (!confirm(`Удалить ${label}?`)) return;
+    setModal({
+      title: `Удалить ${label}?`,
+      placeholder: null,
+      onConfirm: async () => {
+        setModal(null);
+        await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
 
-    await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
-
-    if (type === 'topic') {
-      const updated = topics.filter(t => t.id !== id);
-      setTopics(updated);
-      if (activeItem?.id === id) {
-        setActiveItem(updated.length > 0 ? { type: 'topic', id: updated[0].id, data: updated[0] } : null);
+        if (type === 'topic') {
+          const updated = topics.filter(t => t.id !== id);
+          setTopics(updated);
+          if (activeItem?.id === id) {
+            setActiveItem(updated.length > 0 ? { type: 'topic', id: updated[0].id, data: updated[0] } : null);
+          }
+        } else {
+          setTopics(prev => prev.map(t => ({
+            ...t,
+            subtopics: t.subtopics.filter(s => s.id !== id)
+          })));
+          if (activeItem?.id === id) {
+            const parent = topics.find(t => t.id === parentId);
+            if (parent) setActiveItem({ type: 'topic', id: parent.id, data: parent });
+          }
+        }
+        setIsEditing(false);
       }
-    } else {
-      setTopics(prev => prev.map(t => ({
-        ...t,
-        subtopics: t.subtopics.filter(s => s.id !== id)
-      })));
-      if (activeItem?.id === id) {
-        const parent = topics.find(t => t.id === parentId);
-        if (parent) setActiveItem({ type: 'topic', id: parent.id, data: parent });
-      }
-    }
-    setIsEditing(false);
+    });
   };
 
   if (loading) {
@@ -248,6 +263,15 @@ export default function KnowledgeBase() {
         )}
       </div>
 
+      {modal && (
+        <PromptModal
+          title={modal.title}
+          placeholder={modal.placeholder}
+          isConfirm={!modal.placeholder}
+          onConfirm={modal.onConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

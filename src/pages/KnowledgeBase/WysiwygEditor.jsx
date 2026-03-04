@@ -1,27 +1,42 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import DOMPurify from 'dompurify';
 import {
   Bold, Italic, AlignLeft, List, ListOrdered,
   Link as LinkIcon, Image as ImageIcon, Heading3
 } from 'lucide-react';
+import PromptModal from './PromptModal';
 
 export default function WysiwygEditor({ initialContent, onContentChange }) {
   const editorRef = useRef(null);
   const onChangeRef = useRef(onContentChange);
+  const [activeFormats, setActiveFormats] = useState({});
+  const [modal, setModal] = useState(null);
 
-  // Держим актуальную ссылку на колбэк (без пересоздания функций)
   useEffect(() => {
     onChangeRef.current = onContentChange;
   }, [onContentChange]);
 
-  // Устанавливаем начальный контент ОДИН раз при монтировании через ref
-  // (вместо dangerouslySetInnerHTML, который конфликтует с contentEditable)
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.innerHTML = DOMPurify.sanitize(initialContent || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // только при монтировании
+  }, []);
+
+  // Отслеживаем активные форматы при изменении выделения
+  useEffect(() => {
+    const checkFormats = () => {
+      setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+        insertOrderedList: document.queryCommandState('insertOrderedList'),
+      });
+    };
+
+    document.addEventListener('selectionchange', checkFormats);
+    return () => document.removeEventListener('selectionchange', checkFormats);
+  }, []);
 
   const fireChange = useCallback(() => {
     onChangeRef.current?.(editorRef.current?.innerHTML);
@@ -31,16 +46,33 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
     fireChange();
+    // Обновляем активные форматы после команды
+    setActiveFormats(prev => ({
+      ...prev,
+      [command]: document.queryCommandState(command),
+    }));
   }, [fireChange]);
 
   const handleLink = () => {
-    const url = prompt('Введите URL:');
-    if (url) execCmd('createLink', url);
+    setModal({
+      title: 'Вставить ссылку',
+      placeholder: 'https://example.com',
+      onConfirm: (url) => {
+        setModal(null);
+        execCmd('createLink', url);
+      }
+    });
   };
 
   const handleImage = () => {
-    const url = prompt('Введите URL изображения:');
-    if (url) execCmd('insertImage', url);
+    setModal({
+      title: 'Вставить изображение',
+      placeholder: 'https://example.com/image.png',
+      onConfirm: (url) => {
+        setModal(null);
+        execCmd('insertImage', url);
+      }
+    });
   };
 
   const handleHeading = () => {
@@ -64,13 +96,15 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     fireChange();
   };
 
+  const btnClass = (cmd) => `toolbar-btn${activeFormats[cmd] ? ' toolbar-btn-active' : ''}`;
+
   return (
     <div className="kb-editor">
       <div className="editor-toolbar">
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('bold')} title="Жирный">
+        <button className={btnClass('bold')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('bold')} title="Жирный">
           <Bold size={16} />
         </button>
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('italic')} title="Курсив">
+        <button className={btnClass('italic')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('italic')} title="Курсив">
           <Italic size={16} />
         </button>
         <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={handleHeading} title="Заголовок">
@@ -80,10 +114,10 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
           <AlignLeft size={16} />
         </button>
         <div className="toolbar-divider" />
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertUnorderedList')} title="Маркированный список">
+        <button className={btnClass('insertUnorderedList')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertUnorderedList')} title="Маркированный список">
           <List size={16} />
         </button>
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertOrderedList')} title="Нумерованный список">
+        <button className={btnClass('insertOrderedList')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertOrderedList')} title="Нумерованный список">
           <ListOrdered size={16} />
         </button>
         <div className="toolbar-divider" />
@@ -102,6 +136,14 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
         onInput={fireChange}
         onPaste={handlePaste}
       />
+      {modal && (
+        <PromptModal
+          title={modal.title}
+          placeholder={modal.placeholder}
+          onConfirm={modal.onConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
