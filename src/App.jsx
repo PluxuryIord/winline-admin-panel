@@ -6,6 +6,8 @@ import Analytics from './pages/Analytics/Analytics.jsx';
 import Placeholder from './pages/Placeholder.jsx';
 import Users from './pages/Users/Users.jsx';
 import UserProfile from './pages/Users/UserProfile.jsx';
+import Chats from './pages/Chats/Chats.jsx';
+import ChatView from './pages/Chats/ChatView.jsx';
 
 function App() {
   return (
@@ -16,7 +18,8 @@ function App() {
 
           <Route path="users" element={<Users />} />
           <Route path="users/:id" element={<UserProfile />} />
-          <Route path="chats" element={<Placeholder title="Чаты" />} />
+          <Route path="chats" element={<Chats />} />
+          <Route path="chats/:id" element={<ChatView />} />
           <Route path="mailings" element={<Placeholder title="Рассылки и контент" />} />
           <Route path="scenarios" element={<Placeholder title="Сценарии" />} />
           
