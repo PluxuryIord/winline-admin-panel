@@ -198,7 +198,7 @@ export default function ChatView() {
             <textarea
               ref={inputRef}
               className="chatview-input"
-              placeholder="Написать сообщение... (Enter — отправить, Shift+Enter — перенос)"
+              placeholder="Написать сообщение..."
               value={input}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
