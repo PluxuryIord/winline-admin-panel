@@ -114,6 +114,17 @@ export default function UserProfile() {
     setShowEditDropdown(false);
   };
 
+  // --- Открыть чат ---
+  const handleOpenChat = async () => {
+    try {
+      const res = await fetch(`/api/chats/by-user/${user.id}`);
+      const chat = await res.json();
+      navigate(`/chats/${chat.id}`);
+    } catch {
+      navigate('/chats');
+    }
+  };
+
   // --- Export ---
   const exportTXT = () => {
     const lines = [
@@ -295,7 +306,7 @@ export default function UserProfile() {
           )}
         </div>
 
-        <button className="profile-action-btn" onClick={() => alert('Чат (заглушка)')}>
+        <button className="profile-action-btn" onClick={handleOpenChat}>
           <MessageSquare size={16} /> Чат
         </button>
 
@@ -312,7 +323,7 @@ export default function UserProfile() {
                 <Download size={14} /> Скачать TXT
               </div>
               <div className="profile-action-dropdown-item" onClick={exportPDF}>
-                <Download size={14} /> Печать / PDF
+                <Download size={14} /> Сохранить PDF
               </div>
             </div>
           )}

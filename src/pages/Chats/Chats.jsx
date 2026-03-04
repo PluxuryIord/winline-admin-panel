@@ -37,7 +37,6 @@ export default function Chats() {
   return (
     <div className="chats-container">
       <div className="chats-header">
-        <h2 className="chats-title">Последние чаты</h2>
         <div className="chats-view-toggle">
           <button
             className={`chats-view-btn${viewMode === 'list' ? ' active' : ''}`}

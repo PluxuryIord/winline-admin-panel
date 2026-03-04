@@ -1,21 +1,36 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './Users.css';
 
 export default function Users() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  
+
   // Состояния фильтров
   const [filterPartner, setFilterPartner] = useState('all'); // all, partner, guest
   const [filterCountry, setFilterCountry] = useState('all');
   const [filterGender, setFilterGender] = useState('all');
   const [filterEntity, setFilterEntity] = useState('all'); // all, phys, legal
   const [filterTag, setFilterTag] = useState('all');
-  
+
   // Состояние сортировки (ключ и направление)
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
+
+  // Export dropdown
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (exportRef.current && !exportRef.current.contains(e.target)) {
+        setShowExportDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Все уникальные теги для выпадающего списка
   const allTags = useMemo(() => {
@@ -45,7 +60,7 @@ export default function Users() {
 		// 1. Поиск (по ФИО)
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(u => 
+      result = result.filter(u =>
         u.fullName.toLowerCase().includes(q)
       );
     }
@@ -107,29 +122,82 @@ export default function Users() {
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
 
-  const handleExport = () => {
-    alert('Экспорт отфильтрованной таблицы в Excel запущен...');
+  // Кнопка Чат — найти или создать чат для пользователя
+  const handleOpenChat = async (userId) => {
+    try {
+      const res = await fetch(`/api/chats/by-user/${userId}`);
+      const chat = await res.json();
+      navigate(`/chats/${chat.id}`);
+    } catch {
+      navigate('/chats');
+    }
+  };
+
+  // Экспорт CSV
+  const exportCSV = (users) => {
+    const BOM = '\uFEFF';
+    const headers = ['ФИО', 'Telegram', 'Статус', 'Тип лица', 'Страна', 'Пол', 'Дата регистрации', 'Комиссия (₽)', 'Теги'];
+    const rows = users.map(u => [
+      u.fullName,
+      u.telegram,
+      u.isPartner ? 'Партнёр' : 'Гость',
+      u.entityType,
+      u.country,
+      u.gender,
+      u.registrationDate,
+      u.commission,
+      u.tags.join('; ')
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'users.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
+
+  const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
+
+  const handleExportGoogle = () => {
+    exportCSV(filteredAndSortedUsers);
+    // CSV открывается и в Google Sheets через Файл → Импорт
+    setShowExportDropdown(false);
   };
 
   return (
     <div className="users-container">
-      
+
       {/* ПАНЕЛЬ УПРАВЛЕНИЯ */}
       <div className="users-controls">
         <div className="controls-top-row">
           <div className="search-box">
             <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              className="search-input" 
-              placeholder="Поиск по ФИО..." 
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Поиск по ФИО..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button className="btn-control primary" onClick={handleExport}>
-            <Download size={18} /> Экспорт
-          </button>
+          <div className="export-wrapper" ref={exportRef}>
+            <button className="btn-control primary" onClick={() => setShowExportDropdown(!showExportDropdown)}>
+              <Download size={18} /> Экспорт <ChevronDown size={14} />
+            </button>
+            {showExportDropdown && (
+              <div className="export-dropdown">
+                <div className="export-dropdown-item" onClick={handleExportExcel}>
+                  <Download size={14} /> Excel (CSV)
+                </div>
+                <div className="export-dropdown-item" onClick={handleExportGoogle}>
+                  <Download size={14} /> Google Таблицы (CSV)
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="filters-row">
@@ -232,7 +300,7 @@ export default function Users() {
                 </td>
 
                 <td>
-                  <button className="btn-chat" onClick={() => alert(`Чат с ${user.fullName}`)}>
+                  <button className="btn-chat" onClick={() => handleOpenChat(user.id)}>
                     <MessageSquare size={16} />
                     Чат
                   </button>

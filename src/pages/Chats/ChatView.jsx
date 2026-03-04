@@ -148,16 +148,15 @@ export default function ChatView() {
         <div className="chatview-sidebar">
           {user ? (
             <>
-              <Link to={`/users/${user.id}`} className="chatview-user-link">
-                <div className="chatview-sidebar-avatar">
+              {/* Аватар на всю ширину + имя + бейдж */}
+              <Link to={`/users/${user.id}`} className="chatview-user-hero">
+                <div className="chatview-hero-avatar">
                   {user.fullName.charAt(0)}
                 </div>
-                <div className="chatview-sidebar-name">
-                  {user.fullName}
-                  <span className="chatview-sidebar-status">
-                    {user.isPartner ? 'Партнёр' : 'Гость'}
-                  </span>
-                </div>
+                <div className="chatview-hero-name">{user.fullName}</div>
+                <span className={`chatview-hero-badge${user.isPartner ? ' badge-partner' : ' badge-guest'}`}>
+                  {user.isPartner ? 'Партнёр' : 'Гость'}
+                </span>
               </Link>
 
               <div className="chatview-sidebar-section">

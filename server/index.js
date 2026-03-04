@@ -91,6 +91,23 @@ app.delete('/api/chats/:id', (req, res) => {
   }
 });
 
+// GET /api/chats/by-user/:userId — find or create chat for user
+app.get('/api/chats/by-user/:userId', (req, res) => {
+  try {
+    const chats = readChats();
+    const userId = Number(req.params.userId);
+    let chat = chats.find(c => c.userId === userId);
+    if (!chat) {
+      chat = { id: (chats.at(-1)?.id || 0) + 1, userId, messages: [] };
+      chats.push(chat);
+      writeChats(chats);
+    }
+    res.json(chat);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/chats/:id/messages
 app.post('/api/chats/:id/messages', (req, res) => {
   try {

@@ -110,6 +110,41 @@
   background-color: rgba(255, 126, 0, 0.1);
 }
 
+/* --- ЭКСПОРТ DROPDOWN --- */
+.export-wrapper {
+  position: relative;
+}
+
+.export-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  min-width: 200px;
+  background-color: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.export-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.export-dropdown-item:hover {
+  background-color: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+}
+
 /* --- КНОПКА СБРОСА ФИЛЬТРОВ --- */
 .btn-reset-filters {
   display: inline-flex;
