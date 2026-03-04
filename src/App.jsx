@@ -5,6 +5,7 @@ import KnowledgeBase from './pages/KnowledgeBase/KnowledgeBase.jsx';
 import Analytics from './pages/Analytics/Analytics.jsx';
 import Placeholder from './pages/Placeholder.jsx';
 import Users from './pages/Users/Users.jsx';
+import UserProfile from './pages/Users/UserProfile.jsx';
 
 function App() {
   return (
@@ -12,8 +13,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/users" replace />} />
-          
+
           <Route path="users" element={<Users />} />
+          <Route path="users/:id" element={<UserProfile />} />
           <Route path="chats" element={<Placeholder title="Чаты" />} />
           <Route path="mailings" element={<Placeholder title="Рассылки и контент" />} />
           <Route path="scenarios" element={<Placeholder title="Сценарии" />} />

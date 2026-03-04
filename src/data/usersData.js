@@ -9,6 +9,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-10-15',
     commission: 150000,
+    comment: '',
     tags: ['VIP', 'Арбитраж']
   },
   {
@@ -21,6 +22,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2026-01-20',
     commission: 0,
+    comment: '',
     tags: ['Новичок']
   },
   {
@@ -33,6 +35,7 @@ export const usersData = [
     gender: '-',
     registrationDate: '2025-08-05',
     commission: 4500000,
+    comment: '',
     tags: ['Агентство', 'Крупный объем']
   },
   {
@@ -45,6 +48,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2026-02-15',
     commission: 0,
+    comment: '',
     tags: ['Спам']
   },
   {
@@ -57,6 +61,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2025-11-30',
     commission: 85000,
+    comment: '',
     tags: ['VIP', 'SEO']
   },
   {
@@ -69,6 +74,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2025-12-30',
     commission: 85000,
+    comment: '',
     tags: ['VIP']
   },
   {
@@ -81,6 +87,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-10-30',
     commission: 85000,
+    comment: '',
     tags: ['Новичок', 'SEO']
   },
   {
@@ -93,6 +100,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-09-12',
     commission: 230000,
+    comment: '',
     tags: ['Арбитраж', 'Крупный объем']
   },
   {
@@ -105,6 +113,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2026-02-01',
     commission: 0,
+    comment: '',
     tags: ['Новичок']
   },
   {
@@ -117,6 +126,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-07-20',
     commission: 1200000,
+    comment: '',
     tags: ['Агентство']
   },
   {
@@ -129,6 +139,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-11-05',
     commission: 67000,
+    comment: '',
     tags: ['SEO']
   },
   {
@@ -141,6 +152,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2026-01-10',
     commission: 0,
+    comment: '',
     tags: ['Новичок', 'Спам']
   },
   {
@@ -153,6 +165,7 @@ export const usersData = [
     gender: '-',
     registrationDate: '2025-06-15',
     commission: 3800000,
+    comment: '',
     tags: ['Агентство', 'VIP', 'Крупный объем']
   },
   {
@@ -165,6 +178,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-10-01',
     commission: 45000,
+    comment: '',
     tags: ['Арбитраж']
   },
   {
@@ -177,6 +191,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2026-02-20',
     commission: 0,
+    comment: '',
     tags: ['Новичок']
   },
   {
@@ -189,6 +204,7 @@ export const usersData = [
     gender: 'Мужской',
     registrationDate: '2025-08-22',
     commission: 310000,
+    comment: '',
     tags: ['VIP', 'SEO', 'Арбитраж']
   },
   {
@@ -201,6 +217,7 @@ export const usersData = [
     gender: 'Женский',
     registrationDate: '2025-12-05',
     commission: 92000,
+    comment: '',
     tags: ['SEO']
   }
 ];

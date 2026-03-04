@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Download, MessageSquare, ArrowUpDown, X } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './Users.css';
@@ -206,12 +207,14 @@ export default function Users() {
             {filteredAndSortedUsers.map(user => (
               <tr key={user.id}>
                 <td>
-                  <div className="user-cell">
-                    <div className="user-avatar">
-                      {user.fullName.charAt(0)}
+                  <Link to={`/users/${user.id}`} className="user-cell-link">
+                    <div className="user-cell">
+                      <div className="user-avatar">
+                        {user.fullName.charAt(0)}
+                      </div>
+                      <span className="user-name">{user.fullName}</span>
                     </div>
-                    <span className="user-name">{user.fullName}</span>
-                  </div>
+                  </Link>
                 </td>
 
                 <td>
