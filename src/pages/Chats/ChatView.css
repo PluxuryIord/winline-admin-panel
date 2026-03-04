@@ -160,8 +160,9 @@
   resize: none;
   outline: none;
   min-height: 42px;
-  max-height: 120px;
+  max-height: 180px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .chatview-input:focus {
@@ -378,4 +379,128 @@
 .chatview-sidebar-unknown {
   color: rgba(255, 255, 255, 0.4);
   font-size: 0.9rem;
+}
+
+/* ===== ТЕГИ В САЙДБАРЕ ===== */
+.chatview-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chatview-tag-editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(255, 126, 0, 0.1);
+  color: var(--color-orange);
+  border: 1px solid rgba(255, 126, 0, 0.2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.chatview-tag-x {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-orange);
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+
+.chatview-tag-editable:hover .chatview-tag-x {
+  opacity: 0.7;
+}
+
+.chatview-tag-x:hover {
+  opacity: 1 !important;
+}
+
+/* Кнопка + добавить тег */
+.chatview-tag-add-wrapper {
+  position: relative;
+}
+
+.chatview-tag-add-btn {
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.chatview-tag-add-btn:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+}
+
+/* Dropdown */
+.chatview-tag-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background-color: #1e1e2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 100;
+  min-width: 160px;
+  max-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chatview-tag-dropdown-item {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.chatview-tag-dropdown-item:hover {
+  background-color: rgba(255, 126, 0, 0.1);
+  color: var(--color-orange);
+}
+
+.chatview-tag-dropdown-input-row {
+  padding: 4px 2px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin-top: 2px;
+}
+
+.chatview-tag-dropdown-input {
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: var(--color-white);
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.chatview-tag-dropdown-input:focus {
+  border-color: var(--color-orange);
+}
+
+.chatview-tag-dropdown-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }

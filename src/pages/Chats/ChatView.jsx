@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './ChatView.css';
 
@@ -35,8 +35,15 @@ export default function ChatView() {
   const [chat, setChat] = useState(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+
+  // Теги в сайдбаре
+  const [tags, setTags] = useState([]);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const tagDropdownRef = useRef(null);
 
   useEffect(() => {
     fetch('/api/chats')
@@ -48,13 +55,62 @@ export default function ChatView() {
       .catch(() => {});
   }, [id]);
 
+  // Инициализировать теги когда пользователь загружен
+  const user = chat ? usersData.find(u => u.id === chat.userId) : null;
+  useEffect(() => {
+    if (user) setTags([...user.tags]);
+  }, [user?.id]);
+
+  // Все теги из всей базы
+  const allTags = useMemo(() => {
+    const tagSet = new Set();
+    usersData.forEach(u => u.tags.forEach(t => tagSet.add(t)));
+    return Array.from(tagSet);
+  }, []);
+
+  // Закрыть dropdown по клику снаружи
+  useEffect(() => {
+    const handler = (e) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat?.messages]);
 
-  const user = chat ? usersData.find(u => u.id === chat.userId) : null;
+  // --- Операции с тегами ---
+  const handleRemoveTag = (tag) => {
+    const updated = tags.filter(t => t !== tag);
+    setTags(updated);
+    if (user) user.tags = updated;
+  };
 
+  const handleAddExistingTag = (tag) => {
+    if (!tags.includes(tag)) {
+      const updated = [...tags, tag];
+      setTags(updated);
+      if (user) user.tags = updated;
+    }
+    setShowTagDropdown(false);
+  };
+
+  const handleCreateTag = () => {
+    const trimmed = newTagInput.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      const updated = [...tags, trimmed];
+      setTags(updated);
+      if (user) user.tags = updated;
+    }
+    setNewTagInput('');
+  };
+
+  // --- Отправка сообщения ---
   const handleSend = async () => {
     const text = input.trim();
     if (!text || sending) return;
@@ -68,6 +124,10 @@ export default function ChatView() {
       const newMsg = await res.json();
       setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
       setInput('');
+      // Сбросить высоту textarea
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+      }
       inputRef.current?.focus();
     } catch (e) {
       console.error(e);
@@ -76,11 +136,20 @@ export default function ChatView() {
     }
   };
 
+  // --- Textarea: Enter отправляет, Shift+Enter — перенос строки ---
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // --- Auto-resize textarea ---
+  const handleTextareaChange = (e) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
   };
 
   if (!chat) {
@@ -93,6 +162,7 @@ export default function ChatView() {
   }
 
   const items = groupByDate(chat.messages);
+  const availableTags = allTags.filter(t => !tags.includes(t));
 
   return (
     <div className="chatview-container">
@@ -128,11 +198,10 @@ export default function ChatView() {
             <textarea
               ref={inputRef}
               className="chatview-input"
-              placeholder="Написать сообщение..."
+              placeholder="Написать сообщение... (Enter — отправить, Shift+Enter — перенос)"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
-              rows={1}
             />
             <button
               className="chatview-send-btn"
@@ -159,6 +228,57 @@ export default function ChatView() {
                 </span>
               </Link>
 
+              {/* Теги */}
+              <div className="chatview-sidebar-section">
+                <h4 className="chatview-sidebar-title">Теги</h4>
+                <div className="chatview-tags-row">
+                  {tags.map(tag => (
+                    <span key={tag} className="chatview-tag-editable">
+                      {tag}
+                      <button
+                        className="chatview-tag-x"
+                        onClick={() => handleRemoveTag(tag)}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+
+                  <div className="chatview-tag-add-wrapper" ref={tagDropdownRef}>
+                    <button
+                      className="chatview-tag-add-btn"
+                      onClick={() => setShowTagDropdown(!showTagDropdown)}
+                    >
+                      <Plus size={13} />
+                    </button>
+                    {showTagDropdown && (
+                      <div className="chatview-tag-dropdown">
+                        {availableTags.map(tag => (
+                          <div
+                            key={tag}
+                            className="chatview-tag-dropdown-item"
+                            onClick={() => handleAddExistingTag(tag)}
+                          >
+                            {tag}
+                          </div>
+                        ))}
+                        <div className="chatview-tag-dropdown-input-row">
+                          <input
+                            className="chatview-tag-dropdown-input"
+                            placeholder="Новый тег..."
+                            value={newTagInput}
+                            onChange={e => setNewTagInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Информация */}
               <div className="chatview-sidebar-section">
                 <h4 className="chatview-sidebar-title">Информация</h4>
                 <div className="chatview-info-grid">
@@ -180,16 +300,6 @@ export default function ChatView() {
                       {user.commission.toLocaleString('ru-RU')} ₽
                     </span>
                   </div>
-                  {user.tags.length > 0 && (
-                    <div className="chatview-info-row">
-                      <span className="chatview-info-label">Теги</span>
-                      <span className="chatview-info-value chatview-tags">
-                        {user.tags.map(t => (
-                          <span key={t} className="chatview-tag">{t}</span>
-                        ))}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </>
