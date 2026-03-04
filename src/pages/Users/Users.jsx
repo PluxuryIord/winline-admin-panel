@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Download, MessageSquare, ArrowUpDown } from 'lucide-react';
+import { Search, Download, MessageSquare, ArrowUpDown, X } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './Users.css';
 
@@ -94,6 +94,18 @@ export default function Users() {
     setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
+  const hasActiveFilters = filterPartner !== 'all' || filterCountry !== 'all' || filterGender !== 'all' || filterEntity !== 'all' || filterTag !== 'all' || search;
+
+  const resetFilters = () => {
+    setSearch('');
+    setFilterPartner('all');
+    setFilterCountry('all');
+    setFilterGender('all');
+    setFilterEntity('all');
+    setFilterTag('all');
+    setSortConfig({ key: 'registrationDate', direction: 'desc' });
+  };
+
   const handleExport = () => {
     alert('Экспорт отфильтрованной таблицы в Excel запущен...');
   };
@@ -170,6 +182,13 @@ export default function Users() {
             Комиссия
             {sortConfig.key === 'commission' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
           </button>
+
+          {hasActiveFilters && (
+            <button className="btn-reset-filters" onClick={resetFilters}>
+              <X size={14} />
+              Сбросить
+            </button>
+          )}
         </div>
       </div>
 
