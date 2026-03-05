@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import {
   Folder, FileText, Plus, Edit3, Save, Trash2,
-  ChevronRight, ChevronDown, Loader, Pencil
+  ChevronRight, ChevronDown, Loader, MoreHorizontal
 } from 'lucide-react';
 import WysiwygEditor from './WysiwygEditor';
 import PromptModal from './PromptModal';
@@ -17,6 +17,15 @@ export default function KnowledgeBase() {
   const [editContent, setEditContent] = useState('');
   const [modal, setModal] = useState(null);
   const [editingTitle, setEditingTitle] = useState(null); // { id, value, content }
+  const [openMenu, setOpenMenu] = useState(null); // id элемента с открытым меню
+
+  // Закрываем меню по клику снаружи
+  useEffect(() => {
+    if (!openMenu) return;
+    const handler = () => setOpenMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [openMenu]);
 
   // Загрузка данных из API
   useEffect(() => {
@@ -63,10 +72,8 @@ export default function KnowledgeBase() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: activeItem.data.title, content: editContent })
     });
-
     const updatedData = { ...activeItem.data, content: editContent };
     setActiveItem(prev => ({ ...prev, data: updatedData }));
-
     if (activeItem.type === 'topic') {
       setTopics(prev => prev.map(t => t.id === activeItem.id ? { ...t, content: editContent } : t));
     } else {
@@ -97,8 +104,7 @@ export default function KnowledgeBase() {
     });
   };
 
-  const handleAddSubtopic = (e, parentId) => {
-    e.stopPropagation();
+  const handleAddSubtopic = (parentId) => {
     setModal({
       title: 'Название подтемы',
       placeholder: 'Введите название...',
@@ -120,8 +126,7 @@ export default function KnowledgeBase() {
     });
   };
 
-  const handleRenameStart = (e, item) => {
-    e.stopPropagation();
+  const handleRenameStart = (item) => {
     setEditingTitle({ id: item.id, value: item.title, content: item.content || '' });
   };
 
@@ -150,8 +155,7 @@ export default function KnowledgeBase() {
     if (e.key === 'Escape') setEditingTitle(null);
   };
 
-  const handleDelete = (e, id, type, parentId) => {
-    e.stopPropagation();
+  const handleDelete = (id, type, parentId) => {
     const label = type === 'topic' ? 'тему и все подтемы' : 'подтему';
     setModal({
       title: `Удалить ${label}?`,
@@ -159,7 +163,6 @@ export default function KnowledgeBase() {
       onConfirm: async () => {
         setModal(null);
         await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
-
         if (type === 'topic') {
           const updated = topics.filter(t => t.id !== id);
           setTopics(updated);
@@ -180,6 +183,31 @@ export default function KnowledgeBase() {
       }
     });
   };
+
+  // Кнопка ⋯ с выпадающим меню
+  const ItemMenu = ({ id, actions }) => (
+    <div className="kb-item-menu-wrapper" onClick={e => e.stopPropagation()}>
+      <button
+        className={`kb-item-menu-btn${openMenu === id ? ' open' : ''}`}
+        onClick={(e) => { e.stopPropagation(); setOpenMenu(prev => prev === id ? null : id); }}
+      >
+        <MoreHorizontal size={15} />
+      </button>
+      {openMenu === id && (
+        <div className="kb-item-menu-dropdown">
+          {actions.map(action => (
+            <button
+              key={action.label}
+              className={`kb-item-menu-item${action.danger ? ' danger' : ''}`}
+              onClick={() => { setOpenMenu(null); action.fn(); }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -229,15 +257,14 @@ export default function KnowledgeBase() {
                   ) : (
                     <span style={{ flex: 1 }}>{topic.title}</span>
                   )}
-                  <button className="rename-btn" title="Переименовать" onClick={(e) => handleRenameStart(e, topic)}>
-                    <Pencil size={13} />
-                  </button>
-                  <button className="add-sub-btn" title="Добавить подтему" onClick={(e) => handleAddSubtopic(e, topic.id)}>
-                    <Plus size={14} />
-                  </button>
-                  <button className="delete-btn" title="Удалить тему" onClick={(e) => handleDelete(e, topic.id, 'topic')}>
-                    <Trash2 size={14} />
-                  </button>
+                  <ItemMenu
+                    id={topic.id}
+                    actions={[
+                      { label: 'Переименовать', fn: () => handleRenameStart(topic) },
+                      { label: 'Добавить подтему', fn: () => handleAddSubtopic(topic.id) },
+                      { label: 'Удалить', fn: () => handleDelete(topic.id, 'topic'), danger: true },
+                    ]}
+                  />
                 </div>
 
                 {isFolderExpanded && topic.subtopics.length > 0 && (
@@ -264,12 +291,13 @@ export default function KnowledgeBase() {
                           ) : (
                             <span style={{ flex: 1 }}>{sub.title}</span>
                           )}
-                          <button className="rename-btn" title="Переименовать" onClick={(e) => handleRenameStart(e, sub)}>
-                            <Pencil size={13} />
-                          </button>
-                          <button className="delete-btn" title="Удалить подтему" onClick={(e) => handleDelete(e, sub.id, 'subtopic', topic.id)}>
-                            <Trash2 size={14} />
-                          </button>
+                          <ItemMenu
+                            id={sub.id}
+                            actions={[
+                              { label: 'Переименовать', fn: () => handleRenameStart(sub) },
+                              { label: 'Удалить', fn: () => handleDelete(sub.id, 'subtopic', topic.id), danger: true },
+                            ]}
+                          />
                         </div>
                       );
                     })}
@@ -292,7 +320,6 @@ export default function KnowledgeBase() {
                 </div>
                 <h2>{activeItem.data.title}</h2>
               </div>
-
               {!isEditing ? (
                 <button className="kb-edit-btn" onClick={handleEditClick}>
                   <Edit3 size={18} /> Редактировать

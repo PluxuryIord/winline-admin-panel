@@ -246,41 +246,75 @@
   min-width: 0;
 }
 
-/* Кнопки удаления и добавления подтем (видны по ховеру) */
-.delete-btn,
-.add-sub-btn,
-.rename-btn {
+/* ===== KEBAB-МЕНЮ (⋯) ===== */
+.kb-item-menu-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.kb-item-menu-btn {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 4px 5px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.kb-topic-item:hover .delete-btn,
-.kb-topic-item:hover .add-sub-btn,
-.kb-topic-item:hover .rename-btn,
-.kb-subtopic-item:hover .delete-btn,
-.kb-subtopic-item:hover .rename-btn {
+.kb-topic-item:hover .kb-item-menu-btn,
+.kb-subtopic-item:hover .kb-item-menu-btn,
+.kb-item-menu-btn.open {
   opacity: 1;
 }
 
-.delete-btn:hover {
+.kb-item-menu-btn:hover,
+.kb-item-menu-btn.open {
+  color: var(--color-white);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kb-item-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #1e1e2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px;
+  z-index: 100;
+  min-width: 168px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kb-item-menu-item {
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-item-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-white);
+}
+
+.kb-item-menu-item.danger:hover {
+  background: rgba(255, 68, 68, 0.1);
   color: #ff4444;
-}
-
-.add-sub-btn:hover {
-  color: var(--color-orange);
-}
-
-.rename-btn:hover {
-  color: var(--color-orange);
 }
 
 /* Кнопка «Сохранить» */
