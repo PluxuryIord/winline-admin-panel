@@ -116,6 +116,7 @@
   line-height: 1.5;
   position: relative;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .chatview-msg--user .chatview-msg-bubble {
@@ -163,6 +164,11 @@
   max-height: 180px;
   overflow-y: auto;
   box-sizing: border-box;
+  scrollbar-width: none;
+}
+
+.chatview-input::-webkit-scrollbar {
+  display: none;
 }
 
 .chatview-input:focus {
