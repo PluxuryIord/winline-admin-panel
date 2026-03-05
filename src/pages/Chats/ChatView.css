@@ -510,3 +510,44 @@
 .chatview-tag-dropdown-input::placeholder {
   color: rgba(255, 255, 255, 0.3);
 }
+
+/* ===== ШАПКА ЧАТА (кнопка назад + ссылка на профиль) ===== */
+.chatview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+}
+
+/* Ссылка на профиль — скрыта на десктопе (там есть сайдбар) */
+.chatview-profile-link {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-orange);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.chatview-profile-link:hover {
+  opacity: 0.8;
+}
+
+/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
+@media (max-width: 768px) {
+  /* Сайдбар скрыт — чат на всю ширину */
+  .chatview-body {
+    grid-template-columns: 1fr;
+  }
+
+  .chatview-sidebar {
+    display: none;
+  }
+
+  /* Показываем кнопку «Профиль пользователя» */
+  .chatview-profile-link {
+    display: inline-flex;
+  }
+}

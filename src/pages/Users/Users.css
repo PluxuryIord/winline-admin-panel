@@ -294,7 +294,43 @@
 
 /* --- АДАПТАЦИЯ --- */
 @media (max-width: 768px) {
-  .users-container { margin-right: 15px; }
+  /* Вся страница скроллится, не только блок */
+  .users-container {
+    margin-right: 15px;
+    height: auto;
+  }
+
   .controls-top-row { flex-direction: column; align-items: stretch; }
   .search-box { width: 100%; }
+
+  /* Таблица: убираем горизонтальный скролл и внутренний вертикальный */
+  .table-wrapper {
+    overflow-x: hidden;
+    flex: none;
+    height: auto;
+  }
+
+  /* Скрываем колонку с тегами — не помещается по ширине */
+  .winline-table td:nth-child(2) {
+    display: none;
+  }
+
+  /* Имя пользователя занимает всё свободное место */
+  .winline-table td:first-child {
+    width: 100%;
+  }
+
+  /* Кнопка чата — прижата к правому краю, не растягивается */
+  .winline-table td:last-child {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  /* Имя не переносится на мобиле */
+  .user-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, User } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './ChatView.css';
 
@@ -166,9 +166,16 @@ export default function ChatView() {
 
   return (
     <div className="chatview-container">
-      <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
-        <ArrowLeft size={18} /> Назад
-      </button>
+      <div className="chatview-header">
+        <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
+          <ArrowLeft size={18} /> Назад
+        </button>
+        {user && (
+          <Link to={`/users/${user.id}`} className="chatview-profile-link">
+            <User size={16} /> Профиль пользователя
+          </Link>
+        )}
+      </div>
 
       <div className="chatview-body">
         {/* Левая часть — чат */}
