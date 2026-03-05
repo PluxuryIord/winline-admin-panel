@@ -315,21 +315,21 @@ export default function KnowledgeBase() {
         {activeItem ? (
           <>
             <div className="kb-content-header">
-              <div>
-                <div className="kb-breadcrumbs">
-                  База знаний {activeItem.type === 'subtopic' && <> <ChevronRight size={12} /> {activeItem.parentTitle} </>}
-                </div>
-                <h2>{activeItem.data.title}</h2>
+              <div className="kb-breadcrumbs">
+                База знаний {activeItem.type === 'subtopic' && <> <ChevronRight size={12} /> {activeItem.parentTitle} </>}
               </div>
-              {!isEditing ? (
-                <button className="kb-edit-btn" onClick={handleEditClick}>
-                  <Edit3 size={18} /> Редактировать
-                </button>
-              ) : (
-                <button className="kb-edit-btn kb-save-btn" onClick={handleSaveClick}>
-                  <Save size={18} /> Сохранить
-                </button>
-              )}
+              <div className="kb-header-row">
+                <h2>{activeItem.data.title}</h2>
+                {!isEditing ? (
+                  <button className="kb-edit-btn" onClick={handleEditClick}>
+                    <Edit3 size={18} /> Редактировать
+                  </button>
+                ) : (
+                  <button className="kb-edit-btn kb-save-btn" onClick={handleSaveClick}>
+                    <Save size={18} /> Сохранить
+                  </button>
+                )}
+              </div>
             </div>
 
             {!isEditing ? (
