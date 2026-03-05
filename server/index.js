@@ -8,6 +8,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.API_PORT || 3001;
 
+// --- Автоинициализация данных ---
+// Если файл данных не существует — копируем из .example.json
+// Это защищает от потери данных при git pull
+const dataFiles = ['chats', 'knowledge'];
+for (const name of dataFiles) {
+  const dataPath = path.join(__dirname, 'data', `${name}.json`);
+  const examplePath = path.join(__dirname, 'data', `${name}.example.json`);
+  if (!fs.existsSync(dataPath) && fs.existsSync(examplePath)) {
+    fs.copyFileSync(examplePath, dataPath);
+    console.log(`[init] Created ${name}.json from ${name}.example.json`);
+  }
+}
+
 app.use(express.json({ limit: '5mb' }));
 
 // --- API Routes ---
