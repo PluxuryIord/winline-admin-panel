@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import {
   Folder, FileText, Plus, Edit3, Save, Trash2,
-  ChevronRight, ChevronDown, Loader
+  ChevronRight, ChevronDown, Loader, Pencil
 } from 'lucide-react';
 import WysiwygEditor from './WysiwygEditor';
 import PromptModal from './PromptModal';
@@ -16,6 +16,7 @@ export default function KnowledgeBase() {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [modal, setModal] = useState(null);
+  const [editingTitle, setEditingTitle] = useState(null); // { id, value, content }
 
   // Загрузка данных из API
   useEffect(() => {
@@ -119,6 +120,36 @@ export default function KnowledgeBase() {
     });
   };
 
+  const handleRenameStart = (e, item) => {
+    e.stopPropagation();
+    setEditingTitle({ id: item.id, value: item.title, content: item.content || '' });
+  };
+
+  const handleRenameSave = async () => {
+    if (!editingTitle) return;
+    const { id, value, content } = editingTitle;
+    setEditingTitle(null);
+    if (!value.trim()) return;
+    await fetch(`/api/knowledge/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: value.trim(), content }),
+    });
+    setTopics(prev => prev.map(t => {
+      if (t.id === id) return { ...t, title: value.trim() };
+      return { ...t, subtopics: t.subtopics.map(s => s.id === id ? { ...s, title: value.trim() } : s) };
+    }));
+    if (activeItem?.id === id) {
+      setActiveItem(prev => ({ ...prev, data: { ...prev.data, title: value.trim() } }));
+    }
+  };
+
+  const handleRenameKeyDown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') handleRenameSave();
+    if (e.key === 'Escape') setEditingTitle(null);
+  };
+
   const handleDelete = (e, id, type, parentId) => {
     e.stopPropagation();
     const label = type === 'topic' ? 'тему и все подтемы' : 'подтему';
@@ -185,7 +216,22 @@ export default function KnowledgeBase() {
                     {isFolderExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </span>
                   <Folder size={18} color={isTopicActive ? "#FF7E00" : "currentColor"} />
-                  <span style={{ flex: 1 }}>{topic.title}</span>
+                  {editingTitle?.id === topic.id ? (
+                    <input
+                      className="kb-title-input"
+                      value={editingTitle.value}
+                      onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
+                      onBlur={handleRenameSave}
+                      onKeyDown={handleRenameKeyDown}
+                      onClick={e => e.stopPropagation()}
+                      autoFocus
+                    />
+                  ) : (
+                    <span style={{ flex: 1 }}>{topic.title}</span>
+                  )}
+                  <button className="rename-btn" title="Переименовать" onClick={(e) => handleRenameStart(e, topic)}>
+                    <Pencil size={13} />
+                  </button>
                   <button className="add-sub-btn" title="Добавить подтему" onClick={(e) => handleAddSubtopic(e, topic.id)}>
                     <Plus size={14} />
                   </button>
@@ -205,7 +251,22 @@ export default function KnowledgeBase() {
                           onClick={() => handleSelectSubtopic(sub, topic)}
                         >
                           <FileText size={14} />
-                          <span style={{ flex: 1 }}>{sub.title}</span>
+                          {editingTitle?.id === sub.id ? (
+                            <input
+                              className="kb-title-input"
+                              value={editingTitle.value}
+                              onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
+                              onBlur={handleRenameSave}
+                              onKeyDown={handleRenameKeyDown}
+                              onClick={e => e.stopPropagation()}
+                              autoFocus
+                            />
+                          ) : (
+                            <span style={{ flex: 1 }}>{sub.title}</span>
+                          )}
+                          <button className="rename-btn" title="Переименовать" onClick={(e) => handleRenameStart(e, sub)}>
+                            <Pencil size={13} />
+                          </button>
                           <button className="delete-btn" title="Удалить подтему" onClick={(e) => handleDelete(e, sub.id, 'subtopic', topic.id)}>
                             <Trash2 size={14} />
                           </button>

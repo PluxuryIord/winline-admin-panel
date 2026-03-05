@@ -232,9 +232,24 @@
   align-self: center;
 }
 
+/* Инлайн-ввод для переименования темы */
+.kb-title-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-orange);
+  color: var(--color-white);
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+  padding: 0 2px;
+  min-width: 0;
+}
+
 /* Кнопки удаления и добавления подтем (видны по ховеру) */
 .delete-btn,
-.add-sub-btn {
+.add-sub-btn,
+.rename-btn {
   opacity: 0;
   transition: opacity 0.2s;
   background: transparent;
@@ -250,7 +265,9 @@
 
 .kb-topic-item:hover .delete-btn,
 .kb-topic-item:hover .add-sub-btn,
-.kb-subtopic-item:hover .delete-btn {
+.kb-topic-item:hover .rename-btn,
+.kb-subtopic-item:hover .delete-btn,
+.kb-subtopic-item:hover .rename-btn {
   opacity: 1;
 }
 
@@ -259,6 +276,10 @@
 }
 
 .add-sub-btn:hover {
+  color: var(--color-orange);
+}
+
+.rename-btn:hover {
   color: var(--color-orange);
 }
 
@@ -477,22 +498,36 @@
 }
 
 
-/* --- ЗАГОЛОВКИ ВНУТРИ СТАТЬИ (H3) --- */
-.html-content h3 {
-  /* Чисто белый цвет для иерархии */
+/* --- ЗАГОЛОВКИ ВНУТРИ СТАТЬИ --- */
+.html-content h1 {
   color: #FFFFFF;
-  font-size: 1.5rem; /* Крупный размер */
-  font-weight: 700; /* Жирное начертание */
-  /* Огромный отступ сверху, чтобы визуально отделить новый раздел */
-  margin-top: 48px; 
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 56px;
   margin-bottom: 20px;
-  /* Чуть-чуть сужаем расстояние между буквами для современного вида */
-  letter-spacing: -0.5px; 
+  letter-spacing: -0.5px;
 }
-/* Убираем отступ сверху у самого первого заголовка в статье */
-.html-content h3:first-child {
-  margin-top: 0;
+.html-content h1:first-child { margin-top: 0; }
+
+.html-content h2 {
+  color: #FFFFFF;
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin-top: 48px;
+  margin-bottom: 18px;
+  letter-spacing: -0.5px;
 }
+.html-content h2:first-child { margin-top: 0; }
+
+.html-content h3 {
+  color: #FFFFFF;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-top: 40px;
+  margin-bottom: 14px;
+  letter-spacing: -0.5px;
+}
+.html-content h3:first-child { margin-top: 0; }
 
 
 /* --- СПИСКИ (UL, OL) --- */
