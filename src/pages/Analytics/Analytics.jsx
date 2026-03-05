@@ -117,7 +117,6 @@ export default function Analytics() {
             Конверсия в партнёра
           </div>
           <div className="metric-value">1 к {conversionRatio}</div>
-          <div className="metric-subtext">Расчет: Всего пользователей / Партнеров</div>
         </div>
       </div>
 
@@ -130,7 +129,6 @@ export default function Analytics() {
             Обращений к боту
           </div>
           <div className="metric-value">{stats.requests.toLocaleString('ru-RU')}</div>
-          <div className="metric-subtext">Меню, чат (24ч), техподдержка, получение QR</div>
         </div>
 
         <div className="metric-card">
@@ -147,7 +145,6 @@ export default function Analytics() {
             Новых пользователей
           </div>
           <div className="metric-value">+{stats.newUsers.toLocaleString('ru-RU')}</div>
-          <div className="metric-subtext">За выбранный период</div>
         </div>
       </div>
 
