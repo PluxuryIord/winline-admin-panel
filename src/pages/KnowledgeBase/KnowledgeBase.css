@@ -619,31 +619,59 @@
 .kb-lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
   cursor: zoom-out;
-  animation: kb-fade-in 0.18s ease-out;
+  animation: kb-overlay-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Фон через псевдоэлемент — анимируется отдельно от картинки */
+.kb-lightbox::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(0px);
+  animation: kb-backdrop-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .kb-lightbox-img {
+  position: relative; /* поверх ::before */
   max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
-  border-radius: 12px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
-  animation: kb-zoom-in 0.2s ease-out;
+  border-radius: 14px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  animation: kb-img-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes kb-fade-in {
+@keyframes kb-overlay-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-@keyframes kb-zoom-in {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
+@keyframes kb-backdrop-in {
+  from { backdrop-filter: blur(0px); background: rgba(0,0,0,0); }
+  to   { backdrop-filter: blur(10px); background: rgba(0,0,0,0.85); }
+}
+
+@keyframes kb-img-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(24px);
+    filter: blur(8px);
+  }
+  60% {
+    filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
 }
