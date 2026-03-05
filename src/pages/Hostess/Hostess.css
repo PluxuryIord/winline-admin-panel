@@ -1,0 +1,223 @@
+/* Сбрасываем всё лишнее — это отдельная standalone страница */
+.hostess-page {
+  min-height: 100vh;
+  width: 100%;
+  background-color: #FF7E00;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  padding-bottom: 60px; /* высота футера */
+  box-sizing: border-box;
+}
+
+/* ===== ЛОГОТИП ===== */
+.hostess-logo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 56px;
+}
+
+.hostess-logo-badge {
+  display: flex;
+  align-items: center;
+  background: #111;
+  border-radius: 100px;
+  padding: 8px 12px 8px 20px;
+  gap: 10px;
+}
+
+.hostess-logo-text {
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.hostess-logo-circle {
+  width: 32px;
+  height: 32px;
+  background: #FF7E00;
+  border-radius: 50%;
+  display: block;
+  border: 3px solid #fff;
+  box-sizing: border-box;
+}
+
+.hostess-logo-subtitle {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+}
+
+/* ===== ЦЕНТРАЛЬНЫЙ БЛОК ===== */
+.hostess-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 32px 24px;
+  box-sizing: border-box;
+}
+
+/* Поле ввода QR */
+.hostess-scan-input {
+  width: 100%;
+  max-width: 760px;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 24px 36px;
+  font-size: 1.4rem;
+  color: #555;
+  outline: none;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+.hostess-scan-input::placeholder {
+  color: #aaa;
+}
+
+/* ===== КАРТОЧКА РЕЗУЛЬТАТА ===== */
+.hostess-result-card {
+  width: 100%;
+  max-width: 760px;
+  border-radius: 16px;
+  border: 3px solid #111;
+  padding: 48px 40px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.hostess-result-card.give {
+  background: #C8F5B8;
+}
+
+.hostess-result-card.already {
+  background: #FFB8A8;
+}
+
+.hostess-result-id {
+  font-size: 1.2rem;
+  color: #111;
+}
+
+.hostess-result-action {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #111;
+  text-align: center;
+}
+
+.hostess-next-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 28px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #111;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.hostess-next-btn:hover {
+  opacity: 0.7;
+}
+
+/* ===== НИЖНЯЯ ПАНЕЛЬ ===== */
+.hostess-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  box-sizing: border-box;
+}
+
+.hostess-footer span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+}
+
+.hostess-support-link {
+  color: #FF7E00;
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.hostess-support-link:hover {
+  opacity: 0.8;
+}
+
+/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
+@media (max-width: 600px) {
+  .hostess-logo-wrap {
+    margin-top: 36px;
+  }
+
+  .hostess-logo-text {
+    font-size: 1.1rem;
+  }
+
+  .hostess-logo-circle {
+    width: 24px;
+    height: 24px;
+  }
+
+  .hostess-logo-subtitle {
+    font-size: 0.75rem;
+    letter-spacing: 4px;
+  }
+
+  .hostess-scan-input {
+    padding: 18px 20px;
+    font-size: 1rem;
+    border-radius: 12px;
+  }
+
+  .hostess-result-card {
+    padding: 36px 24px 56px;
+    border-radius: 12px;
+  }
+
+  .hostess-result-id {
+    font-size: 1rem;
+  }
+
+  .hostess-result-action {
+    font-size: 1.15rem;
+  }
+
+  .hostess-footer {
+    padding: 0 20px;
+    height: 52px;
+  }
+
+  .hostess-footer span,
+  .hostess-support-link {
+    font-size: 0.85rem;
+  }
+}

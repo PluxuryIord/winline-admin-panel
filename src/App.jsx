@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import Layout from './components/Layout/Layout.jsx'; 
+import Layout from './components/Layout/Layout.jsx';
 import KnowledgeBase from './pages/KnowledgeBase/KnowledgeBase.jsx';
 import Analytics from './pages/Analytics/Analytics.jsx';
 import Placeholder from './pages/Placeholder.jsx';
@@ -8,11 +8,16 @@ import Users from './pages/Users/Users.jsx';
 import UserProfile from './pages/Users/UserProfile.jsx';
 import Chats from './pages/Chats/Chats.jsx';
 import ChatView from './pages/Chats/ChatView.jsx';
+import EventWork from './pages/EventWork/EventWork.jsx';
+import Hostess from './pages/Hostess/Hostess.jsx';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Standalone страница хостес — без Layout */}
+        <Route path="/hostess" element={<Hostess />} />
+
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/users" replace />} />
 
@@ -22,10 +27,10 @@ function App() {
           <Route path="chats/:id" element={<ChatView />} />
           <Route path="mailings" element={<Placeholder title="Рассылки и контент" />} />
           <Route path="scenarios" element={<Placeholder title="Сценарии" />} />
-          
+
           <Route path="knowledge" element={<KnowledgeBase />} />
           <Route path="analytics" element={<Analytics />} />
-          <Route path="events" element={<Placeholder title="Работа на ивенте" />} />
+          <Route path="events" element={<EventWork />} />
         </Route>
       </Routes>
     </BrowserRouter>
