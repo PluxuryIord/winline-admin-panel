@@ -23,8 +23,70 @@ export default function Analytics() {
     }, 700);
   };
 
-  const handleExport = (format) => {
-    alert(`Начат экспорт отчета в формате ${format}...`);
+  const triggerDownload = (content, filename, mime) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const dateSuffix = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  };
+
+  const handleExportExcel = () => {
+    const rows = [
+      ['Отчёт по аналитике'],
+      ['Период', selectedPeriod],
+      ['Дата формирования', new Date().toLocaleDateString('ru-RU')],
+      [],
+      ['Аудитория бота'],
+      ['Всего пользователей', stats.totalUsers],
+      ['Партнёры', stats.partners],
+      ['Гости', stats.guests],
+      ['Конверсия в партнёра', `1 к ${conversionRatio}`],
+      [],
+      ['Активность и вовлечённость'],
+      ['Обращений к боту', stats.requests],
+      ['Заблокировали бота', stats.blocked],
+      ['Новых пользователей', stats.newUsers],
+      [],
+      ['Контент'],
+      ['Подключённых каналов', stats.channels],
+      ['Сделано постов', stats.posts],
+    ];
+    const csv = '\uFEFF' + rows.map(r => r.join(';')).join('\n');
+    triggerDownload(csv, `analytics_${dateSuffix()}.csv`, 'text/csv;charset=utf-8;');
+    setIsExportOpen(false);
+  };
+
+  const handleExportTxt = () => {
+    const sep = '─'.repeat(42);
+    const lines = [
+      'ОТЧЁТ ПО АНАЛИТИКЕ',
+      `Период: ${selectedPeriod}`,
+      `Дата:   ${new Date().toLocaleDateString('ru-RU')}`,
+      sep,
+      'АУДИТОРИЯ БОТА',
+      `Всего пользователей:   ${stats.totalUsers.toLocaleString('ru-RU')}`,
+      `Партнёры:              ${stats.partners.toLocaleString('ru-RU')}`,
+      `Гости:                 ${stats.guests.toLocaleString('ru-RU')}`,
+      `Конверсия в партнёра:  1 к ${conversionRatio}`,
+      sep,
+      'АКТИВНОСТЬ И ВОВЛЕЧЁННОСТЬ',
+      `Обращений к боту:      ${stats.requests.toLocaleString('ru-RU')}`,
+      `Заблокировали бота:    ${stats.blocked.toLocaleString('ru-RU')}`,
+      `Новых пользователей:   +${stats.newUsers.toLocaleString('ru-RU')}`,
+      sep,
+      'КОНТЕНТ',
+      `Подключённых каналов:  ${stats.channels}`,
+      `Сделано постов:        ${stats.posts}`,
+    ];
+    triggerDownload(lines.join('\n'), `analytics_${dateSuffix()}.txt`, 'text/plain;charset=utf-8;');
     setIsExportOpen(false);
   };
 
@@ -72,8 +134,8 @@ export default function Analytics() {
 
           {isExportOpen && (
             <div className="dropdown-menu" style={{ right: 0, left: 'auto', minWidth: '150px' }}>
-              <button className="dropdown-item" onClick={() => handleExport('.XLSX (Excel)')}>в Excel (.xlsx)</button>
-              <button className="dropdown-item" onClick={() => handleExport('.TXT')}>в Текст (.txt)</button>
+              <button className="dropdown-item" onClick={handleExportExcel}>в Excel (.csv)</button>
+              <button className="dropdown-item" onClick={handleExportTxt}>в Текст (.txt)</button>
             </div>
           )}
         </div>
