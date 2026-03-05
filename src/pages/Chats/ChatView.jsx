@@ -197,6 +197,7 @@ export default function ChatView() {
           <div className="chatview-input-row">
             <textarea
               ref={inputRef}
+              rows={1}
               className="chatview-input"
               placeholder="Написать сообщение..."
               value={input}

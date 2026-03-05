@@ -138,6 +138,7 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: background-color 0.15s;
+  white-space: nowrap;
 }
 
 .export-dropdown-item:hover {
