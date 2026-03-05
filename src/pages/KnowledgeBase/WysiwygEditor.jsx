@@ -1,8 +1,12 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import DOMPurify from 'dompurify';
 import {
-  Bold, Italic, AlignLeft, List, ListOrdered,
-  Link as LinkIcon, Image as ImageIcon, Heading3
+  Bold, Italic, Underline, Strikethrough,
+  AlignLeft, AlignCenter, AlignRight,
+  List, ListOrdered,
+  Link as LinkIcon, Image as ImageIcon,
+  Heading3, Pilcrow,
+  Minus,
 } from 'lucide-react';
 import PromptModal from './PromptModal';
 
@@ -12,9 +16,7 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
   const [activeFormats, setActiveFormats] = useState({});
   const [modal, setModal] = useState(null);
 
-  useEffect(() => {
-    onChangeRef.current = onContentChange;
-  }, [onContentChange]);
+  useEffect(() => { onChangeRef.current = onContentChange; }, [onContentChange]);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -26,14 +28,21 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
   // Отслеживаем активные форматы при изменении выделения
   useEffect(() => {
     const checkFormats = () => {
+      const block = document.queryCommandValue('formatBlock').toLowerCase();
       setActiveFormats({
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
+        bold:                document.queryCommandState('bold'),
+        italic:              document.queryCommandState('italic'),
+        underline:           document.queryCommandState('underline'),
+        strikeThrough:       document.queryCommandState('strikeThrough'),
         insertUnorderedList: document.queryCommandState('insertUnorderedList'),
-        insertOrderedList: document.queryCommandState('insertOrderedList'),
+        insertOrderedList:   document.queryCommandState('insertOrderedList'),
+        justifyLeft:         document.queryCommandState('justifyLeft'),
+        justifyCenter:       document.queryCommandState('justifyCenter'),
+        justifyRight:        document.queryCommandState('justifyRight'),
+        h3:                  block === 'h3',
+        p:                   block === 'p' || block === '',
       });
     };
-
     document.addEventListener('selectionchange', checkFormats);
     return () => document.removeEventListener('selectionchange', checkFormats);
   }, []);
@@ -43,13 +52,19 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
   }, []);
 
   const execCmd = useCallback((command, value = null) => {
-    document.execCommand(command, false, value);
     editorRef.current?.focus();
+    document.execCommand(command, false, value);
     fireChange();
-    // Обновляем активные форматы после команды
+    // Обновляем форматы сразу после команды
+    const block = document.queryCommandValue('formatBlock').toLowerCase();
     setActiveFormats(prev => ({
       ...prev,
       [command]: document.queryCommandState(command),
+      h3: block === 'h3',
+      p: block === 'p' || block === '',
+      justifyLeft:   document.queryCommandState('justifyLeft'),
+      justifyCenter: document.queryCommandState('justifyCenter'),
+      justifyRight:  document.queryCommandState('justifyRight'),
     }));
   }, [fireChange]);
 
@@ -57,37 +72,26 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     setModal({
       title: 'Вставить ссылку',
       placeholder: 'https://example.com',
-      onConfirm: (url) => {
-        setModal(null);
-        execCmd('createLink', url);
-      }
+      onConfirm: (url) => { setModal(null); execCmd('createLink', url); }
     });
   };
 
   const handleImage = () => {
     setModal({
-      title: 'Вставить изображение',
+      title: 'URL изображения',
       placeholder: 'https://example.com/image.png',
-      onConfirm: (url) => {
-        setModal(null);
-        execCmd('insertImage', url);
-      }
+      onConfirm: (url) => { setModal(null); execCmd('insertImage', url); }
     });
-  };
-
-  const handleHeading = () => {
-    execCmd('formatBlock', 'h3');
   };
 
   const handlePaste = (e) => {
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
-
     if (html) {
       const clean = DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'ul', 'ol', 'li', 'a', 'h3', 'img', 'span'],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'target'],
+        ALLOWED_TAGS: ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'ul', 'ol', 'li', 'a', 'h3', 'img', 'span', 'strike', 's'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'target', 'style'],
       });
       document.execCommand('insertHTML', false, clean);
     } else {
@@ -96,38 +100,47 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     fireChange();
   };
 
-  const btnClass = (cmd) => `toolbar-btn${activeFormats[cmd] ? ' toolbar-btn-active' : ''}`;
+  const prevent = (e) => e.preventDefault();
+  const btn = (cmd) => `toolbar-btn${activeFormats[cmd] ? ' toolbar-btn-active' : ''}`;
 
   return (
     <div className="kb-editor">
       <div className="editor-toolbar">
-        <button className={btnClass('bold')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('bold')} title="Жирный">
-          <Bold size={16} />
-        </button>
-        <button className={btnClass('italic')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('italic')} title="Курсив">
-          <Italic size={16} />
-        </button>
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={handleHeading} title="Заголовок">
-          <Heading3 size={16} />
-        </button>
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('justifyLeft')} title="Выравнивание">
-          <AlignLeft size={16} />
-        </button>
+
+        {/* Форматирование текста */}
+        <button className={btn('bold')}        onMouseDown={prevent} onClick={() => execCmd('bold')}        title="Жирный (Ctrl+B)"><Bold size={15} /></button>
+        <button className={btn('italic')}      onMouseDown={prevent} onClick={() => execCmd('italic')}      title="Курсив (Ctrl+I)"><Italic size={15} /></button>
+        <button className={btn('underline')}   onMouseDown={prevent} onClick={() => execCmd('underline')}   title="Подчёркнутый (Ctrl+U)"><Underline size={15} /></button>
+        <button className={btn('strikeThrough')} onMouseDown={prevent} onClick={() => execCmd('strikeThrough')} title="Зачёркнутый"><Strikethrough size={15} /></button>
+
         <div className="toolbar-divider" />
-        <button className={btnClass('insertUnorderedList')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertUnorderedList')} title="Маркированный список">
-          <List size={16} />
-        </button>
-        <button className={btnClass('insertOrderedList')} onMouseDown={(e) => e.preventDefault()} onClick={() => execCmd('insertOrderedList')} title="Нумерованный список">
-          <ListOrdered size={16} />
-        </button>
+
+        {/* Блочный формат */}
+        <button className={btn('h3')} onMouseDown={prevent} onClick={() => execCmd('formatBlock', 'h3')} title="Заголовок"><Heading3 size={15} /></button>
+        <button className={btn('p')}  onMouseDown={prevent} onClick={() => execCmd('formatBlock', 'p')}  title="Обычный текст"><Pilcrow size={15} /></button>
+
         <div className="toolbar-divider" />
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={handleLink} title="Добавить ссылку">
-          <LinkIcon size={16} />
-        </button>
-        <button className="toolbar-btn" onMouseDown={(e) => e.preventDefault()} onClick={handleImage} title="Добавить картинку">
-          <ImageIcon size={16} />
-        </button>
+
+        {/* Выравнивание */}
+        <button className={btn('justifyLeft')}   onMouseDown={prevent} onClick={() => execCmd('justifyLeft')}   title="По левому краю"><AlignLeft size={15} /></button>
+        <button className={btn('justifyCenter')} onMouseDown={prevent} onClick={() => execCmd('justifyCenter')} title="По центру"><AlignCenter size={15} /></button>
+        <button className={btn('justifyRight')}  onMouseDown={prevent} onClick={() => execCmd('justifyRight')}  title="По правому краю"><AlignRight size={15} /></button>
+
+        <div className="toolbar-divider" />
+
+        {/* Списки */}
+        <button className={btn('insertUnorderedList')} onMouseDown={prevent} onClick={() => execCmd('insertUnorderedList')} title="Маркированный список"><List size={15} /></button>
+        <button className={btn('insertOrderedList')}   onMouseDown={prevent} onClick={() => execCmd('insertOrderedList')}   title="Нумерованный список"><ListOrdered size={15} /></button>
+
+        <div className="toolbar-divider" />
+
+        {/* Вставка */}
+        <button className="toolbar-btn" onMouseDown={prevent} onClick={handleLink}  title="Добавить ссылку"><LinkIcon size={15} /></button>
+        <button className="toolbar-btn" onMouseDown={prevent} onClick={handleImage} title="Вставить изображение"><ImageIcon size={15} /></button>
+        <button className="toolbar-btn" onMouseDown={prevent} onClick={() => execCmd('insertHorizontalRule')} title="Горизонтальная линия"><Minus size={15} /></button>
+
       </div>
+
       <div
         ref={editorRef}
         className="editor-contenteditable html-content"
@@ -136,6 +149,7 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
         onInput={fireChange}
         onPaste={handlePaste}
       />
+
       {modal && (
         <PromptModal
           title={modal.title}

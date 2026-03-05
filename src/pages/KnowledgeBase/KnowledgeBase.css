@@ -181,11 +181,13 @@
 
 .editor-toolbar {
   display: flex;
-  gap: 8px;
-  padding: 12px;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 12px;
   background-color: var(--color-black);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
 }
 
 .toolbar-btn {
@@ -526,6 +528,17 @@
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* Горизонтальная линия */
+.html-content hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 32px 0;
+}
+
+/* Подчёркнутый и зачёркнутый */
+.html-content u { text-decoration: underline; }
+.html-content s, .html-content strike { text-decoration: line-through; color: rgba(255,255,255,0.5); }
 
 /* Эффект при наведении на картинку (необязательно, но стильно) */
 .html-content img:hover {
