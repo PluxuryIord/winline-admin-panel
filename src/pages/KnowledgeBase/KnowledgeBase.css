@@ -588,14 +588,14 @@
 /* --- ИЗОБРАЖЕНИЯ (КРАСИВОЕ ОФОРМЛЕНИЕ) --- */
 .html-content img {
   display: block;
-  /* Было auto по бокам. Теперь 0 — картинка прижата влево, ровно по тексту */
-  margin: 40px 0; 
-  max-width: 100%; 
-  height: auto; 
-  border-radius: 16px; 
+  margin: 40px 0;
+  max-width: 100%;
+  height: auto;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: zoom-in;
 }
 
 /* Горизонтальная линия */
@@ -609,10 +609,41 @@
 .html-content u { text-decoration: underline; }
 .html-content s, .html-content strike { text-decoration: line-through; color: rgba(255,255,255,0.5); }
 
-/* Эффект при наведении на картинку (необязательно, но стильно) */
+/* Эффект при наведении на картинку */
 .html-content img:hover {
-  /* Чуть-чуть увеличиваем */
   transform: scale(1.015);
-  /* Делаем тень еще глубже */
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* ===== ЛАЙТБОКС ===== */
+.kb-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: zoom-out;
+  animation: kb-fade-in 0.18s ease-out;
+}
+
+.kb-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+  animation: kb-zoom-in 0.2s ease-out;
+}
+
+@keyframes kb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes kb-zoom-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
 }

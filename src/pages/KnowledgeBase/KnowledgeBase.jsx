@@ -18,6 +18,7 @@ export default function KnowledgeBase() {
   const [modal, setModal] = useState(null);
   const [editingTitle, setEditingTitle] = useState(null); // { id, value, content }
   const [openMenu, setOpenMenu] = useState(null); // id элемента с открытым меню
+  const [lightboxSrc, setLightboxSrc] = useState(null); // src открытой картинки
 
   // Закрываем меню по клику снаружи
   useEffect(() => {
@@ -335,6 +336,7 @@ export default function KnowledgeBase() {
               <div
                 className="kb-article html-content"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(activeItem.data.content) }}
+                onClick={(e) => { if (e.target.tagName === 'IMG') setLightboxSrc(e.target.src); }}
               />
             ) : (
               <WysiwygEditor
@@ -350,6 +352,12 @@ export default function KnowledgeBase() {
           </div>
         )}
       </div>
+
+      {lightboxSrc && (
+        <div className="kb-lightbox" onClick={() => setLightboxSrc(null)}>
+          <img src={lightboxSrc} alt="" className="kb-lightbox-img" />
+        </div>
+      )}
 
       {modal && (
         <PromptModal
