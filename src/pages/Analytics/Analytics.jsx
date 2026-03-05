@@ -1,30 +1,26 @@
 import { useState } from 'react';
-import { 
-  Calendar, RefreshCw, Download, ChevronDown, 
+import {
+  Calendar, RefreshCw, Download, ChevronDown,
   Users, UserCheck, UserPlus, MessageCircle, Ban, Share2, FileText, BarChart2
 } from 'lucide-react';
 import './Analytics.css';
-import { analyticsStats as stats } from '../../data/analyticsData';
+import { analyticsByPeriod } from '../../data/analyticsData';
 
 export default function Analytics() {
-  // Состояния для выпадающих меню
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  
-  // Состояние для выбранного периода
   const [selectedPeriod, setSelectedPeriod] = useState('За всё время');
-  
-  // Имитация загрузки при нажатии на "Сформировать"
   const [isGenerating, setIsGenerating] = useState(false);
+  const [stats, setStats] = useState(analyticsByPeriod['За всё время']);
 
   const periods = ["За всё время", "Сегодня", "За 24 часа", "За неделю", "За месяц", "За год"];
 
   const handleGenerate = () => {
     setIsGenerating(true);
-    // Имитируем запрос к БД (крутим иконку 1 секунду)
     setTimeout(() => {
+      setStats(analyticsByPeriod[selectedPeriod]);
       setIsGenerating(false);
-    }, 1000);
+    }, 700);
   };
 
   const handleExport = (format) => {
@@ -32,31 +28,26 @@ export default function Analytics() {
     setIsExportOpen(false);
   };
 
-
-
-  // Расчет конверсии по твоей формуле (Все пользователи / Партнеры)
-  const conversionRatio = (stats.totalUsers / stats.partners).toFixed(1); 
-  // ИЛИ классическая конверсия в %: ((stats.partners / stats.totalUsers) * 100).toFixed(1) + '%'
+  const conversionRatio = (stats.totalUsers / stats.partners).toFixed(1);
 
   return (
     <div className="analytics-container">
-      
-      {/* 1. БЛОК УПРАВЛЕНИЯ (Кнопки из твоего ТЗ) */}
+
+      {/* 1. БЛОК УПРАВЛЕНИЯ */}
       <div className="analytics-controls">
-        
-        {/* Кнопка 1: Начало и конец периода */}
+
         <div className="control-wrapper">
           <button className="btn-control" onClick={() => { setIsPeriodOpen(!isPeriodOpen); setIsExportOpen(false); }}>
             <Calendar size={18} />
             {selectedPeriod}
             <ChevronDown size={16} />
           </button>
-          
+
           {isPeriodOpen && (
             <div className="dropdown-menu">
               {periods.map(period => (
-                <button 
-                  key={period} 
+                <button
+                  key={period}
                   className={`dropdown-item ${selectedPeriod === period ? 'active' : ''}`}
                   onClick={() => { setSelectedPeriod(period); setIsPeriodOpen(false); }}
                 >
@@ -67,20 +58,18 @@ export default function Analytics() {
           )}
         </div>
 
-        {/* Кнопка 2: Сформировать (Обновить) */}
-        <button className="btn-control primary" onClick={handleGenerate}>
+        <button className="btn-control primary" onClick={handleGenerate} disabled={isGenerating}>
           <RefreshCw size={18} className={isGenerating ? 'spin' : ''} />
           Сформировать
         </button>
 
-        {/* Кнопка 3: Экспорт */}
         <div className="control-wrapper" style={{ marginLeft: 'auto' }}>
           <button className="btn-control" onClick={() => { setIsExportOpen(!isExportOpen); setIsPeriodOpen(false); }}>
             <Download size={18} />
             Экспорт
             <ChevronDown size={16} />
           </button>
-          
+
           {isExportOpen && (
             <div className="dropdown-menu" style={{ right: 0, left: 'auto', minWidth: '150px' }}>
               <button className="dropdown-item" onClick={() => handleExport('.XLSX (Excel)')}>в Excel (.xlsx)</button>
@@ -90,9 +79,12 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* Метка активного периода */}
+      <div className="analytics-period-label">
+        Данные: <span>{selectedPeriod}</span>
+      </div>
 
-      {/* 2. БЛОК ДАННЫХ (Дашборд вместо списка) */}
-      
+      {/* 2. АУДИТОРИЯ */}
       <h3 className="section-title">Аудитория бота</h3>
       <div className="metrics-grid">
         <div className="metric-card" style={{ borderColor: 'rgba(255, 126, 0, 0.4)' }}>
@@ -124,13 +116,12 @@ export default function Analytics() {
             <div className="metric-icon"><BarChart2 size={20} /></div>
             Конверсия в партнёра
           </div>
-          {/* По твоей формуле 1 партнер на X пользователей */}
           <div className="metric-value">1 к {conversionRatio}</div>
           <div className="metric-subtext">Расчет: Всего пользователей / Партнеров</div>
         </div>
       </div>
 
-
+      {/* 3. АКТИВНОСТЬ */}
       <h3 className="section-title">Активность и вовлеченность</h3>
       <div className="metrics-grid">
         <div className="metric-card">
@@ -160,7 +151,7 @@ export default function Analytics() {
         </div>
       </div>
 
-
+      {/* 4. КОНТЕНТ */}
       <h3 className="section-title">Контент</h3>
       <div className="metrics-grid">
         <div className="metric-card">

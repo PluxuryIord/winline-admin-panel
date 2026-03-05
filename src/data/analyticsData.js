@@ -1,11 +1,66 @@
-export   // Фейковые данные (в будущем прилетят с бэкенда)
-  const analyticsStats = {
+// Фейковые данные по периодам (в будущем прилетят с бэкенда)
+export const analyticsByPeriod = {
+  'За всё время': {
     totalUsers: 15420,
-    partners: 3855,
-    guests: 11565,
-    blocked: 430,
-    requests: 89200, // Включает меню, чат, ТП, QR
-    newUsers: 1240,
-    channels: 18,
-    posts: 342
-  };
+    partners:    3855,
+    guests:      11565,
+    blocked:     430,
+    requests:    89200,
+    newUsers:    15420,
+    channels:    18,
+    posts:       342,
+  },
+  'За год': {
+    totalUsers: 15420,
+    partners:    3855,
+    guests:      11565,
+    blocked:     318,
+    requests:    67400,
+    newUsers:    8240,
+    channels:    18,
+    posts:       286,
+  },
+  'За месяц': {
+    totalUsers: 15420,
+    partners:    3855,
+    guests:      11565,
+    blocked:     42,
+    requests:    7830,
+    newUsers:    680,
+    channels:    18,
+    posts:       28,
+  },
+  'За неделю': {
+    totalUsers: 15420,
+    partners:    3855,
+    guests:      11565,
+    blocked:     11,
+    requests:    1940,
+    newUsers:    156,
+    channels:    18,
+    posts:       7,
+  },
+  'За 24 часа': {
+    totalUsers: 15420,
+    partners:    3855,
+    guests:      11565,
+    blocked:     3,
+    requests:    284,
+    newUsers:    23,
+    channels:    18,
+    posts:       1,
+  },
+  'Сегодня': {
+    totalUsers: 15420,
+    partners:    3855,
+    guests:      11565,
+    blocked:     2,
+    requests:    241,
+    newUsers:    18,
+    channels:    18,
+    posts:       1,
+  },
+};
+
+// Экспорт дефолтного набора для обратной совместимости
+export const analyticsStats = analyticsByPeriod['За всё время'];

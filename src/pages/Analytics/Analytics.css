@@ -7,6 +7,19 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Метка активного периода */
+.analytics-period-label {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: -12px;
+  padding-left: 2px;
+}
+
+.analytics-period-label span {
+  color: var(--color-orange);
+  font-weight: 500;
+}
+
 /* === ВЕРХНЯЯ ПАНЕЛЬ С КНОПКАМИ === */
 .analytics-controls {
   display: flex;
