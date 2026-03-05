@@ -523,20 +523,51 @@
 .chatview-profile-link {
   display: none;
   align-items: center;
-  gap: 6px;
-  color: var(--color-orange);
+  gap: 8px;
   text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
+  color: inherit;
   transition: opacity 0.2s;
+  min-width: 0;
 }
 
 .chatview-profile-link:hover {
   opacity: 0.8;
 }
 
+.chatview-profile-link-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.25), rgba(255, 126, 0, 0.1));
+  border: 1.5px solid rgba(255, 126, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-orange);
+  flex-shrink: 0;
+}
+
+.chatview-profile-link-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
 /* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
 @media (max-width: 768px) {
+  /* Убираем горизонтальный и вертикальный скролл на уровне страницы */
+  .chatview-container {
+    overflow: hidden;
+    max-width: 100%;
+  }
+
   /* Сайдбар скрыт — чат на всю ширину */
   .chatview-body {
     grid-template-columns: 1fr;
@@ -546,7 +577,19 @@
     display: none;
   }
 
-  /* Показываем кнопку «Профиль пользователя» */
+  /* Фикс высоты блока сообщений: убираем ограничение max-height,
+     flex: 1 внутри chatview-main растянет область правильно */
+  .chatview-messages {
+    min-height: 0;
+    max-height: none;
+  }
+
+  /* Отступ снизу в поле ввода = как сверху (12px) */
+  .chatview-input-row {
+    padding-bottom: 12px;
+  }
+
+  /* Показываем карточку профиля */
   .chatview-profile-link {
     display: inline-flex;
   }

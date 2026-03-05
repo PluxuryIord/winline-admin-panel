@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus, User } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus } from 'lucide-react';
 import { usersData } from '../../data/usersData';
 import './ChatView.css';
 
@@ -172,7 +172,8 @@ export default function ChatView() {
         </button>
         {user && (
           <Link to={`/users/${user.id}`} className="chatview-profile-link">
-            <User size={16} /> Профиль пользователя
+            <div className="chatview-profile-link-avatar">{user.fullName.charAt(0)}</div>
+            <span className="chatview-profile-link-name">{user.fullName}</span>
           </Link>
         )}
       </div>
