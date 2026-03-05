@@ -1,44 +1,33 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import jsQR from 'jsqr';
 import './Hostess.css';
 
-// Есть ли BarcodeDetector в браузере (Chrome/Edge Android + Desktop)
-const hasBarcodeDetector = () => typeof window !== 'undefined' && 'BarcodeDetector' in window;
-
-// Мобильное устройство
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+// Логика статуса: 1/11/111... → выдать приз, 2/22/222... → уже получил
+// Для реальных ID: первый скан → выдать, повторный → уже получил
+const getScanStatus = (id, givenIds) => {
+  if (/^1+$/.test(id)) return 'give';
+  if (/^2+$/.test(id)) return 'already';
+  return givenIds.has(id) ? 'already' : 'give';
+};
+
 export default function Hostess() {
-  const [inputValue, setInputValue]   = useState('');
-  const [result, setResult]           = useState(null); // null | { id, status: 'give'|'already' }
+  const [inputValue, setInputValue]     = useState('');
+  const [result, setResult]             = useState(null); // null | { id, status }
   const [scannedCount, setScannedCount] = useState(0);
-  const [cameraError, setCameraError] = useState(null); // null | string
-  const [scanning, setScanning]       = useState(false); // камера активна
+  const [cameraError, setCameraError]   = useState(null);
+  const [scanning, setScanning]         = useState(false);
 
-  const givenIds      = useRef(new Set());
-  const inputRef      = useRef(null);
-  const videoRef      = useRef(null);
-  const streamRef     = useRef(null);
-  const detectorRef   = useRef(null);
-  const rafRef        = useRef(null);
-  const isMobile      = isMobileDevice();
+  const givenIds  = useRef(new Set());
+  const inputRef  = useRef(null);
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafRef    = useRef(null);
+  const isMobile  = isMobileDevice();
 
-  /* ---------- Логика сканирования ---------- */
-  const handleScan = useCallback((rawId) => {
-    const id = String(rawId).trim();
-    if (!id) return;
-    stopCamera();
-    const status = givenIds.current.has(id) ? 'already' : 'give';
-    setResult({ id, status });
-    setInputValue('');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleNext = () => {
-    if (result?.status === 'give') givenIds.current.add(result.id);
-    setScannedCount(prev => prev + 1);
-    setResult(null);
-  };
-
-  /* ---------- Камера + BarcodeDetector ---------- */
+  /* ─── Завершить сканирование ─── */
   const stopCamera = useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) {
@@ -48,56 +37,81 @@ export default function Hostess() {
     setScanning(false);
   }, []);
 
-  const scanLoop = useCallback(async () => {
-    if (!videoRef.current || !detectorRef.current) return;
-    try {
-      const codes = await detectorRef.current.detect(videoRef.current);
-      if (codes.length > 0) { handleScan(codes[0].rawValue); return; }
-    } catch (_) {}
+  /* ─── Обработка результата сканирования ─── */
+  const handleScan = useCallback((rawId) => {
+    const id = String(rawId).trim();
+    if (!id) return;
+    stopCamera();
+    const status = getScanStatus(id, givenIds.current);
+    setResult({ id, status });
+    setInputValue('');
+  }, [stopCamera]);
+
+  /* ─── jsQR: читаем фреймы с видео через canvas ─── */
+  const scanLoop = useCallback(() => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) { rafRef.current = requestAnimationFrame(scanLoop); return; }
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (code) { handleScan(code.data); return; }
+    }
     rafRef.current = requestAnimationFrame(scanLoop);
   }, [handleScan]);
 
+  /* ─── Запуск камеры ─── */
   const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play();
       }
-      if (hasBarcodeDetector()) {
-        detectorRef.current = new window.BarcodeDetector({ formats: ['qr_code'] });
-        setScanning(true);
-        rafRef.current = requestAnimationFrame(scanLoop);
-      } else {
-        setScanning(true); // камера есть, но декодера нет — только картинка
-      }
-    } catch (e) {
+      setScanning(true);
+      rafRef.current = requestAnimationFrame(scanLoop);
+    } catch {
       setCameraError('Нет доступа к камере. Разрешите использование в настройках браузера.');
     }
   }, [scanLoop]);
 
-  /* ---------- Запуск камеры на мобиле при отсутствии результата ---------- */
+  /* ─── Автостарт камеры на мобиле ─── */
   useEffect(() => {
-    if (isMobile && !result) {
-      startCamera();
-    }
+    if (isMobile && !result) startCamera();
     return () => { if (isMobile) stopCamera(); };
   }, [isMobile, result]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ---------- Автофокус текстового поля на десктопе ---------- */
+  /* ─── Автофокус на десктопе ─── */
   useEffect(() => {
     if (!isMobile && !result) inputRef.current?.focus();
   }, [isMobile, result]);
 
+  /* ─── Клавиатурный ввод (десктоп) ─── */
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleScan(inputValue);
   };
 
-  /* ---------- Render ---------- */
+  /* ─── «Далее» ─── */
+  const handleNext = () => {
+    if (result?.status === 'give' && !/^[12]+$/.test(result.id)) {
+      givenIds.current.add(result.id);
+    }
+    setScannedCount(prev => prev + 1);
+    setResult(null);
+  };
+
   return (
     <div className="hostess-page">
 
@@ -110,39 +124,28 @@ export default function Hostess() {
         <div className="hostess-logo-subtitle">PARTNERS</div>
       </div>
 
-      {/* Центральный блок */}
+      {/* Центральная зона */}
       <div className="hostess-center">
-
         {!result ? (
           isMobile ? (
-            /* === МОБИЛЬ: Камера === */
+            /* === МОБИЛЬ: живая камера === */
             <div className="hostess-camera-wrap">
               {cameraError ? (
                 <div className="hostess-camera-error">{cameraError}</div>
               ) : (
-                <video
-                  ref={videoRef}
-                  className="hostess-camera-video"
-                  autoPlay
-                  playsInline
-                  muted
-                />
-              )}
-              {/* На случай если BarcodeDetector недоступен — ручной ввод */}
-              {scanning && !hasBarcodeDetector() && (
-                <input
-                  ref={inputRef}
-                  className="hostess-scan-input hostess-scan-input--overlay"
-                  placeholder="Введите код вручную"
-                  value={inputValue}
-                  onChange={e => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  autoComplete="off"
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    className="hostess-camera-video"
+                    autoPlay playsInline muted
+                  />
+                  {/* скрытый canvas для jsQR */}
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                </>
               )}
             </div>
           ) : (
-            /* === ДЕСКТОП: Текстовое поле === */
+            /* === ДЕСКТОП: текстовый ввод === */
             <input
               ref={inputRef}
               className="hostess-scan-input"
@@ -164,14 +167,13 @@ export default function Hostess() {
             <button className="hostess-next-btn" onClick={handleNext}>Далее</button>
           </div>
         )}
-
       </div>
 
       {/* Нижняя панель */}
       <div className="hostess-footer">
         <span>Отсканировано кодов: {scannedCount}</span>
         <a
-          href="https://t.me/winlinepartners"
+          href="https://t.me/avoynich"
           target="_blank"
           rel="noopener noreferrer"
           className="hostess-support-link"

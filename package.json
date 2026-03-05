@@ -9,13 +9,13 @@
     "dev:server": "node server/index.js",
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
-
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "dompurify": "^3.3.1",
     "express": "^5.2.1",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.574.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

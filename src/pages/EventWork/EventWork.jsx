@@ -87,7 +87,6 @@ export default function EventWork() {
               </div>
               <div className="ew-preview-subtitle">PARTNERS</div>
               <div className="ew-preview-input">Отсканируйте QR код</div>
-              <div className="ew-preview-bar">Отсканировано: 0</div>
             </div>
           </div>
         </div>
