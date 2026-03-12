@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import { getAllNested, getById, create, update, remove } from './db.js';
 
@@ -141,6 +142,53 @@ app.post('/api/chats/:id/messages', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- Bot API Proxy (port 5050 → /api/bot/*) ---
+// Routes that proxy to admin_api.py running alongside the bot
+
+const BOT_API_HOST = '127.0.0.1';
+const BOT_API_PORT = 5050;
+
+function proxyBotApi(req, res, targetPath, method, bodyObj) {
+  const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
+  const options = {
+    hostname: BOT_API_HOST,
+    port: BOT_API_PORT,
+    path: targetPath,
+    method: method || req.method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    let data = '';
+    proxyRes.on('data', chunk => { data += chunk; });
+    proxyRes.on('end', () => {
+      res.status(proxyRes.statusCode);
+      try { res.json(JSON.parse(data)); } catch { res.send(data); }
+    });
+  });
+
+  proxyReq.on('error', () => {
+    res.status(503).json({ error: 'Bot API unavailable. Is admin_api.py running?' });
+  });
+
+  if (bodyStr) proxyReq.write(bodyStr);
+  proxyReq.end();
+}
+
+app.get('/api/bot/users/count', (req, res) => {
+  const qs = new URLSearchParams(req.query).toString();
+  proxyBotApi(req, res, `/users/count${qs ? '?' + qs : ''}`);
+});
+
+app.get('/api/bot/broadcasts', (req, res) => {
+  proxyBotApi(req, res, '/broadcasts');
+});
+
+app.post('/api/bot/broadcasts', (req, res) => {
+  proxyBotApi(req, res, '/broadcasts', 'POST', req.body);
 });
 
 // --- Production: serve Vite build ---

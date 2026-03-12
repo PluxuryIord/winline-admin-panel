@@ -1,26 +1,37 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, BarChart2, Trophy, HelpCircle,
   Plus, Trash2, Image, Paperclip, Check, Shuffle,
-  ChevronDown, ChevronUp, Send
+  Send, Users, CheckCircle, AlertCircle, Loader
 } from 'lucide-react';
 import './BroadcastEditor.css';
 
 /* ── метаданные типов ── */
 const TYPE_META = {
-  post:    { icon: FileText,  label: 'Пост' },
-  poll:    { icon: BarChart2, label: 'Опрос' },
-  contest: { icon: Trophy,    label: 'Конкурс с рандомайзером' },
+  post:    { icon: FileText,   label: 'Пост' },
+  poll:    { icon: BarChart2,  label: 'Опрос' },
+  contest: { icon: Trophy,     label: 'Конкурс с рандомайзером' },
   quiz:    { icon: HelpCircle, label: 'Викторина с рандомайзером' },
 };
 
-const MOCK_BOTS = ['Winline Partners Bot', 'Winline Sport Bot', 'Winline VIP Bot'];
-const MOCK_CHANNELS = [
-  { id: 'news',  label: '#winline_news' },
-  { id: 'sport', label: '#winline_sport' },
-  { id: 'vip',   label: '#winline_vip' },
-  { id: 'promo', label: '#winline_promo' },
+/* ── Аудитория бота ── */
+const AUDIENCE_OPTIONS = [
+  {
+    key: 'all',
+    label: 'Все пользователи бота',
+    desc: 'Отправить всем активным пользователям',
+  },
+  {
+    key: 'registered',
+    label: 'Зарегистрированные партнёры',
+    desc: 'Только те, кто завершил регистрацию',
+  },
+  {
+    key: 'me',
+    label: 'Только я (тест)',
+    desc: 'Отправить только себе для проверки',
+  },
 ];
 
 /* ════════ Конструкторы по типам ════════ */
@@ -198,73 +209,53 @@ function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, on
   );
 }
 
-/* ════════ Правая панель — фильтры ════════ */
-function FiltersPanel({ selectedBot, onBot, selectedChannels, onChannels }) {
-  const [botsOpen, setBotsOpen] = useState(true);
-  const [channelsOpen, setChannelsOpen] = useState(true);
-
-  const toggleChannel = (id) => {
-    onChannels(prev =>
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    );
-  };
-
+/* ════════ Правая панель — аудитория ════════ */
+function AudiencePanel({ audience, onAudience, userCount, countLoading }) {
   return (
     <div className="be-filters-panel">
-      <div className="be-filters-title">Аудитория</div>
-
-      {/* По боту */}
-      <div className="be-filter-group">
-        <button className="be-filter-group-header" onClick={() => setBotsOpen(o => !o)}>
-          <span>Бот</span>
-          {botsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        {botsOpen && (
-          <div className="be-filter-group-body">
-            {MOCK_BOTS.map(bot => (
-              <label key={bot} className="be-radio-row">
-                <input
-                  type="radio"
-                  name="bot"
-                  className="be-radio"
-                  checked={selectedBot === bot}
-                  onChange={() => onBot(bot)}
-                />
-                <span>{bot}</span>
-              </label>
-            ))}
-          </div>
-        )}
+      <div className="be-filters-title">
+        <Users size={13} style={{ display: 'inline', marginRight: 6 }} />
+        Аудитория
       </div>
 
-      {/* По каналам */}
-      <div className="be-filter-group">
-        <button className="be-filter-group-header" onClick={() => setChannelsOpen(o => !o)}>
-          <span>Каналы</span>
-          {channelsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        {channelsOpen && (
-          <div className="be-filter-group-body">
-            {MOCK_CHANNELS.map(ch => (
-              <label key={ch.id} className="be-checkbox-row">
-                <input
-                  type="checkbox"
-                  className="be-checkbox"
-                  checked={selectedChannels.includes(ch.id)}
-                  onChange={() => toggleChannel(ch.id)}
-                />
-                <span className="be-channel-label">{ch.label}</span>
-              </label>
-            ))}
-          </div>
-        )}
+      <div className="be-filter-group-body be-audience-options">
+        {AUDIENCE_OPTIONS.map(opt => (
+          <label
+            key={opt.key}
+            className={`be-audience-option ${audience === opt.key ? 'be-audience-option--active' : ''}`}
+          >
+            <input
+              type="radio"
+              name="audience"
+              className="be-radio"
+              checked={audience === opt.key}
+              onChange={() => onAudience(opt.key)}
+            />
+            <div className="be-audience-option-info">
+              <span className="be-audience-option-label">{opt.label}</span>
+              <span className="be-audience-option-desc">{opt.desc}</span>
+            </div>
+          </label>
+        ))}
       </div>
 
       <div className="be-audience-summary">
-        {selectedChannels.length === 0
-          ? <span className="be-audience-warn">Выберите хотя бы один канал</span>
-          : <span>Каналов выбрано: <b>{selectedChannels.length}</b></span>
-        }
+        {countLoading ? (
+          <span className="be-audience-loading">
+            <Loader size={12} className="be-spin" /> Загрузка...
+          </span>
+        ) : userCount !== null ? (
+          <span>
+            Получателей: <b>{userCount.toLocaleString('ru-RU')}</b>
+          </span>
+        ) : (
+          <span className="be-audience-warn">Бот API недоступен</span>
+        )}
+      </div>
+
+      <div className="be-bot-note">
+        Рассылка отправляется через Telegram бота
+        напрямую каждому пользователю в личные сообщения.
       </div>
     </div>
   );
@@ -286,14 +277,92 @@ export default function BroadcastEditor() {
   const [correctIndex, setCorrectIndex] = useState(0);
   const [randomizer, setRandomizer] = useState(true);
 
-  // Состояние фильтров
-  const [selectedBot, setSelectedBot] = useState(MOCK_BOTS[0]);
-  const [selectedChannels, setSelectedChannels] = useState([]);
+  // Аудитория + счётчик
+  const [audience, setAudience] = useState('all');
+  const [userCount, setUserCount] = useState(null);
+  const [countLoading, setCountLoading] = useState(false);
 
-  const handlePublish = useCallback(() => {
-    alert('Рассылка опубликована!');
-    navigate('/mailings');
-  }, [navigate]);
+  // Состояние отправки
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null); // null | {success, count, alertId} | {error}
+
+  // Запрашиваем счётчик при смене аудитории
+  useEffect(() => {
+    setCountLoading(true);
+    setUserCount(null);
+    fetch(`/api/bot/users/count?audience=${audience}`)
+      .then(r => r.json())
+      .then(d => setUserCount(typeof d.count === 'number' ? d.count : null))
+      .catch(() => setUserCount(null))
+      .finally(() => setCountLoading(false));
+  }, [audience]);
+
+  // Форматируем содержимое в текст для бота
+  const buildText = useCallback(() => {
+    if (type === 'post' || type === 'contest') return text;
+    if (type === 'poll') {
+      const opts = pollOptions
+        .filter(o => o.trim())
+        .map((o, i) => `${i + 1}. ${o}`)
+        .join('\n');
+      return `❓ <b>${question}</b>\n\n${opts}`;
+    }
+    if (type === 'quiz') {
+      const opts = quizOptions
+        .filter(o => o.trim())
+        .map((o, i) => `${i === correctIndex ? '✅' : '▫️'} ${o}`)
+        .join('\n');
+      return `🧠 <b>${question}</b>\n\n${opts}`;
+    }
+    return text;
+  }, [type, text, question, pollOptions, quizOptions, correctIndex]);
+
+  const handlePublish = useCallback(async () => {
+    const msgText = buildText().trim();
+    if (!msgText) {
+      alert('Заполните содержимое рассылки!');
+      return;
+    }
+
+    setSending(true);
+    setSendResult(null);
+
+    try {
+      const r = await fetch('/api/bot/broadcasts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msgText, audience }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      setSendResult({ success: true, count: data.recipients_count, alertId: data.alert_id });
+    } catch (e) {
+      setSendResult({ error: e.message });
+    } finally {
+      setSending(false);
+    }
+  }, [audience, buildText]);
+
+  // Успешная отправка — показываем результат
+  if (sendResult?.success) {
+    return (
+      <div className="be-container">
+        <div className="be-success-screen">
+          <div className="be-success-icon">
+            <CheckCircle size={52} />
+          </div>
+          <h2 className="be-success-title">Рассылка запущена!</h2>
+          <p className="be-success-desc">
+            Сообщение отправляется <b>{sendResult.count.toLocaleString('ru-RU')}</b> получателям.
+            <br />ID рассылки: <code>#{sendResult.alertId}</code>
+          </p>
+          <button className="be-publish-btn" onClick={() => navigate('/mailings')}>
+            Перейти к списку рассылок
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="be-container">
@@ -338,7 +407,7 @@ export default function BroadcastEditor() {
             />
           )}
 
-          {/* Кнопка загрузки материалов */}
+          {/* Загрузка материалов */}
           <div className="be-upload-row">
             <button className="be-upload-btn">
               <Image size={16} /> Загрузить изображение
@@ -349,14 +418,22 @@ export default function BroadcastEditor() {
           </div>
         </div>
 
-        {/* Правая колонка — фильтры */}
-        <FiltersPanel
-          selectedBot={selectedBot}
-          onBot={setSelectedBot}
-          selectedChannels={selectedChannels}
-          onChannels={setSelectedChannels}
+        {/* Правая колонка — аудитория */}
+        <AudiencePanel
+          audience={audience}
+          onAudience={setAudience}
+          userCount={userCount}
+          countLoading={countLoading}
         />
       </div>
+
+      {/* Ошибка отправки */}
+      {sendResult?.error && (
+        <div className="be-send-error">
+          <AlertCircle size={16} />
+          <span>{sendResult.error}</span>
+        </div>
+      )}
 
       {/* Подвал */}
       <div className="be-footer">
@@ -366,10 +443,10 @@ export default function BroadcastEditor() {
         <button
           className="be-publish-btn"
           onClick={handlePublish}
-          disabled={selectedChannels.length === 0}
+          disabled={sending || countLoading}
         >
-          <Send size={16} />
-          Опубликовать
+          {sending ? <Loader size={16} className="be-spin" /> : <Send size={16} />}
+          {sending ? 'Отправка...' : 'Опубликовать'}
         </button>
       </div>
     </div>
