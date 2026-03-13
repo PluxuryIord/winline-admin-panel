@@ -1,8 +1,9 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import http from 'http';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
+import mysql from 'mysql2/promise';
 import { getAllNested, getById, create, update, remove } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -144,51 +145,131 @@ app.post('/api/chats/:id/messages', (req, res) => {
   }
 });
 
-// --- Bot API Proxy (port 5050 → /api/bot/*) ---
-// Routes that proxy to admin_api.py running alongside the bot
+// --- Bot DB: прямое подключение к MySQL бота ---
+// Читаем .env бота (оба проекта лежат рядом: ../WLPartnersBot)
 
-const BOT_API_HOST = '127.0.0.1';
-const BOT_API_PORT = 5050;
+const BOT_DIR = path.resolve(__dirname, '..', '..', 'WLPartnersBot');
+const PYTHON_BIN = process.platform === 'win32'
+  ? path.join(BOT_DIR, 'venv', 'Scripts', 'python.exe')
+  : path.join(BOT_DIR, 'venv', 'bin', 'python3');
 
-function proxyBotApi(req, res, targetPath, method, bodyObj) {
-  const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
-  const options = {
-    hostname: BOT_API_HOST,
-    port: BOT_API_PORT,
-    path: targetPath,
-    method: method || req.method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
-
-  const proxyReq = http.request(options, (proxyRes) => {
-    let data = '';
-    proxyRes.on('data', chunk => { data += chunk; });
-    proxyRes.on('end', () => {
-      res.status(proxyRes.statusCode);
-      try { res.json(JSON.parse(data)); } catch { res.send(data); }
-    });
-  });
-
-  proxyReq.on('error', () => {
-    res.status(503).json({ error: 'Bot API unavailable. Is admin_api.py running?' });
-  });
-
-  if (bodyStr) proxyReq.write(bodyStr);
-  proxyReq.end();
+// Парсим .env файл бота
+function parseBotEnv() {
+  try {
+    const raw = fs.readFileSync(path.join(BOT_DIR, '.env'), 'utf-8');
+    return Object.fromEntries(
+      raw.split('\n')
+        .filter(l => l.includes('=') && !l.startsWith('#'))
+        .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
+    );
+  } catch { return null; }
 }
 
-app.get('/api/bot/users/count', (req, res) => {
-  const qs = new URLSearchParams(req.query).toString();
-  proxyBotApi(req, res, `/users/count${qs ? '?' + qs : ''}`);
+let botDb = null;
+const botEnv = parseBotEnv();
+if (botEnv?.MYSQL_HOST) {
+  botDb = mysql.createPool({
+    host: botEnv.MYSQL_HOST,
+    port: parseInt(botEnv.MYSQL_PORT || '3306'),
+    user: botEnv.MYSQL_USER,
+    password: botEnv.MYSQL_PASSWORD,
+    database: botEnv.MYSQL_DATABASE,
+    charset: 'utf8mb4',
+    waitForConnections: true,
+    connectionLimit: 5,
+  });
+  console.log('[bot-db] Connected to bot MySQL:', botEnv.MYSQL_DATABASE);
+} else {
+  console.warn('[bot-db] Bot .env not found or MYSQL_* vars missing — bot routes unavailable');
+}
+
+// Alert data template (matches bot's Alert.add() format)
+const makeAlertData = (text) => JSON.stringify({
+  alert_type: 'text',
+  text,
+  files: [],
+  buttons: [],
+  files_counter: { all: 0, photo: 0, video: 0, document: 0, animation: 0, sticker: false, video_note: false, voice: false },
 });
 
-app.get('/api/bot/broadcasts', (req, res) => {
-  proxyBotApi(req, res, '/broadcasts');
+// GET /api/bot/users/count?audience=all|registered|me
+app.get('/api/bot/users/count', async (req, res) => {
+  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+  try {
+    const audience = req.query.audience || 'all';
+    let sql = 'SELECT COUNT(*) AS count FROM users WHERE banned = 0';
+    if (audience === 'registered') sql += ' AND registered = 1';
+    if (audience === 'me') sql += ' AND user_id IN (SELECT admin_id FROM admins LIMIT 1)';
+    const [[row]] = await botDb.query(sql);
+    res.json({ count: Number(row.count), audience });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/bot/broadcasts', (req, res) => {
-  proxyBotApi(req, res, '/broadcasts', 'POST', req.body);
+// GET /api/bot/broadcasts — история рассылок из БД бота
+app.get('/api/bot/broadcasts', async (req, res) => {
+  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+  try {
+    const [rows] = await botDb.query(
+      'SELECT id, data, status_code, date_sent, successfully_sent, error_sent FROM alerts WHERE status_code != 0 ORDER BY id DESC LIMIT 100'
+    );
+    const statusMap = { 1: 'sending', 201: 'published' };
+    res.json(rows.map(r => {
+      const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
+      return {
+        id: r.id,
+        text: (d.text || '').substring(0, 120),
+        alert_type: d.alert_type,
+        status: statusMap[r.status_code] || 'unknown',
+        date_sent: r.date_sent,
+        successfully_sent: r.successfully_sent,
+        error_sent: r.error_sent,
+      };
+    }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/bot/broadcasts — создать и отправить рассылку
+app.post('/api/bot/broadcasts', async (req, res) => {
+  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+  const { text, audience } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+
+  try {
+    // Получаем admin_id
+    const [[admin]] = await botDb.query('SELECT admin_id FROM admins LIMIT 1');
+    if (!admin) return res.status(500).json({ error: 'No admins in bot DB' });
+
+    // Получаем список получателей
+    let usersSql = 'SELECT user_id FROM users WHERE banned = 0';
+    if (audience === 'registered') usersSql += ' AND registered = 1';
+    if (audience === 'me')         usersSql += ' AND user_id IN (SELECT admin_id FROM admins LIMIT 1)';
+    const [users] = await botDb.query(usersSql);
+    if (!users.length) return res.status(400).json({ error: 'No users found for selected audience' });
+
+    // Создаём запись рассылки
+    const recipients = JSON.stringify(Object.fromEntries(users.map(u => [u.user_id, 0])));
+    const [result] = await botDb.query(
+      `INSERT INTO alerts (data, status_code, admin_id, recipients, successfully_sent, error_sent, dispatch_log)
+       VALUES (?, 0, ?, ?, 0, 0, '⏳Рассылка запускается...\n\n')`,
+      [makeAlertData(text.trim()), admin.admin_id, recipients]
+    );
+    const alertId = result.insertId;
+
+    // Запускаем background_alert.py (фоновый процесс)
+    spawn(PYTHON_BIN, ['-m', 'background_alert', String(alertId)], {
+      cwd: BOT_DIR,
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+
+    res.json({ alert_id: alertId, recipients_count: users.length, status: 'sending' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Production: serve Vite build ---
