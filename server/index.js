@@ -308,8 +308,12 @@ function getPeriodDates(period) {
   }
 }
 
-// Одиночный GraphQL запрос к IAP (таймаут 35с — демо-сервер бывает медленным)
-async function iapQuery(query) {
+// Кеш IAP ответов: ключ = period, значение = { data, ts }
+const iapCache = new Map();
+const IAP_CACHE_TTL = 5 * 60 * 1000; // 5 минут
+
+// Одиночный GraphQL запрос к IAP
+async function iapQuery(query, timeoutMs = 40000) {
   if (!IAP_URL || !IAP_TOKEN) throw new Error('IAP не настроен (нет IAP_URL или IAP_TOKEN в .env)');
   const res = await fetch(IAP_URL, {
     method: 'POST',
@@ -318,7 +322,7 @@ async function iapQuery(query) {
       'Authorization': `Bearer ${IAP_TOKEN}`,
     },
     body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(35000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`IAP HTTP ${res.status}`);
   const json = await res.json();
@@ -328,10 +332,16 @@ async function iapQuery(query) {
 
 // GET /api/iap/analytics?period=today|24h|week|month|year|all
 app.get('/api/iap/analytics', async (req, res) => {
-  // Даём Express 160с — 4 запроса по 35с + запас
-  res.setTimeout(160000);
+  res.setTimeout(180000); // 3 мин — запас на медленный демо-сервер
 
   const period = req.query.period || 'month';
+
+  // Отдаём кеш если свежий
+  const cached = iapCache.get(period);
+  if (cached && Date.now() - cached.ts < IAP_CACHE_TTL) {
+    return res.json({ ...cached.data, cached: true });
+  }
+
   const { start, end } = getPeriodDates(period);
 
   const makeQuery = (statusFilter) => {
@@ -342,11 +352,13 @@ app.get('/api/iap/analytics', async (req, res) => {
   };
 
   try {
-    // Запросы последовательно — демо-сервер не справляется с 4 параллельными
-    const rTotal     = await iapQuery(makeQuery(null));
-    const rConfirmed = await iapQuery(makeQuery(2));
-    const rPending   = await iapQuery(makeQuery(1));
-    const rCancelled = await iapQuery(makeQuery(3));
+    // Пробуем параллельно (быстрее на нормальном сервере)
+    const [rTotal, rConfirmed, rPending, rCancelled] = await Promise.all([
+      iapQuery(makeQuery(null)),
+      iapQuery(makeQuery(2)),
+      iapQuery(makeQuery(1)),
+      iapQuery(makeQuery(3)),
+    ]);
 
     const total     = rTotal.conversions.count;
     const confirmed = rConfirmed.conversions.count;
@@ -354,9 +366,30 @@ app.get('/api/iap/analytics', async (req, res) => {
     const cancelled = rCancelled.conversions.count;
     const confirmRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0.0';
 
-    res.json({ total, confirmed, pending, cancelled, confirmRate, period, start, end });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const data = { total, confirmed, pending, cancelled, confirmRate, period, start, end };
+    iapCache.set(period, { data, ts: Date.now() });
+    res.json(data);
+  } catch (parallelErr) {
+    // Если параллельные упали — пробуем последовательно
+    console.warn('[iap] Parallel failed, trying sequential:', parallelErr.message);
+    try {
+      const rTotal     = await iapQuery(makeQuery(null), 45000);
+      const rConfirmed = await iapQuery(makeQuery(2), 45000);
+      const rPending   = await iapQuery(makeQuery(1), 45000);
+      const rCancelled = await iapQuery(makeQuery(3), 45000);
+
+      const total     = rTotal.conversions.count;
+      const confirmed = rConfirmed.conversions.count;
+      const pending   = rPending.conversions.count;
+      const cancelled = rCancelled.conversions.count;
+      const confirmRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0.0';
+
+      const data = { total, confirmed, pending, cancelled, confirmRate, period, start, end };
+      iapCache.set(period, { data, ts: Date.now() });
+      res.json(data);
+    } catch (seqErr) {
+      res.status(500).json({ error: seqErr.message });
+    }
   }
 });
 

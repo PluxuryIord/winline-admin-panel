@@ -20,9 +20,9 @@ const PERIOD_CODE = {
 export default function Analytics() {
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState('За месяц');
+  const [selectedPeriod, setSelectedPeriod] = useState('За неделю');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [stats, setStats] = useState(analyticsByPeriod['За месяц']);
+  const [stats, setStats] = useState(analyticsByPeriod['За неделю']);
 
   // IAP данные
   const [iap, setIap] = useState(null);        // { total, confirmed, pending, cancelled, confirmRate }
@@ -48,6 +48,9 @@ export default function Analytics() {
   }, []);
 
   // Загрузка при старте
+  // Периоды, которые грузятся долго (много данных)
+  const SLOW_PERIODS = new Set(['За месяц', 'За год', 'За всё время']);
+
   useEffect(() => { fetchIap(selectedPeriod); }, []);
 
   const handleGenerate = () => {
@@ -272,6 +275,11 @@ export default function Analytics() {
         <span className="iap-badge">IAP Live</span>
         {iapLoading && <RefreshCw size={16} className="spin iap-spin" />}
       </div>
+      {iapLoading && SLOW_PERIODS.has(selectedPeriod) && (
+        <div className="iap-slow-hint">
+          ⏳ Большой диапазон — загрузка может занять до 2 минут
+        </div>
+      )}
 
       {iapError ? (
         <div className="iap-error">
