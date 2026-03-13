@@ -148,7 +148,9 @@ app.post('/api/chats/:id/messages', (req, res) => {
 // --- Bot DB: прямое подключение к MySQL бота ---
 // Читаем .env бота (оба проекта лежат рядом: ../WLPartnersBot)
 
-const BOT_DIR = path.resolve(__dirname, '..', '..', 'WLPartnersBot');
+// BOT_DIR берётся из переменной окружения (задаётся в .env или systemd-сервисе)
+// Fallback: папка рядом с проектом называется WLPartnersBot (локальная разработка)
+const BOT_DIR = process.env.BOT_DIR || path.resolve(__dirname, '..', '..', 'WLPartnersBot');
 const PYTHON_BIN = process.platform === 'win32'
   ? path.join(BOT_DIR, 'venv', 'Scripts', 'python.exe')
   : path.join(BOT_DIR, 'venv', 'bin', 'python3');

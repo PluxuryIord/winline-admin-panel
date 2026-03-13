@@ -1,0 +1,17 @@
+[Unit]
+Description=Winline Admin Panel
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/winline-admin-panel/
+Environment=NODE_ENV=production
+Environment=BOT_DIR=/root/WLPartners
+ExecStart=/usr/bin/node server/index.js
+RestartSec=10
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
