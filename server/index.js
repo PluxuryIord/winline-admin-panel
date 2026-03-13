@@ -312,22 +312,38 @@ function getPeriodDates(period) {
 const iapCache = new Map();
 const IAP_CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
+// Проверяем конфигурацию IAP при старте
+if (IAP_URL && IAP_TOKEN) {
+  console.log('[iap] Configured:', IAP_URL);
+} else {
+  console.warn('[iap] NOT configured — создайте .env с IAP_URL и IAP_TOKEN');
+}
+
 // Одиночный GraphQL запрос к IAP
+// Используем AbortController + setTimeout (совместимо с Node.js 14+)
 async function iapQuery(query, timeoutMs = 40000) {
   if (!IAP_URL || !IAP_TOKEN) throw new Error('IAP не настроен (нет IAP_URL или IAP_TOKEN в .env)');
-  const res = await fetch(IAP_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${IAP_TOKEN}`,
-    },
-    body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!res.ok) throw new Error(`IAP HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.errors?.[0]) throw new Error(json.errors[0].message);
-  return json.data;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(IAP_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${IAP_TOKEN}`,
+      },
+      body: JSON.stringify({ query }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`IAP HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.errors?.[0]) throw new Error(json.errors[0].message);
+    return json.data;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // GET /api/iap/analytics?period=today|24h|week|month|year|all
