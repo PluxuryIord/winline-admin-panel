@@ -10,6 +10,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.API_PORT || 3001;
 
+// --- Читаем .env проекта (IAP_TOKEN, IAP_URL и т.д.) ---
+function parseProjectEnv() {
+  try {
+    const raw = fs.readFileSync(path.resolve(__dirname, '..', '.env'), 'utf-8');
+    return Object.fromEntries(
+      raw.split('\n')
+        .filter(l => l.includes('=') && !l.startsWith('#'))
+        .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
+    );
+  } catch { return {}; }
+}
+const projectEnv = parseProjectEnv();
+const IAP_URL   = process.env.IAP_URL   || projectEnv.IAP_URL   || '';
+const IAP_TOKEN = process.env.IAP_TOKEN || projectEnv.IAP_TOKEN || '';
+
 // --- Автоинициализация данных ---
 // Если файл данных не существует — копируем из .example.json
 // Это защищает от потери данных при git pull
@@ -269,6 +284,77 @@ app.post('/api/bot/broadcasts', async (req, res) => {
     }).unref();
 
     res.json({ alert_id: alertId, recipients_count: users.length, status: 'sending' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- IAP API helpers ---
+
+// Вычисляем диапазон дат по названию периода
+function getPeriodDates(period) {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const ago = (days) => { const d = new Date(now); d.setDate(d.getDate() - days); return d; };
+  const today = fmt(now);
+  switch (period) {
+    case 'today':  return { start: today, end: today };
+    case '24h':    return { start: fmt(ago(1)), end: today };
+    case 'week':   return { start: fmt(ago(7)), end: today };
+    case 'month':  return { start: fmt(ago(30)), end: today };
+    case 'year':   return { start: fmt(ago(365)), end: today };
+    default:       return { start: '2020-01-01', end: today }; // all time
+  }
+}
+
+// Одиночный GraphQL запрос к IAP (таймаут 35с — демо-сервер бывает медленным)
+async function iapQuery(query) {
+  if (!IAP_URL || !IAP_TOKEN) throw new Error('IAP не настроен (нет IAP_URL или IAP_TOKEN в .env)');
+  const res = await fetch(IAP_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${IAP_TOKEN}`,
+    },
+    body: JSON.stringify({ query }),
+    signal: AbortSignal.timeout(35000),
+  });
+  if (!res.ok) throw new Error(`IAP HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors?.[0]) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+// GET /api/iap/analytics?period=today|24h|week|month|year|all
+app.get('/api/iap/analytics', async (req, res) => {
+  // Даём Express 160с — 4 запроса по 35с + запас
+  res.setTimeout(160000);
+
+  const period = req.query.period || 'month';
+  const { start, end } = getPeriodDates(period);
+
+  const makeQuery = (statusFilter) => {
+    const where = statusFilter !== null
+      ? `where: { status: ${statusFilter}, start: "${start}", end: "${end}" }`
+      : `where: { start: "${start}", end: "${end}" }`;
+    return `{ conversions(${where}) { count } }`;
+  };
+
+  try {
+    // Запросы последовательно — демо-сервер не справляется с 4 параллельными
+    const rTotal     = await iapQuery(makeQuery(null));
+    const rConfirmed = await iapQuery(makeQuery(2));
+    const rPending   = await iapQuery(makeQuery(1));
+    const rCancelled = await iapQuery(makeQuery(3));
+
+    const total     = rTotal.conversions.count;
+    const confirmed = rConfirmed.conversions.count;
+    const pending   = rPending.conversions.count;
+    const cancelled = rCancelled.conversions.count;
+    const confirmRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0.0';
+
+    res.json({ total, confirmed, pending, cancelled, confirmRate, period, start, end });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
