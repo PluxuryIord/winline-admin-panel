@@ -9,6 +9,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        proxyTimeout: 200000,  // 200с — IAP может быть медленным
+        timeout: 200000,
       }
     }
   }
