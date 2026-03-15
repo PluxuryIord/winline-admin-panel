@@ -25,6 +25,34 @@ for (const name of dataFiles) {
 
 app.use(express.json({ limit: '5mb' }));
 
+// --- Статика для загруженных файлов ---
+const uploadsDir = path.join(__dirname, 'data', 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
+// POST /api/upload — загрузка изображения (base64)
+app.post('/api/upload', (req, res) => {
+  try {
+    const { data, filename } = req.body;
+    if (!data) return res.status(400).json({ error: 'No data' });
+
+    // data = "data:image/png;base64,iVBOR..."
+    const match = data.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (!match) return res.status(400).json({ error: 'Invalid image data' });
+
+    const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+    const buffer = Buffer.from(match[2], 'base64');
+
+    // Уникальное имя: timestamp + рандом
+    const name = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, name), buffer);
+
+    res.json({ url: `/uploads/${name}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- API Routes ---
 
 app.get('/api/knowledge', (req, res) => {
@@ -169,6 +197,8 @@ function parseBotEnv() {
 
 let botDb = null;
 const botEnv = parseBotEnv();
+const BOT_TOKEN = botEnv?.BOT_TOKEN || '';
+
 if (botEnv?.MYSQL_HOST) {
   botDb = mysql.createPool({
     host: botEnv.MYSQL_HOST,
@@ -184,6 +214,12 @@ if (botEnv?.MYSQL_HOST) {
 } else {
   console.warn('[bot-db] Bot .env not found or MYSQL_* vars missing — bot routes unavailable');
 }
+
+// Логируем конфигурацию бота при старте
+console.log('[bot] BOT_DIR:', BOT_DIR);
+console.log('[bot] PYTHON_BIN:', PYTHON_BIN);
+console.log('[bot] venv exists:', fs.existsSync(PYTHON_BIN));
+console.log('[bot] BOT_TOKEN:', BOT_TOKEN ? 'set' : 'NOT SET');
 
 // Alert data template (matches bot's Alert.add() format)
 const makeAlertData = (text) => JSON.stringify({
@@ -262,13 +298,87 @@ app.post('/api/bot/broadcasts', async (req, res) => {
     const alertId = result.insertId;
 
     // Запускаем background_alert.py (фоновый процесс)
-    spawn(PYTHON_BIN, ['-m', 'background_alert', String(alertId)], {
+    if (!fs.existsSync(PYTHON_BIN)) {
+      console.error('[bot] PYTHON_BIN not found:', PYTHON_BIN);
+      return res.status(500).json({
+        error: `Python не найден: ${PYTHON_BIN}. Проверьте BOT_DIR и наличие venv.`,
+      });
+    }
+
+    const child = spawn(PYTHON_BIN, ['-m', 'background_alert', String(alertId)], {
       cwd: BOT_DIR,
       detached: true,
-      stdio: 'ignore',
-    }).unref();
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    // Логируем ошибки spawn
+    child.stderr.on('data', (d) => console.error('[bot:alert:stderr]', d.toString()));
+    child.on('error', (err) => console.error('[bot:alert:error]', err.message));
+    child.on('exit', (code) => {
+      if (code !== 0) console.error('[bot:alert] exited with code', code);
+    });
+    child.unref();
 
     res.json({ alert_id: alertId, recipients_count: users.length, status: 'sending' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/bot/status — диагностика конфигурации бота
+app.get('/api/bot/status', (req, res) => {
+  res.json({
+    botDir: BOT_DIR,
+    botDirExists: fs.existsSync(BOT_DIR),
+    pythonBin: PYTHON_BIN,
+    pythonExists: fs.existsSync(PYTHON_BIN),
+    botEnvExists: botEnv !== null,
+    dbConnected: botDb !== null,
+    botToken: BOT_TOKEN ? 'set' : 'not set',
+  });
+});
+
+// POST /api/bot/channel-broadcast — рассылка по Telegram каналам
+app.post('/api/bot/channel-broadcast', async (req, res) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не найден в .env бота' });
+
+  const { text, channelIds } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+  if (!channelIds?.length) return res.status(400).json({ error: 'channelIds is required' });
+
+  const results = [];
+  for (const chatId of channelIds) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: text.trim(), parse_mode: 'HTML' }),
+      });
+      const data = await r.json();
+      results.push({ chatId, ok: data.ok, error: data.description || null });
+    } catch (err) {
+      results.push({ chatId, ok: false, error: err.message });
+    }
+  }
+
+  const success = results.filter(r => r.ok).length;
+  res.json({ total: channelIds.length, success, failed: channelIds.length - success, results });
+});
+
+// GET /api/bot/channels — получить список каналов где бот админ
+app.get('/api/bot/channels', async (req, res) => {
+  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+  try {
+    // Пробуем получить каналы из таблицы channels (если есть)
+    const [rows] = await botDb.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'channels'"
+    );
+    if (rows.length > 0) {
+      const [channels] = await botDb.query('SELECT * FROM channels ORDER BY id');
+      return res.json(channels);
+    }
+    // Если таблицы нет — отдаём пустой список
+    res.json([]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

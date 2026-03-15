@@ -656,3 +656,44 @@
     justify-content: center;
   }
 }
+
+/* ===== Переключатель бот/канал ===== */
+.be-send-mode-toggle {
+  display: flex;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 16px;
+}
+
+.be-send-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.be-send-mode-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.be-send-mode-btn--active {
+  background: var(--color-orange);
+  color: #fff;
+}
+
+.be-send-mode-btn--active:hover {
+  color: #fff;
+}

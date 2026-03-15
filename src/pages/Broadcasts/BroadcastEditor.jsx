@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, BarChart2, Trophy, HelpCircle,
   Plus, Trash2, Image, Paperclip, Check, Shuffle,
-  Send, Users, CheckCircle, AlertCircle, Loader
+  Send, Users, CheckCircle, AlertCircle, Loader, Hash
 } from 'lucide-react';
 import './BroadcastEditor.css';
 
@@ -210,53 +210,96 @@ function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, on
 }
 
 /* ════════ Правая панель — аудитория ════════ */
-function AudiencePanel({ audience, onAudience, userCount, countLoading }) {
+function AudiencePanel({ audience, onAudience, userCount, countLoading, sendMode, onSendMode, channelId, onChannelId }) {
   return (
     <div className="be-filters-panel">
-      <div className="be-filters-title">
-        <Users size={13} style={{ display: 'inline', marginRight: 6 }} />
-        Аудитория
+      {/* Переключатель: бот / канал */}
+      <div className="be-send-mode-toggle">
+        <button
+          className={`be-send-mode-btn ${sendMode === 'bot' ? 'be-send-mode-btn--active' : ''}`}
+          onClick={() => onSendMode('bot')}
+        >
+          <Users size={14} /> В бота
+        </button>
+        <button
+          className={`be-send-mode-btn ${sendMode === 'channel' ? 'be-send-mode-btn--active' : ''}`}
+          onClick={() => onSendMode('channel')}
+        >
+          <Hash size={14} /> В канал
+        </button>
       </div>
 
-      <div className="be-filter-group-body be-audience-options">
-        {AUDIENCE_OPTIONS.map(opt => (
-          <label
-            key={opt.key}
-            className={`be-audience-option ${audience === opt.key ? 'be-audience-option--active' : ''}`}
-          >
+      {sendMode === 'bot' ? (
+        <>
+          <div className="be-filters-title">
+            <Users size={13} style={{ display: 'inline', marginRight: 6 }} />
+            Аудитория
+          </div>
+
+          <div className="be-filter-group-body be-audience-options">
+            {AUDIENCE_OPTIONS.map(opt => (
+              <label
+                key={opt.key}
+                className={`be-audience-option ${audience === opt.key ? 'be-audience-option--active' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="audience"
+                  className="be-radio"
+                  checked={audience === opt.key}
+                  onChange={() => onAudience(opt.key)}
+                />
+                <div className="be-audience-option-info">
+                  <span className="be-audience-option-label">{opt.label}</span>
+                  <span className="be-audience-option-desc">{opt.desc}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="be-audience-summary">
+            {countLoading ? (
+              <span className="be-audience-loading">
+                <Loader size={12} className="be-spin" /> Загрузка...
+              </span>
+            ) : userCount !== null ? (
+              <span>
+                Получателей: <b>{userCount.toLocaleString('ru-RU')}</b>
+              </span>
+            ) : (
+              <span className="be-audience-warn">Бот API недоступен</span>
+            )}
+          </div>
+
+          <div className="be-bot-note">
+            Рассылка отправляется через Telegram бота
+            напрямую каждому пользователю в личные сообщения.
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="be-filters-title">
+            <Hash size={13} style={{ display: 'inline', marginRight: 6 }} />
+            Telegram канал
+          </div>
+
+          <div className="be-editor-section" style={{ padding: '0 0 8px' }}>
+            <label className="be-label">ID или @username канала</label>
             <input
-              type="radio"
-              name="audience"
-              className="be-radio"
-              checked={audience === opt.key}
-              onChange={() => onAudience(opt.key)}
+              className="be-input"
+              type="text"
+              placeholder="@channel или -100123456789"
+              value={channelId}
+              onChange={e => onChannelId(e.target.value)}
             />
-            <div className="be-audience-option-info">
-              <span className="be-audience-option-label">{opt.label}</span>
-              <span className="be-audience-option-desc">{opt.desc}</span>
-            </div>
-          </label>
-        ))}
-      </div>
+          </div>
 
-      <div className="be-audience-summary">
-        {countLoading ? (
-          <span className="be-audience-loading">
-            <Loader size={12} className="be-spin" /> Загрузка...
-          </span>
-        ) : userCount !== null ? (
-          <span>
-            Получателей: <b>{userCount.toLocaleString('ru-RU')}</b>
-          </span>
-        ) : (
-          <span className="be-audience-warn">Бот API недоступен</span>
-        )}
-      </div>
-
-      <div className="be-bot-note">
-        Рассылка отправляется через Telegram бота
-        напрямую каждому пользователю в личные сообщения.
-      </div>
+          <div className="be-bot-note">
+            Сообщение будет отправлено в указанный Telegram канал.
+            Бот должен быть администратором канала с правом публикации.
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -277,6 +320,10 @@ export default function BroadcastEditor() {
   const [correctIndex, setCorrectIndex] = useState(0);
   const [randomizer, setRandomizer] = useState(true);
 
+  // Режим отправки: бот / канал
+  const [sendMode, setSendMode] = useState('bot');
+  const [channelId, setChannelId] = useState('');
+
   // Аудитория + счётчик
   const [audience, setAudience] = useState('all');
   const [userCount, setUserCount] = useState(null);
@@ -284,10 +331,11 @@ export default function BroadcastEditor() {
 
   // Состояние отправки
   const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState(null); // null | {success, count, alertId} | {error}
+  const [sendResult, setSendResult] = useState(null);
 
-  // Запрашиваем счётчик при смене аудитории
+  // Запрашиваем счётчик при смене аудитории (только в режиме бота)
   useEffect(() => {
+    if (sendMode !== 'bot') return;
     setCountLoading(true);
     setUserCount(null);
     fetch(`/api/bot/users/count?audience=${audience}`)
@@ -295,7 +343,7 @@ export default function BroadcastEditor() {
       .then(d => setUserCount(typeof d.count === 'number' ? d.count : null))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [audience]);
+  }, [audience, sendMode]);
 
   // Форматируем содержимое в текст для бота
   const buildText = useCallback(() => {
@@ -324,24 +372,45 @@ export default function BroadcastEditor() {
       return;
     }
 
+    if (sendMode === 'channel' && !channelId.trim()) {
+      alert('Укажите ID или @username канала!');
+      return;
+    }
+
     setSending(true);
     setSendResult(null);
 
     try {
-      const r = await fetch('/api/bot/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: msgText, audience }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      setSendResult({ success: true, count: data.recipients_count, alertId: data.alert_id });
+      if (sendMode === 'channel') {
+        // Отправка в канал
+        const r = await fetch('/api/bot/channel-broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: msgText, channelIds: [channelId.trim()] }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        if (data.results?.[0] && !data.results[0].ok) {
+          throw new Error(data.results[0].error || 'Ошибка отправки в канал');
+        }
+        setSendResult({ success: true, count: 1, channel: channelId.trim() });
+      } else {
+        // Отправка через бота
+        const r = await fetch('/api/bot/broadcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: msgText, audience }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        setSendResult({ success: true, count: data.recipients_count, alertId: data.alert_id });
+      }
     } catch (e) {
       setSendResult({ error: e.message });
     } finally {
       setSending(false);
     }
-  }, [audience, buildText]);
+  }, [audience, buildText, sendMode, channelId]);
 
   // Успешная отправка — показываем результат
   if (sendResult?.success) {
@@ -351,10 +420,18 @@ export default function BroadcastEditor() {
           <div className="be-success-icon">
             <CheckCircle size={52} />
           </div>
-          <h2 className="be-success-title">Рассылка запущена!</h2>
+          <h2 className="be-success-title">
+            {sendResult.channel ? 'Опубликовано в канал!' : 'Рассылка запущена!'}
+          </h2>
           <p className="be-success-desc">
-            Сообщение отправляется <b>{sendResult.count.toLocaleString('ru-RU')}</b> получателям.
-            <br />ID рассылки: <code>#{sendResult.alertId}</code>
+            {sendResult.channel ? (
+              <>Сообщение отправлено в канал <code>{sendResult.channel}</code></>
+            ) : (
+              <>
+                Сообщение отправляется <b>{sendResult.count.toLocaleString('ru-RU')}</b> получателям.
+                <br />ID рассылки: <code>#{sendResult.alertId}</code>
+              </>
+            )}
           </p>
           <button className="be-publish-btn" onClick={() => navigate('/mailings')}>
             Перейти к списку рассылок
@@ -424,6 +501,10 @@ export default function BroadcastEditor() {
           onAudience={setAudience}
           userCount={userCount}
           countLoading={countLoading}
+          sendMode={sendMode}
+          onSendMode={setSendMode}
+          channelId={channelId}
+          onChannelId={setChannelId}
         />
       </div>
 
@@ -443,7 +524,7 @@ export default function BroadcastEditor() {
         <button
           className="be-publish-btn"
           onClick={handlePublish}
-          disabled={sending || countLoading}
+          disabled={sending || (sendMode === 'bot' && countLoading)}
         >
           {sending ? <Loader size={16} className="be-spin" /> : <Send size={16} />}
           {sending ? 'Отправка...' : 'Опубликовать'}
