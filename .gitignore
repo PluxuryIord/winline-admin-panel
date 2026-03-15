@@ -16,6 +16,7 @@ server/data/knowledge.db-wal
 # Runtime data — не трогается git-ом, живёт только на сервере
 server/data/chats.json
 server/data/knowledge.json
+server/data/uploads/
 dist-ssr
 *.local
 

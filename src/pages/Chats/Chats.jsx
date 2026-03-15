@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, List, LayoutGrid } from 'lucide-react';
 import { usersData } from '../../data/usersData';
+import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
 
 function formatTime(iso) {
@@ -16,6 +17,7 @@ export default function Chats() {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'columns'
+  const [deleteModal, setDeleteModal] = useState(null); // { chatId, userName }
 
   useEffect(() => {
     fetch('/api/chats')
@@ -26,8 +28,14 @@ export default function Chats() {
 
   const getUser = (userId) => usersData.find(u => u.id === userId);
 
-  const handleDelete = async (e, chatId) => {
+  const handleDelete = (e, chatId, userName) => {
     e.stopPropagation();
+    setDeleteModal({ chatId, userName });
+  };
+
+  const confirmDelete = async () => {
+    const { chatId } = deleteModal;
+    setDeleteModal(null);
     await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
     setChats(prev => prev.filter(c => c.id !== chatId));
   };
@@ -84,7 +92,7 @@ export default function Chats() {
               )}
               <button
                 className="chat-item-delete"
-                onClick={(e) => handleDelete(e, chat.id)}
+                onClick={(e) => handleDelete(e, chat.id, user ? user.fullName : `#${chat.userId}`)}
                 title="Удалить чат"
               >
                 <X size={14} />
@@ -93,6 +101,15 @@ export default function Chats() {
           );
         })}
       </div>
+
+      {deleteModal && (
+        <PromptModal
+          title={`Удалить чат с ${deleteModal.userName}?`}
+          isConfirm
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteModal(null)}
+        />
+      )}
     </div>
   );
 }

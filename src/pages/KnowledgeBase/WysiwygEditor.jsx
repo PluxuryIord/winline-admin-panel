@@ -60,12 +60,39 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     setTimeout(checkFormats, 0);
   }, [fireChange, checkFormats]);
 
+  const fileInputRef = useRef(null);
+
   const handleImage = () => {
-    setModal({
-      title: 'URL изображения',
-      placeholder: 'https://example.com/image.png',
-      onConfirm: (url) => { setModal(null); execCmd('insertImage', url); }
-    });
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; // сбрасываем чтобы можно было загрузить тот же файл
+
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 4 * 1024 * 1024) {
+      alert('Максимальный размер изображения — 4 МБ');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: reader.result }),
+        });
+        const { url, error } = await res.json();
+        if (error) throw new Error(error);
+        execCmd('insertImage', url);
+      } catch (err) {
+        alert('Ошибка загрузки: ' + err.message);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Убираем color/background/fontFamily из вставленного HTML (Word, Google Docs и т.д.)
@@ -136,7 +163,14 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
         <div className="toolbar-divider" />
 
         {/* Изображение */}
-        <button className="toolbar-btn" onMouseDown={prevent} onClick={handleImage} title="Вставить изображение"><ImageIcon size={15} /></button>
+        <button className="toolbar-btn" onMouseDown={prevent} onClick={handleImage} title="Загрузить изображение"><ImageIcon size={15} /></button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
 
       </div>
 
