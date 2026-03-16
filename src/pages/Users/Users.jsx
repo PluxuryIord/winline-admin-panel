@@ -1,46 +1,91 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader } from 'lucide-react';
 import './Users.css';
 
+const PAGE_SIZE = 50;
+
 export default function Users() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [users, setUsers] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(true);
 
-  // Состояния фильтров
+  // Фильтры
   const [filterRole, setFilterRole] = useState('all');
   const [filterBanned, setFilterBanned] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
 
-  // Состояние сортировки
+  // Сортировка
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
 
   // Export dropdown
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const exportRef = useRef(null);
+  const sentinelRef = useRef(null);
 
-  // Загрузка пользователей из API
+  // Дебаунс поиска
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/users');
-        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setUsers(data);
-      } catch (err) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
+  // Загрузка пользователей
+  const fetchUsers = useCallback(async (offset = 0, append = false) => {
+    try {
+      if (!append) setLoading(true);
+      else setLoadingMore(true);
+
+      const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+
+      const res = await fetch(`/api/users?${params}`);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      const data = await res.json();
+
+      if (append) {
+        setUsers(prev => [...prev, ...data.users]);
+      } else {
+        setUsers(data.users);
+      }
+      setTotal(data.total);
+      setHasMore(offset + data.users.length < data.total);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [debouncedSearch]);
+
+  // Перезагрузка при смене поиска
+  useEffect(() => {
+    setUsers([]);
+    setHasMore(true);
+    fetchUsers(0, false);
+  }, [fetchUsers]);
+
+  // Infinite scroll — IntersectionObserver
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchUsers(users.length, true);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, users.length, fetchUsers]);
+
+  // Close export dropdown
   useEffect(() => {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
@@ -65,20 +110,10 @@ export default function Users() {
     return Array.from(roles).sort();
   }, [users]);
 
-  // Фильтрация и сортировка
+  // Фильтрация и сортировка (клиентская, по загруженным)
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
-    // 1. Поиск
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(u =>
-        u.fullName.toLowerCase().includes(q) ||
-        u.telegram.toLowerCase().includes(q)
-      );
-    }
-
-    // 2. Фильтры
     if (filterRole !== 'all') {
       result = result.filter(u => u.role === filterRole);
     }
@@ -90,7 +125,6 @@ export default function Users() {
       result = result.filter(u => (u.tags || []).includes(filterTag));
     }
 
-    // 3. Сортировка
     if (sortConfig.key) {
       result.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -100,7 +134,7 @@ export default function Users() {
     }
 
     return result;
-  }, [users, search, filterRole, filterBanned, filterTag, sortConfig]);
+  }, [users, filterRole, filterBanned, filterTag, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -160,7 +194,7 @@ export default function Users() {
   const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
   const handleExportGoogle = () => { exportCSV(filteredAndSortedUsers); setShowExportDropdown(false); };
 
-  if (loading) {
+  if (loading && users.length === 0) {
     return (
       <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
         <Loader size={32} className="spinner" />
@@ -169,7 +203,7 @@ export default function Users() {
     );
   }
 
-  if (error) {
+  if (error && users.length === 0) {
     return (
       <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: '#ff5555' }}>
         Ошибка загрузки: {error}
@@ -193,7 +227,7 @@ export default function Users() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <span style={{ color: '#888', fontSize: 14 }}>Всего: {users.length} | Найдено: {filteredAndSortedUsers.length}</span>
+          <span style={{ color: '#888', fontSize: 14 }}>Всего: {total} | Загружено: {users.length}</span>
           <div className="export-wrapper" ref={exportRef}>
             <button className="btn-control primary" onClick={() => setShowExportDropdown(!showExportDropdown)}>
               <Download size={18} /> Экспорт <ChevronDown size={14} />
@@ -289,7 +323,7 @@ export default function Users() {
                       </span>
                     ))}
                     {user.banned && <span className="tag-badge tag-banned">Забанен</span>}
-                    {user.role && user.role !== '—' && <span className="tag-badge tag-role">{user.role}</span>}
+                    {user.role && user.role !== '—' && <span className="tag-badge">{user.role}</span>}
                   </div>
                 </td>
 
@@ -301,7 +335,7 @@ export default function Users() {
                 </td>
               </tr>
             ))}
-            {filteredAndSortedUsers.length === 0 && (
+            {filteredAndSortedUsers.length === 0 && !loading && (
               <tr>
                 <td colSpan="3" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
                   Пользователи не найдены
@@ -310,6 +344,16 @@ export default function Users() {
             )}
           </tbody>
         </table>
+
+        {/* Sentinel для infinite scroll */}
+        <div ref={sentinelRef} style={{ height: 1 }} />
+
+        {loadingMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+            <Loader size={24} className="spinner" />
+            <span style={{ marginLeft: 10, color: '#888', fontSize: 14 }}>Загрузка...</span>
+          </div>
+        )}
       </div>
 
     </div>

@@ -79,16 +79,34 @@ export default function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat?.messages]);
 
-  const handleRemoveTag = (tag) => setTags(prev => prev.filter(t => t !== tag));
+  // Сохранение тегов на сервер
+  const saveTags = async (newTags) => {
+    setTags(newTags);
+    if (!user) return;
+    try {
+      await fetch(`/api/users/${user.id}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
+      });
+    } catch (err) {
+      console.error('Failed to save tags:', err);
+    }
+  };
+
+  const handleRemoveTag = (tag) => {
+    if (tag === 'Старый пользователь') return;
+    saveTags(tags.filter(t => t !== tag));
+  };
 
   const handleAddExistingTag = (tag) => {
-    if (!tags.includes(tag)) setTags(prev => [...prev, tag]);
+    if (!tags.includes(tag)) saveTags([...tags, tag]);
     setShowTagDropdown(false);
   };
 
   const handleCreateTag = () => {
     const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) setTags(prev => [...prev, trimmed]);
+    if (trimmed && !tags.includes(trimmed)) saveTags([...tags, trimmed]);
     setNewTagInput('');
   };
 
@@ -135,7 +153,7 @@ export default function ChatView() {
   }
 
   const items = groupByDate(chat.messages);
-  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
+  const knownTags = ['VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
   const availableTags = knownTags.filter(t => !tags.includes(t));
 
   return (
@@ -203,11 +221,13 @@ export default function ChatView() {
                 <h4 className="chatview-sidebar-title">Теги</h4>
                 <div className="chatview-tags-row">
                   {tags.map(tag => (
-                    <span key={tag} className="chatview-tag-editable">
+                    <span key={tag} className={`chatview-tag-editable${tag === 'Старый пользователь' ? ' chatview-tag-old' : ''}`}>
                       {tag}
-                      <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}>
-                        <X size={11} />
-                      </button>
+                      {tag !== 'Старый пользователь' && (
+                        <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}>
+                          <X size={11} />
+                        </button>
+                      )}
                     </span>
                   ))}
 

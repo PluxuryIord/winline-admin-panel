@@ -74,8 +74,10 @@ for (const name of dataFiles) {
 // Инициализация JSON-файлов для рассылок
 const BROADCASTS_FILE = path.join(__dirname, 'data', 'broadcasts.json');
 const CHANNELS_FILE = path.join(__dirname, 'data', 'channels.json');
+const TAGS_FILE = path.join(__dirname, 'data', 'tags.json');
 if (!fs.existsSync(BROADCASTS_FILE)) fs.writeFileSync(BROADCASTS_FILE, '[]', 'utf-8');
 if (!fs.existsSync(CHANNELS_FILE)) fs.writeFileSync(CHANNELS_FILE, '[]', 'utf-8');
+if (!fs.existsSync(TAGS_FILE)) fs.writeFileSync(TAGS_FILE, '{}', 'utf-8');
 
 const readJSON = (file) => JSON.parse(fs.readFileSync(file, 'utf-8'));
 const writeJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
@@ -109,28 +111,62 @@ app.post('/api/upload', (req, res) => {
 
 // --- Users (из MySQL) ---
 
-// GET /api/users — все пользователи
+// Хелпер: получить теги из файла
+function getUserTags() {
+  try { return JSON.parse(fs.readFileSync(TAGS_FILE, 'utf-8')); } catch { return {}; }
+}
+function saveUserTags(data) {
+  fs.writeFileSync(TAGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function mapUserRow(r, tagsMap) {
+  const userId = String(r.user_id);
+  const customTags = tagsMap[userId] || [];
+  // Всегда добавляем «Старый пользователь» как первый тег
+  const tags = ['Старый пользователь', ...customTags.filter(t => t !== 'Старый пользователь')];
+  return {
+    id: r.user_id,
+    fullName: r.rl_full_name || r.full_name || '—',
+    telegram: r.username ? `@${r.username}` : '—',
+    registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
+    banned: !!r.banned,
+    role: r.role || '—',
+    graph: r.graph || '—',
+    phone: r.phone_number || '—',
+    registered: !!r.registered,
+    personalLabel: !!r.personal_label,
+    showQr: !!r.show_qr,
+    tags,
+  };
+}
+
+// GET /api/users?limit=50&offset=0&search=...
 app.get('/api/users', async (req, res) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    const search = (req.query.search || '').trim();
+    const tagsMap = getUserTags();
+
+    let where = '';
+    const params = [];
+    if (search) {
+      where = 'WHERE (full_name LIKE ? OR rl_full_name LIKE ? OR username LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
+
+    // Общее количество
+    const [[{ total }]] = await dbPool.query(`SELECT COUNT(*) as total FROM users ${where}`, params);
+
     const [rows] = await dbPool.query(
-      'SELECT user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr FROM users ORDER BY date_reg DESC'
+      `SELECT user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr FROM users ${where} ORDER BY date_reg DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
     );
-    const users = rows.map(r => ({
-      id: r.user_id,
-      fullName: r.rl_full_name || r.full_name || '—',
-      telegram: r.username ? `@${r.username}` : '—',
-      registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
-      banned: !!r.banned,
-      role: r.role || '—',
-      graph: r.graph || '—',
-      phone: r.phone_number || '—',
-      registered: !!r.registered,
-      personalLabel: !!r.personal_label,
-      showQr: !!r.show_qr,
-      tags: ['Старый пользователь'],
-    }));
-    res.json(users);
+
+    const users = rows.map(r => mapUserRow(r, tagsMap));
+    res.json({ users, total, limit, offset });
   } catch (err) {
     console.error('[db] /api/users error:', err.message);
     res.status(500).json({ error: err.message });
@@ -146,23 +182,26 @@ app.get('/api/users/:id', async (req, res) => {
       [Number(req.params.id)]
     );
     if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
-    const r = rows[0];
-    res.json({
-      id: r.user_id,
-      fullName: r.rl_full_name || r.full_name || '—',
-      telegram: r.username ? `@${r.username}` : '—',
-      registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
-      banned: !!r.banned,
-      role: r.role || '—',
-      graph: r.graph || '—',
-      phone: r.phone_number || '—',
-      registered: !!r.registered,
-      personalLabel: !!r.personal_label,
-      showQr: !!r.show_qr,
-      tags: ['Старый пользователь'],
-    });
+    const tagsMap = getUserTags();
+    res.json(mapUserRow(rows[0], tagsMap));
   } catch (err) {
     console.error('[db] /api/users/:id error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/users/:id/tags — сохранить теги пользователя
+app.put('/api/users/:id/tags', (req, res) => {
+  try {
+    const userId = String(req.params.id);
+    const { tags } = req.body;
+    if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags must be an array' });
+    const tagsMap = getUserTags();
+    // Убираем «Старый пользователь» из сохраняемых — он добавляется автоматически
+    tagsMap[userId] = tags.filter(t => t !== 'Старый пользователь');
+    saveUserTags(tagsMap);
+    res.json({ success: true, tags: ['Старый пользователь', ...tagsMap[userId]] });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

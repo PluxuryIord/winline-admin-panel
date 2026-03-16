@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, X, Plus, Edit3, Trash2, Ban,
@@ -65,6 +65,20 @@ export default function UserProfile() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Сохранение тегов на сервер
+  const saveTags = useCallback(async (newTags) => {
+    setTags(newTags);
+    try {
+      await fetch(`/api/users/${id}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: newTags }),
+      });
+    } catch (err) {
+      console.error('Failed to save tags:', err);
+    }
+  }, [id]);
+
   if (loading) {
     return (
       <div className="profile-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
@@ -84,11 +98,23 @@ export default function UserProfile() {
   }
 
   // --- Tag operations ---
-  const handleRemoveTag = (tag) => setTags(prev => prev.filter(t => t !== tag));
-  const handleAddExistingTag = (tag) => { if (!tags.includes(tag)) setTags(prev => [...prev, tag]); };
+  const handleRemoveTag = (tag) => {
+    if (tag === 'Старый пользователь') return; // нельзя удалить
+    const newTags = tags.filter(t => t !== tag);
+    saveTags(newTags);
+  };
+
+  const handleAddExistingTag = (tag) => {
+    if (!tags.includes(tag)) {
+      saveTags([...tags, tag]);
+    }
+  };
+
   const handleCreateTag = () => {
     const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) setTags(prev => [...prev, trimmed]);
+    if (trimmed && !tags.includes(trimmed)) {
+      saveTags([...tags, trimmed]);
+    }
     setNewTagInput('');
   };
 
@@ -133,7 +159,7 @@ export default function UserProfile() {
 
   const exportPDF = () => { window.print(); setShowExportDropdown(false); };
 
-  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
+  const knownTags = ['VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
   const availableTags = knownTags.filter(t => !tags.includes(t));
 
   return (
@@ -171,9 +197,11 @@ export default function UserProfile() {
               {tags.map(tag => (
                 <span key={tag} className={`profile-tag${tag === 'Старый пользователь' ? ' profile-tag-old' : ''}`}>
                   {tag}
-                  <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
-                    <X size={12} />
-                  </button>
+                  {tag !== 'Старый пользователь' && (
+                    <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
+                      <X size={12} />
+                    </button>
+                  )}
                 </span>
               ))}
               {user.banned && <span className="profile-tag profile-tag-banned">Забанен</span>}

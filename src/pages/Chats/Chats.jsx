@@ -21,7 +21,7 @@ export default function Chats() {
 
   useEffect(() => {
     fetch('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
-    fetch('/api/users').then(r => r.json()).then(setUsers).catch(() => {});
+    fetch('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
   }, []);
 
   const getUser = (userId) => users.find(u => u.id === userId);
