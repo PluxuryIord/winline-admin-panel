@@ -6,9 +6,20 @@ import { spawn } from 'child_process';
 import mysql from 'mysql2/promise';
 import { getAllNested, getById, create, update, remove } from './db.js';
 
+// --- Ловим необработанные ошибки чтобы сервер не падал молча ---
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] unhandledRejection:', reason);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.API_PORT || 3001;
+
+console.log('[env] NODE_ENV:', process.env.NODE_ENV);
+console.log('[env] node:', process.version);
 
 // --- Автоинициализация данных ---
 // Если файл данных не существует — копируем из .example.json
@@ -387,12 +398,26 @@ app.get('/api/bot/channels', async (req, res) => {
 // --- Production: serve Vite build ---
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
-  app.get('/{0,}', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
+  const indexHtml = path.join(distPath, 'index.html');
+
+  if (fs.existsSync(indexHtml)) {
+    app.use(express.static(distPath));
+    // SPA fallback: все не-API запросы → index.html
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+      res.sendFile(indexHtml);
+    });
+    console.log('[prod] Serving dist from:', distPath);
+  } else {
+    console.warn('[prod] dist/index.html NOT FOUND — run: npm run build');
+    console.warn('[prod] Expected path:', indexHtml);
+  }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  console.error('[server] Listen error:', err.message);
 });
