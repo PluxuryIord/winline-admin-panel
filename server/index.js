@@ -2,8 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
-import mysql from 'mysql2/promise';
 import { getAllNested, getById, create, update, remove } from './db.js';
 
 // --- Ловим необработанные ошибки чтобы сервер не падал молча ---
@@ -21,9 +19,22 @@ const PORT = process.env.API_PORT || 3001;
 console.log('[env] NODE_ENV:', process.env.NODE_ENV);
 console.log('[env] node:', process.version);
 
+// --- Читаем .env проекта ---
+function parseProjectEnv() {
+  try {
+    const raw = fs.readFileSync(path.resolve(__dirname, '..', '.env'), 'utf-8');
+    return Object.fromEntries(
+      raw.split('\n')
+        .filter(l => l.includes('=') && !l.startsWith('#'))
+        .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
+    );
+  } catch { return {}; }
+}
+const projectEnv = parseProjectEnv();
+const BOT_TOKEN = process.env.BOT_TOKEN || projectEnv.BOT_TOKEN || '';
+console.log('[bot] BOT_TOKEN:', BOT_TOKEN ? 'set' : 'NOT SET');
+
 // --- Автоинициализация данных ---
-// Если файл данных не существует — копируем из .example.json
-// Это защищает от потери данных при git pull
 const dataFiles = ['chats', 'knowledge'];
 for (const name of dataFiles) {
   const dataPath = path.join(__dirname, 'data', `${name}.json`);
@@ -33,6 +44,15 @@ for (const name of dataFiles) {
     console.log(`[init] Created ${name}.json from ${name}.example.json`);
   }
 }
+
+// Инициализация JSON-файлов для рассылок
+const BROADCASTS_FILE = path.join(__dirname, 'data', 'broadcasts.json');
+const CHANNELS_FILE = path.join(__dirname, 'data', 'channels.json');
+if (!fs.existsSync(BROADCASTS_FILE)) fs.writeFileSync(BROADCASTS_FILE, '[]', 'utf-8');
+if (!fs.existsSync(CHANNELS_FILE)) fs.writeFileSync(CHANNELS_FILE, '[]', 'utf-8');
+
+const readJSON = (file) => JSON.parse(fs.readFileSync(file, 'utf-8'));
+const writeJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
 
 app.use(express.json({ limit: '5mb' }));
 
@@ -44,17 +64,14 @@ app.use('/uploads', express.static(uploadsDir));
 // POST /api/upload — загрузка изображения (base64)
 app.post('/api/upload', (req, res) => {
   try {
-    const { data, filename } = req.body;
+    const { data } = req.body;
     if (!data) return res.status(400).json({ error: 'No data' });
 
-    // data = "data:image/png;base64,iVBOR..."
     const match = data.match(/^data:image\/(\w+);base64,(.+)$/);
     if (!match) return res.status(400).json({ error: 'Invalid image data' });
 
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const buffer = Buffer.from(match[2], 'base64');
-
-    // Уникальное имя: timestamp + рандом
     const name = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     fs.writeFileSync(path.join(uploadsDir, name), buffer);
 
@@ -64,14 +81,10 @@ app.post('/api/upload', (req, res) => {
   }
 });
 
-// --- API Routes ---
-
+// --- Knowledge Base ---
 app.get('/api/knowledge', (req, res) => {
-  try {
-    res.json(getAllNested());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { res.json(getAllNested()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/knowledge/:id', (req, res) => {
@@ -79,9 +92,7 @@ app.get('/api/knowledge/:id', (req, res) => {
     const article = getById(Number(req.params.id));
     if (!article) return res.status(404).json({ error: 'Not found' });
     res.json(article);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/knowledge', (req, res) => {
@@ -90,9 +101,7 @@ app.post('/api/knowledge', (req, res) => {
     if (!title) return res.status(400).json({ error: 'Title is required' });
     const article = create({ title, content, parent_id: parent_id || null });
     res.status(201).json(article);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/knowledge/:id', (req, res) => {
@@ -101,9 +110,7 @@ app.put('/api/knowledge/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
     const article = update(Number(req.params.id), req.body);
     res.json(article);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/knowledge/:id', (req, res) => {
@@ -112,26 +119,19 @@ app.delete('/api/knowledge/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
     remove(Number(req.params.id));
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Chats helpers ---
+// --- Chats ---
 const CHATS_FILE = path.join(__dirname, 'data', 'chats.json');
 const readChats = () => JSON.parse(fs.readFileSync(CHATS_FILE, 'utf-8'));
-const writeChats = (data) => fs.writeFileSync(CHATS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+const writeChats = (d) => fs.writeFileSync(CHATS_FILE, JSON.stringify(d, null, 2), 'utf-8');
 
-// GET /api/chats
 app.get('/api/chats', (req, res) => {
-  try {
-    res.json(readChats());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { res.json(readChats()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DELETE /api/chats/:id
 app.delete('/api/chats/:id', (req, res) => {
   try {
     const chats = readChats();
@@ -140,12 +140,9 @@ app.delete('/api/chats/:id', (req, res) => {
     chats.splice(idx, 1);
     writeChats(chats);
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/chats/by-user/:userId — find or create chat for user
 app.get('/api/chats/by-user/:userId', (req, res) => {
   try {
     const chats = readChats();
@@ -157,12 +154,9 @@ app.get('/api/chats/by-user/:userId', (req, res) => {
       writeChats(chats);
     }
     res.json(chat);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/chats/:id/messages
 app.post('/api/chats/:id/messages', (req, res) => {
   try {
     const chats = readChats();
@@ -179,193 +173,84 @@ app.post('/api/chats/:id/messages', (req, res) => {
     chat.messages.push(newMsg);
     writeChats(chats);
     res.status(201).json(newMsg);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Bot DB: прямое подключение к MySQL бота ---
-// Читаем .env бота (оба проекта лежат рядом: ../WLPartnersBot)
+// =====================================================
+// === Рассылки (Telegram Bot API напрямую) ===
+// =====================================================
 
-// BOT_DIR берётся из переменной окружения (задаётся в .env или systemd-сервисе)
-// Fallback: папка рядом с проектом называется WLPartnersBot (локальная разработка)
-const BOT_DIR = process.env.BOT_DIR || path.resolve(__dirname, '..', '..', 'WLPartnersBot');
-const PYTHON_BIN = process.platform === 'win32'
-  ? path.join(BOT_DIR, 'venv', 'Scripts', 'python.exe')
-  : path.join(BOT_DIR, 'venv', 'bin', 'python3');
-
-// Парсим .env файл бота
-function parseBotEnv() {
-  try {
-    const raw = fs.readFileSync(path.join(BOT_DIR, '.env'), 'utf-8');
-    return Object.fromEntries(
-      raw.split('\n')
-        .filter(l => l.includes('=') && !l.startsWith('#'))
-        .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })
-    );
-  } catch { return null; }
-}
-
-let botDb = null;
-const botEnv = parseBotEnv();
-const BOT_TOKEN = botEnv?.BOT_TOKEN || '';
-
-if (botEnv?.MYSQL_HOST) {
-  botDb = mysql.createPool({
-    host: botEnv.MYSQL_HOST,
-    port: parseInt(botEnv.MYSQL_PORT || '3306'),
-    user: botEnv.MYSQL_USER,
-    password: botEnv.MYSQL_PASSWORD,
-    database: botEnv.MYSQL_DATABASE,
-    charset: 'utf8mb4',
-    waitForConnections: true,
-    connectionLimit: 5,
+// Хелпер: отправить сообщение через Telegram Bot API
+async function tgSend(chatId, text, parseMode = 'HTML') {
+  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: parseMode }),
   });
-  console.log('[bot-db] Connected to bot MySQL:', botEnv.MYSQL_DATABASE);
-} else {
-  console.warn('[bot-db] Bot .env not found or MYSQL_* vars missing — bot routes unavailable');
+  return r.json();
 }
 
-// Логируем конфигурацию бота при старте
-console.log('[bot] BOT_DIR:', BOT_DIR);
-console.log('[bot] PYTHON_BIN:', PYTHON_BIN);
-console.log('[bot] venv exists:', fs.existsSync(PYTHON_BIN));
-console.log('[bot] BOT_TOKEN:', BOT_TOKEN ? 'set' : 'NOT SET');
+// --- Каналы ---
 
-// Alert data template (matches bot's Alert.add() format)
-const makeAlertData = (text) => JSON.stringify({
-  alert_type: 'text',
-  text,
-  files: [],
-  buttons: [],
-  files_counter: { all: 0, photo: 0, video: 0, document: 0, animation: 0, sticker: false, video_note: false, voice: false },
+// GET /api/broadcasts/channels
+app.get('/api/broadcasts/channels', (req, res) => {
+  try { res.json(readJSON(CHANNELS_FILE)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/bot/users/count?audience=all|registered|me
-app.get('/api/bot/users/count', async (req, res) => {
-  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+// POST /api/broadcasts/channels — добавить канал { chatId, title }
+app.post('/api/broadcasts/channels', (req, res) => {
   try {
-    const audience = req.query.audience || 'all';
-    let sql = 'SELECT COUNT(*) AS count FROM users WHERE banned = 0';
-    if (audience === 'registered') sql += ' AND registered = 1';
-    if (audience === 'me') sql += ' AND user_id IN (SELECT admin_id FROM admins LIMIT 1)';
-    const [[row]] = await botDb.query(sql);
-    res.json({ count: Number(row.count), audience });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/bot/broadcasts — история рассылок из БД бота
-app.get('/api/bot/broadcasts', async (req, res) => {
-  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
-  try {
-    const [rows] = await botDb.query(
-      'SELECT id, data, status_code, date_sent, successfully_sent, error_sent FROM alerts WHERE status_code != 0 ORDER BY id DESC LIMIT 100'
-    );
-    const statusMap = { 1: 'sending', 201: 'published' };
-    res.json(rows.map(r => {
-      const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
-      return {
-        id: r.id,
-        text: (d.text || '').substring(0, 120),
-        alert_type: d.alert_type,
-        status: statusMap[r.status_code] || 'unknown',
-        date_sent: r.date_sent,
-        successfully_sent: r.successfully_sent,
-        error_sent: r.error_sent,
-      };
-    }));
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/bot/broadcasts — создать и отправить рассылку
-app.post('/api/bot/broadcasts', async (req, res) => {
-  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
-  const { text, audience } = req.body;
-  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
-
-  try {
-    // Получаем admin_id
-    const [[admin]] = await botDb.query('SELECT admin_id FROM admins LIMIT 1');
-    if (!admin) return res.status(500).json({ error: 'No admins in bot DB' });
-
-    // Получаем список получателей
-    let usersSql = 'SELECT user_id FROM users WHERE banned = 0';
-    if (audience === 'registered') usersSql += ' AND registered = 1';
-    if (audience === 'me')         usersSql += ' AND user_id IN (SELECT admin_id FROM admins LIMIT 1)';
-    const [users] = await botDb.query(usersSql);
-    if (!users.length) return res.status(400).json({ error: 'No users found for selected audience' });
-
-    // Создаём запись рассылки
-    const recipients = JSON.stringify(Object.fromEntries(users.map(u => [u.user_id, 0])));
-    const [result] = await botDb.query(
-      `INSERT INTO alerts (data, status_code, admin_id, recipients, successfully_sent, error_sent, dispatch_log)
-       VALUES (?, 0, ?, ?, 0, 0, '⏳Рассылка запускается...\n\n')`,
-      [makeAlertData(text.trim()), admin.admin_id, recipients]
-    );
-    const alertId = result.insertId;
-
-    // Запускаем background_alert.py (фоновый процесс)
-    if (!fs.existsSync(PYTHON_BIN)) {
-      console.error('[bot] PYTHON_BIN not found:', PYTHON_BIN);
-      return res.status(500).json({
-        error: `Python не найден: ${PYTHON_BIN}. Проверьте BOT_DIR и наличие venv.`,
-      });
+    const { chatId, title } = req.body;
+    if (!chatId) return res.status(400).json({ error: 'chatId is required' });
+    const channels = readJSON(CHANNELS_FILE);
+    if (channels.some(c => String(c.chatId) === String(chatId))) {
+      return res.status(409).json({ error: 'Канал уже добавлен' });
     }
-
-    const child = spawn(PYTHON_BIN, ['-m', 'background_alert', String(alertId)], {
-      cwd: BOT_DIR,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    // Логируем ошибки spawn
-    child.stderr.on('data', (d) => console.error('[bot:alert:stderr]', d.toString()));
-    child.on('error', (err) => console.error('[bot:alert:error]', err.message));
-    child.on('exit', (code) => {
-      if (code !== 0) console.error('[bot:alert] exited with code', code);
-    });
-    child.unref();
-
-    res.json({ alert_id: alertId, recipients_count: users.length, status: 'sending' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const ch = {
+      id: (channels.at(-1)?.id || 0) + 1,
+      chatId: String(chatId),
+      title: title || chatId,
+      addedAt: new Date().toISOString(),
+    };
+    channels.push(ch);
+    writeJSON(CHANNELS_FILE, channels);
+    res.status(201).json(ch);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// GET /api/bot/status — диагностика конфигурации бота
-app.get('/api/bot/status', (req, res) => {
-  res.json({
-    botDir: BOT_DIR,
-    botDirExists: fs.existsSync(BOT_DIR),
-    pythonBin: PYTHON_BIN,
-    pythonExists: fs.existsSync(PYTHON_BIN),
-    botEnvExists: botEnv !== null,
-    dbConnected: botDb !== null,
-    botToken: BOT_TOKEN ? 'set' : 'not set',
-  });
+// DELETE /api/broadcasts/channels/:id
+app.delete('/api/broadcasts/channels/:id', (req, res) => {
+  try {
+    const channels = readJSON(CHANNELS_FILE);
+    const idx = channels.findIndex(c => c.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    channels.splice(idx, 1);
+    writeJSON(CHANNELS_FILE, channels);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST /api/bot/channel-broadcast — рассылка по Telegram каналам
-app.post('/api/bot/channel-broadcast', async (req, res) => {
-  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не найден в .env бота' });
+// --- Рассылки ---
+
+// GET /api/broadcasts
+app.get('/api/broadcasts', (req, res) => {
+  try { res.json(readJSON(BROADCASTS_FILE)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/broadcasts — отправить рассылку по каналам
+app.post('/api/broadcasts', async (req, res) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен — добавьте в .env' });
 
   const { text, channelIds } = req.body;
   if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
-  if (!channelIds?.length) return res.status(400).json({ error: 'channelIds is required' });
+  if (!channelIds?.length) return res.status(400).json({ error: 'Выберите хотя бы один канал' });
 
   const results = [];
   for (const chatId of channelIds) {
     try {
-      const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: text.trim(), parse_mode: 'HTML' }),
-      });
-      const data = await r.json();
+      const data = await tgSend(chatId, text.trim());
       results.push({ chatId, ok: data.ok, error: data.description || null });
     } catch (err) {
       results.push({ chatId, ok: false, error: err.message });
@@ -373,26 +258,52 @@ app.post('/api/bot/channel-broadcast', async (req, res) => {
   }
 
   const success = results.filter(r => r.ok).length;
-  res.json({ total: channelIds.length, success, failed: channelIds.length - success, results });
+  const channels = readJSON(CHANNELS_FILE);
+  const channelNames = channelIds.map(id => {
+    const ch = channels.find(c => String(c.chatId) === String(id));
+    return ch?.title || id;
+  });
+
+  // Сохраняем в историю
+  const broadcasts = readJSON(BROADCASTS_FILE);
+  const record = {
+    id: (broadcasts.at(-1)?.id || 0) + 1,
+    text: text.trim().substring(0, 200),
+    channels: channelNames,
+    channelIds,
+    total: channelIds.length,
+    success,
+    failed: channelIds.length - success,
+    results,
+    date: new Date().toISOString(),
+    status: success === channelIds.length ? 'published' : (success > 0 ? 'partial' : 'failed'),
+  };
+  broadcasts.unshift(record);
+  if (broadcasts.length > 200) broadcasts.length = 200;
+  writeJSON(BROADCASTS_FILE, broadcasts);
+
+  res.json(record);
 });
 
-// GET /api/bot/channels — получить список каналов где бот админ
-app.get('/api/bot/channels', async (req, res) => {
-  if (!botDb) return res.status(503).json({ error: 'Bot DB not configured' });
+// DELETE /api/broadcasts/:id
+app.delete('/api/broadcasts/:id', (req, res) => {
   try {
-    // Пробуем получить каналы из таблицы channels (если есть)
-    const [rows] = await botDb.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'channels'"
-    );
-    if (rows.length > 0) {
-      const [channels] = await botDb.query('SELECT * FROM channels ORDER BY id');
-      return res.json(channels);
-    }
-    // Если таблицы нет — отдаём пустой список
-    res.json([]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const broadcasts = readJSON(BROADCASTS_FILE);
+    const idx = broadcasts.findIndex(b => b.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    broadcasts.splice(idx, 1);
+    writeJSON(BROADCASTS_FILE, broadcasts);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/bot/status — диагностика
+app.get('/api/bot/status', (req, res) => {
+  res.json({
+    botToken: BOT_TOKEN ? 'set' : 'not set',
+    channelsCount: readJSON(CHANNELS_FILE).length,
+    broadcastsCount: readJSON(BROADCASTS_FILE).length,
+  });
 });
 
 // --- Production: serve Vite build ---
@@ -402,7 +313,6 @@ if (process.env.NODE_ENV === 'production') {
 
   if (fs.existsSync(indexHtml)) {
     app.use(express.static(distPath));
-    // SPA fallback: все не-API запросы → index.html
     app.use((req, res, next) => {
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
       res.sendFile(indexHtml);
