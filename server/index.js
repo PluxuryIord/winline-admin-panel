@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import mysql from 'mysql2/promise';
 import { getAllNested, getById, create, update, remove } from './db.js';
 
 // --- Ловим необработанные ошибки чтобы сервер не падал молча ---
@@ -33,6 +34,31 @@ function parseProjectEnv() {
 const projectEnv = parseProjectEnv();
 const BOT_TOKEN = process.env.BOT_TOKEN || projectEnv.BOT_TOKEN || '';
 console.log('[bot] BOT_TOKEN:', BOT_TOKEN ? 'set' : 'NOT SET');
+
+// --- MySQL пул для таблицы users ---
+const MYSQL_HOST = process.env.MYSQL_HOST || projectEnv.MYSQL_HOST || '';
+const MYSQL_PORT = Number(process.env.MYSQL_PORT || projectEnv.MYSQL_PORT || 3306);
+const MYSQL_USER = process.env.MYSQL_USER || projectEnv.MYSQL_USER || '';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || projectEnv.MYSQL_PASSWORD || '';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || projectEnv.MYSQL_DATABASE || '';
+
+let dbPool = null;
+if (MYSQL_HOST && MYSQL_USER && MYSQL_DATABASE) {
+  dbPool = mysql.createPool({
+    host: MYSQL_HOST,
+    port: MYSQL_PORT,
+    user: MYSQL_USER,
+    password: MYSQL_PASSWORD,
+    database: MYSQL_DATABASE,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    connectTimeout: 10000,
+  });
+  console.log('[db] MySQL pool created for', MYSQL_DATABASE, '@', MYSQL_HOST);
+} else {
+  console.warn('[db] MySQL не настроен — добавьте MYSQL_HOST/USER/DATABASE в .env');
+}
 
 // --- Автоинициализация данных ---
 const dataFiles = ['chats', 'knowledge'];
@@ -77,6 +103,66 @@ app.post('/api/upload', (req, res) => {
 
     res.json({ url: `/uploads/${name}` });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Users (из MySQL) ---
+
+// GET /api/users — все пользователи
+app.get('/api/users', async (req, res) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr FROM users ORDER BY date_reg DESC'
+    );
+    const users = rows.map(r => ({
+      id: r.user_id,
+      fullName: r.rl_full_name || r.full_name || '—',
+      telegram: r.username ? `@${r.username}` : '—',
+      registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
+      banned: !!r.banned,
+      role: r.role || '—',
+      graph: r.graph || '—',
+      phone: r.phone_number || '—',
+      registered: !!r.registered,
+      personalLabel: !!r.personal_label,
+      showQr: !!r.show_qr,
+      tags: ['Старый пользователь'],
+    }));
+    res.json(users);
+  } catch (err) {
+    console.error('[db] /api/users error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/users/:id — один пользователь
+app.get('/api/users/:id', async (req, res) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr FROM users WHERE user_id = ?',
+      [Number(req.params.id)]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
+    const r = rows[0];
+    res.json({
+      id: r.user_id,
+      fullName: r.rl_full_name || r.full_name || '—',
+      telegram: r.username ? `@${r.username}` : '—',
+      registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
+      banned: !!r.banned,
+      role: r.role || '—',
+      graph: r.graph || '—',
+      phone: r.phone_number || '—',
+      registered: !!r.registered,
+      personalLabel: !!r.personal_label,
+      showQr: !!r.show_qr,
+      tags: ['Старый пользователь'],
+    });
+  } catch (err) {
+    console.error('[db] /api/users/:id error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

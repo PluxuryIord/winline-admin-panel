@@ -1,26 +1,45 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown } from 'lucide-react';
-import { usersData } from '../../data/usersData';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader } from 'lucide-react';
 import './Users.css';
 
 export default function Users() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Состояния фильтров
-  const [filterPartner, setFilterPartner] = useState('all'); // all, partner, guest
-  const [filterCountry, setFilterCountry] = useState('all');
-  const [filterGender, setFilterGender] = useState('all');
-  const [filterEntity, setFilterEntity] = useState('all'); // all, phys, legal
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterBanned, setFilterBanned] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
 
-  // Состояние сортировки (ключ и направление)
+  // Состояние сортировки
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
 
   // Export dropdown
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const exportRef = useRef(null);
+
+  // Загрузка пользователей из API
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/users');
+        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setUsers(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -32,56 +51,43 @@ export default function Users() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Все уникальные теги для выпадающего списка
+  // Все уникальные теги
   const allTags = useMemo(() => {
     const tags = new Set();
-    usersData.forEach(user => user.tags.forEach(t => tags.add(t)));
+    users.forEach(user => (user.tags || []).forEach(t => tags.add(t)));
     return Array.from(tags);
-  }, []);
+  }, [users]);
 
-  // Все уникальные страны
-  const allCountries = useMemo(() => {
-    const countries = new Set();
-    usersData.forEach(user => { if (user.country) countries.add(user.country); });
-    return Array.from(countries).sort();
-  }, []);
+  // Все уникальные роли
+  const allRoles = useMemo(() => {
+    const roles = new Set();
+    users.forEach(user => { if (user.role && user.role !== '—') roles.add(user.role); });
+    return Array.from(roles).sort();
+  }, [users]);
 
-  // Все уникальные значения пола
-  const allGenders = useMemo(() => {
-    const genders = new Set();
-    usersData.forEach(user => { if (user.gender && user.gender !== '-') genders.add(user.gender); });
-    return Array.from(genders);
-  }, []);
-
-  // Функция применения фильтров и сортировки
+  // Фильтрация и сортировка
   const filteredAndSortedUsers = useMemo(() => {
-    let result = [...usersData];
+    let result = [...users];
 
-		// 1. Поиск (по ФИО)
+    // 1. Поиск
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(u =>
-        u.fullName.toLowerCase().includes(q)
+        u.fullName.toLowerCase().includes(q) ||
+        u.telegram.toLowerCase().includes(q)
       );
     }
 
     // 2. Фильтры
-    if (filterPartner !== 'all') {
-      const isPartner = filterPartner === 'partner';
-      result = result.filter(u => u.isPartner === isPartner);
+    if (filterRole !== 'all') {
+      result = result.filter(u => u.role === filterRole);
     }
-    if (filterCountry !== 'all') {
-      result = result.filter(u => u.country === filterCountry);
-    }
-    if (filterGender !== 'all') {
-      result = result.filter(u => u.gender === filterGender);
-    }
-    if (filterEntity !== 'all') {
-      const entity = filterEntity === 'phys' ? 'Физ. лицо' : 'Юр. лицо';
-      result = result.filter(u => u.entityType === entity);
+    if (filterBanned !== 'all') {
+      const banned = filterBanned === 'banned';
+      result = result.filter(u => u.banned === banned);
     }
     if (filterTag !== 'all') {
-      result = result.filter(u => u.tags.includes(filterTag));
+      result = result.filter(u => (u.tags || []).includes(filterTag));
     }
 
     // 3. Сортировка
@@ -94,9 +100,8 @@ export default function Users() {
     }
 
     return result;
-  }, [search, filterPartner, filterCountry, filterGender, filterEntity, filterTag, sortConfig]);
+  }, [users, search, filterRole, filterBanned, filterTag, sortConfig]);
 
-  // Смена сортировки при клике на заголовок колонки
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -105,24 +110,20 @@ export default function Users() {
     setSortConfig({ key, direction });
   };
 
-  // Клик по тегу прямо в таблице (быстрая фильтрация / снятие)
   const handleTagClick = (tag) => {
     setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
-  const hasActiveFilters = filterPartner !== 'all' || filterCountry !== 'all' || filterGender !== 'all' || filterEntity !== 'all' || filterTag !== 'all' || search;
+  const hasActiveFilters = filterRole !== 'all' || filterBanned !== 'all' || filterTag !== 'all' || search;
 
   const resetFilters = () => {
     setSearch('');
-    setFilterPartner('all');
-    setFilterCountry('all');
-    setFilterGender('all');
-    setFilterEntity('all');
+    setFilterRole('all');
+    setFilterBanned('all');
     setFilterTag('all');
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
 
-  // Кнопка Чат — найти или создать чат для пользователя
   const handleOpenChat = async (userId) => {
     try {
       const res = await fetch(`/api/chats/by-user/${userId}`);
@@ -134,19 +135,16 @@ export default function Users() {
   };
 
   // Экспорт CSV
-  const exportCSV = (users) => {
+  const exportCSV = (list) => {
     const BOM = '\uFEFF';
-    const headers = ['ФИО', 'Telegram', 'Статус', 'Тип лица', 'Страна', 'Пол', 'Дата регистрации', 'Комиссия (₽)', 'Теги'];
-    const rows = users.map(u => [
+    const headers = ['ФИО', 'Telegram', 'Роль', 'Дата регистрации', 'Забанен', 'Теги'];
+    const rows = list.map(u => [
       u.fullName,
       u.telegram,
-      u.isPartner ? 'Партнёр' : 'Гость',
-      u.entityType,
-      u.country,
-      u.gender,
+      u.role,
       u.registrationDate,
-      u.commission,
-      u.tags.join('; ')
+      u.banned ? 'Да' : 'Нет',
+      (u.tags || []).join('; ')
     ]);
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
@@ -160,12 +158,24 @@ export default function Users() {
   };
 
   const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
+  const handleExportGoogle = () => { exportCSV(filteredAndSortedUsers); setShowExportDropdown(false); };
 
-  const handleExportGoogle = () => {
-    exportCSV(filteredAndSortedUsers);
-    // CSV открывается и в Google Sheets через Файл → Импорт
-    setShowExportDropdown(false);
-  };
+  if (loading) {
+    return (
+      <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <Loader size={32} className="spinner" />
+        <span style={{ marginLeft: 12, color: '#aaa' }}>Загрузка пользователей...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: '#ff5555' }}>
+        Ошибка загрузки: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="users-container">
@@ -178,11 +188,12 @@ export default function Users() {
             <input
               type="text"
               className="search-input"
-              placeholder="Поиск по ФИО..."
+              placeholder="Поиск по ФИО или Telegram..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <span style={{ color: '#888', fontSize: 14 }}>Всего: {users.length} | Найдено: {filteredAndSortedUsers.length}</span>
           <div className="export-wrapper" ref={exportRef}>
             <button className="btn-control primary" onClick={() => setShowExportDropdown(!showExportDropdown)}>
               <Download size={18} /> Экспорт <ChevronDown size={14} />
@@ -201,30 +212,17 @@ export default function Users() {
         </div>
 
         <div className="filters-row">
-          <select className="filter-select" value={filterPartner} onChange={(e) => setFilterPartner(e.target.value)}>
+          <select className="filter-select" value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+            <option value="all">Все роли</option>
+            {allRoles.map(role => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+
+          <select className="filter-select" value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
             <option value="all">Все статусы</option>
-            <option value="partner">Партнёр</option>
-            <option value="guest">Гость</option>
-          </select>
-
-          <select className="filter-select" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
-            <option value="all">Все страны</option>
-            {allCountries.map(country => (
-              <option key={country} value={country}>{country}</option>
-            ))}
-          </select>
-
-          <select className="filter-select" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-            <option value="all">Любой пол</option>
-            {allGenders.map(gender => (
-              <option key={gender} value={gender}>{gender}</option>
-            ))}
-          </select>
-
-          <select className="filter-select" value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)}>
-            <option value="all">Все лица</option>
-            <option value="phys">Физ. лицо</option>
-            <option value="legal">Юр. лицо</option>
+            <option value="active">Активные</option>
+            <option value="banned">Забаненные</option>
           </select>
 
           <select className="filter-select" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
@@ -241,15 +239,6 @@ export default function Users() {
             <ArrowUpDown size={14} />
             Дата регистрации
             {sortConfig.key === 'registrationDate' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-          </button>
-
-          <button
-            className={`btn-sort${sortConfig.key === 'commission' ? ' btn-sort-active' : ''}`}
-            onClick={() => handleSort('commission')}
-          >
-            <ArrowUpDown size={14} />
-            Комиссия
-            {sortConfig.key === 'commission' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
           </button>
 
           {hasActiveFilters && (
@@ -273,29 +262,34 @@ export default function Users() {
           </thead>
           <tbody>
             {filteredAndSortedUsers.map(user => (
-              <tr key={user.id}>
+              <tr key={user.id} className={user.banned ? 'row-banned' : ''}>
                 <td>
                   <Link to={`/users/${user.id}`} className="user-cell-link">
                     <div className="user-cell">
                       <div className="user-avatar">
                         {user.fullName.charAt(0)}
                       </div>
-                      <span className="user-name">{user.fullName}</span>
+                      <div className="user-name-block">
+                        <span className="user-name">{user.fullName}</span>
+                        <span className="user-telegram">{user.telegram}</span>
+                      </div>
                     </div>
                   </Link>
                 </td>
 
                 <td>
                   <div className="tags-wrapper">
-                    {user.tags.map(tag => (
+                    {(user.tags || []).map(tag => (
                       <span
                         key={tag}
-                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}`}
+                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}${tag === 'Старый пользователь' ? ' tag-old' : ''}`}
                         onClick={() => handleTagClick(tag)}
                       >
                         {tag}
                       </span>
                     ))}
+                    {user.banned && <span className="tag-badge tag-banned">Забанен</span>}
+                    {user.role && user.role !== '—' && <span className="tag-badge tag-role">{user.role}</span>}
                   </div>
                 </td>
 

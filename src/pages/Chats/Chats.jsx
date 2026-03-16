@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, List, LayoutGrid } from 'lucide-react';
-import { usersData } from '../../data/usersData';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
 
@@ -16,17 +15,16 @@ function formatTime(iso) {
 export default function Chats() {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'columns'
-  const [deleteModal, setDeleteModal] = useState(null); // { chatId, userName }
+  const [users, setUsers] = useState([]);
+  const [viewMode, setViewMode] = useState('list');
+  const [deleteModal, setDeleteModal] = useState(null);
 
   useEffect(() => {
-    fetch('/api/chats')
-      .then(r => r.json())
-      .then(setChats)
-      .catch(() => {});
+    fetch('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
+    fetch('/api/users').then(r => r.json()).then(setUsers).catch(() => {});
   }, []);
 
-  const getUser = (userId) => usersData.find(u => u.id === userId);
+  const getUser = (userId) => users.find(u => u.id === userId);
 
   const handleDelete = (e, chatId, userName) => {
     e.stopPropagation();

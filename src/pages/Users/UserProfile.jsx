@@ -1,120 +1,105 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, X, Plus, Edit3, Trash2, Ban,
-  MessageSquare, Download, ChevronDown, Save
+  MessageSquare, Download, ChevronDown, Save, Loader
 } from 'lucide-react';
-import { usersData } from '../../data/usersData';
 import './UserProfile.css';
 
 export default function UserProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const user = usersData.find(u => u.id === Number(id));
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // --- State (all hooks BEFORE early return) ---
-  const [tags, setTags] = useState(user?.tags || []);
-  const [comment, setComment] = useState(user?.comment || '');
+  const [tags, setTags] = useState([]);
+  const [comment, setComment] = useState('');
   const [isEditingComment, setIsEditingComment] = useState(false);
-  const [fullName, setFullName] = useState(user?.fullName || '');
+  const [fullName, setFullName] = useState('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [showEditDropdown, setShowEditDropdown] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(user?.fullName || '');
+  const [editNameValue, setEditNameValue] = useState('');
 
   const tagDropdownRef = useRef(null);
   const editDropdownRef = useRef(null);
   const exportDropdownRef = useRef(null);
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set();
-    usersData.forEach(u => u.tags.forEach(t => tagSet.add(t)));
-    return Array.from(tagSet);
-  }, [tags]);
+  // Загрузка пользователя из API
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/users/${id}`);
+        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setUser(data);
+          setTags(data.tags || []);
+          setComment('');
+          setFullName(data.fullName || '');
+          setEditNameValue(data.fullName || '');
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
-        setShowTagDropdown(false);
-      }
-      if (editDropdownRef.current && !editDropdownRef.current.contains(e.target)) {
-        setShowEditDropdown(false);
-      }
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
-        setShowExportDropdown(false);
-      }
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) setShowTagDropdown(false);
+      if (editDropdownRef.current && !editDropdownRef.current.contains(e.target)) setShowEditDropdown(false);
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) setShowExportDropdown(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // --- Early return AFTER hooks ---
-  if (!user) {
+  if (loading) {
+    return (
+      <div className="profile-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+        <Loader size={32} className="spinner" />
+        <span style={{ marginLeft: 12, color: '#aaa' }}>Загрузка...</span>
+      </div>
+    );
+  }
+
+  if (error || !user) {
     return (
       <div className="profile-not-found">
-        <p>Пользователь не найден</p>
+        <p>{error || 'Пользователь не найден'}</p>
         <button onClick={() => navigate('/users')}>Назад к списку</button>
       </div>
     );
   }
 
   // --- Tag operations ---
-  const handleRemoveTag = (tag) => {
-    const updated = tags.filter(t => t !== tag);
-    setTags(updated);
-    user.tags = updated;
-  };
-
-  const handleAddExistingTag = (tag) => {
-    if (!tags.includes(tag)) {
-      const updated = [...tags, tag];
-      setTags(updated);
-      user.tags = updated;
-    }
-  };
-
+  const handleRemoveTag = (tag) => setTags(prev => prev.filter(t => t !== tag));
+  const handleAddExistingTag = (tag) => { if (!tags.includes(tag)) setTags(prev => [...prev, tag]); };
   const handleCreateTag = () => {
     const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      const updated = [...tags, trimmed];
-      setTags(updated);
-      user.tags = updated;
-    }
+    if (trimmed && !tags.includes(trimmed)) setTags(prev => [...prev, trimmed]);
     setNewTagInput('');
   };
 
-  // --- Comment ---
-  const handleSaveComment = () => {
-    user.comment = comment;
-    setIsEditingComment(false);
-  };
+  const handleSaveComment = () => setIsEditingComment(false);
 
-  // --- Edit actions ---
   const handleSaveName = () => {
     const trimmed = editNameValue.trim();
-    if (trimmed) {
-      user.fullName = trimmed;
-      setFullName(trimmed);
-    }
+    if (trimmed) setFullName(trimmed);
     setIsEditingName(false);
   };
 
-  const handleDeleteUser = () => {
-    const idx = usersData.findIndex(u => u.id === user.id);
-    if (idx !== -1) usersData.splice(idx, 1);
-    navigate('/users');
-  };
-
-  const handleBanUser = () => {
-    alert(`Пользователь ${fullName} заблокирован в боте (заглушка)`);
-    setShowEditDropdown(false);
-  };
-
-  // --- Открыть чат ---
   const handleOpenChat = async () => {
     try {
       const res = await fetch(`/api/chats/by-user/${user.id}`);
@@ -125,17 +110,14 @@ export default function UserProfile() {
     }
   };
 
-  // --- Export ---
   const exportTXT = () => {
     const lines = [
       `Пользователь: ${fullName}`,
       `Telegram: ${user.telegram}`,
-      `Статус: ${user.isPartner ? 'Партнёр' : 'Гость'}`,
-      `Тип лица: ${user.entityType}`,
-      `Страна: ${user.country}`,
-      `Пол: ${user.gender}`,
+      `Роль: ${user.role}`,
       `Дата регистрации: ${user.registrationDate}`,
-      `Комиссия: ${user.commission.toLocaleString('ru-RU')} ₽`,
+      `Забанен: ${user.banned ? 'Да' : 'Нет'}`,
+      `Телефон: ${user.phone}`,
       `Теги: ${tags.join(', ') || '—'}`,
       `Комментарий: ${comment || '—'}`,
     ];
@@ -149,14 +131,13 @@ export default function UserProfile() {
     setShowExportDropdown(false);
   };
 
-  const exportPDF = () => {
-    window.print();
-    setShowExportDropdown(false);
-  };
+  const exportPDF = () => { window.print(); setShowExportDropdown(false); };
+
+  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
+  const availableTags = knownTags.filter(t => !tags.includes(t));
 
   return (
     <div className="profile-container">
-      {/* Назад */}
       <button className="profile-back-btn" onClick={() => navigate('/users')}>
         <ArrowLeft size={18} /> Назад
       </button>
@@ -188,34 +169,26 @@ export default function UserProfile() {
             {/* Теги */}
             <div className="profile-tags-row">
               {tags.map(tag => (
-                <span key={tag} className="profile-tag">
+                <span key={tag} className={`profile-tag${tag === 'Старый пользователь' ? ' profile-tag-old' : ''}`}>
                   {tag}
                   <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
                     <X size={12} />
                   </button>
                 </span>
               ))}
+              {user.banned && <span className="profile-tag profile-tag-banned">Забанен</span>}
 
               <div className="profile-tag-add-wrapper" ref={tagDropdownRef}>
-                <button
-                  className="profile-tag-add-btn"
-                  onClick={() => setShowTagDropdown(!showTagDropdown)}
-                >
+                <button className="profile-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
                   <Plus size={14} /> Добавить тег
                 </button>
                 {showTagDropdown && (
                   <div className="profile-tag-dropdown">
-                    {allTags.filter(t => !tags.includes(t)).length > 0 && (
-                      allTags.filter(t => !tags.includes(t)).map(tag => (
-                        <div
-                          key={tag}
-                          className="profile-tag-dropdown-item"
-                          onClick={() => handleAddExistingTag(tag)}
-                        >
-                          {tag}
-                        </div>
-                      ))
-                    )}
+                    {availableTags.map(tag => (
+                      <div key={tag} className="profile-tag-dropdown-item" onClick={() => handleAddExistingTag(tag)}>
+                        {tag}
+                      </div>
+                    ))}
                     <div className="profile-tag-dropdown-input-row">
                       <input
                         className="profile-tag-dropdown-input"
@@ -234,18 +207,18 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* СРЕДНЯЯ ЧАСТЬ — два панели */}
+      {/* СРЕДНЯЯ ЧАСТЬ */}
       <div className="profile-panels">
         <div className="profile-panel">
           <h3 className="profile-panel-title">Информация</h3>
           <div className="profile-info-grid">
             <div className="info-row"><span className="info-label">Telegram</span><span className="info-value">{user.telegram}</span></div>
-            <div className="info-row"><span className="info-label">Статус</span><span className="info-value">{user.isPartner ? 'Партнёр' : 'Гость'}</span></div>
-            <div className="info-row"><span className="info-label">Тип лица</span><span className="info-value">{user.entityType}</span></div>
-            <div className="info-row"><span className="info-label">Страна</span><span className="info-value">{user.country}</span></div>
-            <div className="info-row"><span className="info-label">Пол</span><span className="info-value">{user.gender}</span></div>
+            <div className="info-row"><span className="info-label">Роль</span><span className="info-value">{user.role}</span></div>
+            <div className="info-row"><span className="info-label">График</span><span className="info-value">{user.graph}</span></div>
+            <div className="info-row"><span className="info-label">Телефон</span><span className="info-value">{user.phone}</span></div>
             <div className="info-row"><span className="info-label">Дата регистрации</span><span className="info-value">{user.registrationDate}</span></div>
-            <div className="info-row"><span className="info-label">Комиссия</span><span className="info-value">{user.commission.toLocaleString('ru-RU')} ₽</span></div>
+            <div className="info-row"><span className="info-label">Забанен</span><span className="info-value">{user.banned ? 'Да' : 'Нет'}</span></div>
+            <div className="info-row"><span className="info-label">Зарегистрирован</span><span className="info-value">{user.registered ? 'Да' : 'Нет'}</span></div>
           </div>
         </div>
 
@@ -254,16 +227,9 @@ export default function UserProfile() {
             <h3 className="profile-panel-title">Комментарий</h3>
             <button
               className="profile-comment-edit-btn"
-              onClick={() => {
-                if (isEditingComment) handleSaveComment();
-                else setIsEditingComment(true);
-              }}
+              onClick={() => { if (isEditingComment) handleSaveComment(); else setIsEditingComment(true); }}
             >
-              {isEditingComment ? (
-                <><Save size={16} /> Сохранить</>
-              ) : (
-                <><Edit3 size={16} /> Редактировать</>
-              )}
+              {isEditingComment ? <><Save size={16} /> Сохранить</> : <><Edit3 size={16} /> Редактировать</>}
             </button>
           </div>
           {isEditingComment ? (
@@ -275,32 +241,21 @@ export default function UserProfile() {
               autoFocus
             />
           ) : (
-            <p className="profile-comment-text">
-              {comment || 'Нет комментария'}
-            </p>
+            <p className="profile-comment-text">{comment || 'Нет комментария'}</p>
           )}
         </div>
       </div>
 
-      {/* НИЖНЯЯ ЧАСТЬ — кнопки */}
+      {/* НИЖНЯЯ ЧАСТЬ */}
       <div className="profile-actions">
         <div className="profile-action-wrapper" ref={editDropdownRef}>
-          <button
-            className="profile-action-btn"
-            onClick={() => setShowEditDropdown(!showEditDropdown)}
-          >
+          <button className="profile-action-btn" onClick={() => setShowEditDropdown(!showEditDropdown)}>
             <Edit3 size={16} /> Редактировать <ChevronDown size={14} />
           </button>
           {showEditDropdown && (
             <div className="profile-action-dropdown">
               <div className="profile-action-dropdown-item" onClick={() => { setIsEditingName(true); setShowEditDropdown(false); }}>
                 <Edit3 size={14} /> Изменить имя
-              </div>
-              <div className="profile-action-dropdown-item danger" onClick={handleDeleteUser}>
-                <Trash2 size={14} /> Удалить карточку
-              </div>
-              <div className="profile-action-dropdown-item danger" onClick={handleBanUser}>
-                <Ban size={14} /> Заблокировать в боте
               </div>
             </div>
           )}
@@ -311,10 +266,7 @@ export default function UserProfile() {
         </button>
 
         <div className="profile-action-wrapper" ref={exportDropdownRef}>
-          <button
-            className="profile-action-btn"
-            onClick={() => setShowExportDropdown(!showExportDropdown)}
-          >
+          <button className="profile-action-btn" onClick={() => setShowExportDropdown(!showExportDropdown)}>
             <Download size={16} /> Экспорт карточки <ChevronDown size={14} />
           </button>
           {showExportDropdown && (
