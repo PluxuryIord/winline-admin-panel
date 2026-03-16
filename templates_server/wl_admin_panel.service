@@ -8,9 +8,6 @@ Type=simple
 User=root
 WorkingDirectory=/var/www/winline-source/
 Environment=NODE_ENV=production
-# BOT_DIR — путь к папке с ботом (рядом с проектом)
-# Если бот лежит в другом месте — поменяйте этот путь
-Environment=BOT_DIR=/var/www/WLPartnersBot
 ExecStart=/usr/bin/node server/index.js
 RestartSec=10
 Restart=always
