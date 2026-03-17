@@ -82,7 +82,7 @@ export default function ChatView() {
 
   // SSE — реалтайм входящие сообщения
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('wl_admin_token');
     const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
     const es = new EventSource(url);
 
