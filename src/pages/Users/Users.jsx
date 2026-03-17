@@ -19,7 +19,6 @@ export default function Users() {
   const searchRef = useRef(null);
 
   // Фильтры
-  const [filterBanned, setFilterBanned] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
 
   // Сортировка
@@ -107,10 +106,6 @@ export default function Users() {
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
-    if (filterBanned !== 'all') {
-      const banned = filterBanned === 'banned';
-      result = result.filter(u => u.banned === banned);
-    }
     if (filterTag !== 'all') {
       result = result.filter(u => (u.tags || []).includes(filterTag));
     }
@@ -124,7 +119,7 @@ export default function Users() {
     }
 
     return result;
-  }, [users, filterBanned, filterTag, sortConfig]);
+  }, [users, filterTag, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -138,11 +133,10 @@ export default function Users() {
     setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
-  const hasActiveFilters = filterBanned !== 'all' || filterTag !== 'all' || search;
+  const hasActiveFilters = filterTag !== 'all' || search;
 
   const resetFilters = () => {
     setSearch('');
-    setFilterBanned('all');
     setFilterTag('all');
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
@@ -237,12 +231,6 @@ export default function Users() {
         </div>
 
         <div className="filters-row">
-          <select className="filter-select" value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
-            <option value="all">Все статусы</option>
-            <option value="active">Активные</option>
-            <option value="banned">Забаненные</option>
-          </select>
-
           <select className="filter-select" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
             <option value="all">Все теги</option>
             {allTags.map(tag => (
@@ -306,11 +294,6 @@ export default function Users() {
                         {tag}
                       </span>
                     ))}
-                    {user.banned && (
-                      <span className="tag-badge" onClick={() => setFilterBanned(filterBanned === 'banned' ? 'all' : 'banned')}>
-                        Забанен
-                      </span>
-                    )}
                   </div>
                 </td>
 

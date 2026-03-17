@@ -54,15 +54,21 @@ async function getUserIdsWithTags(userIds) {
 // Решение: при сохранении пустых тегов — вставляем специальную строку с tag = '__edited__'
 const EDITED_MARKER = '__edited__';
 
-function buildTagsForUser(userId, tagsMap, editedIds) {
+function buildTagsForUser(userId, tagsMap, editedIds, role) {
   const uid = String(userId);
+  let tags;
   if (tagsMap[uid]) {
-    return tagsMap[uid].filter(t => t !== EDITED_MARKER);
+    tags = tagsMap[uid].filter(t => t !== EDITED_MARKER);
+  } else if (editedIds.has(uid)) {
+    tags = []; // был отредактирован, но все теги удалены
+  } else {
+    tags = ['Старый пользователь']; // никогда не редактировался
   }
-  if (editedIds.has(uid)) {
-    return []; // был отредактирован, но все теги удалены
+  // Добавляем роль из таблицы users как тег (если есть и ещё не в списке)
+  if (role && role !== '—' && !tags.includes(role)) {
+    tags.push(role);
   }
-  return ['Старый пользователь']; // никогда не редактировался
+  return tags;
 }
 
 const USER_COLUMNS = 'user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr';
@@ -93,7 +99,7 @@ router.get('/', async (req, res, next) => {
     const tagsMap = await getTagsForUsers(userIds);
     const editedIds = await getUserIdsWithTags(userIds);
 
-    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds)));
+    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.role)));
     res.json({ users, total, limit, offset });
   } catch (err) { next(err); }
 });
@@ -111,7 +117,7 @@ router.get('/:id', async (req, res, next) => {
     const userId = rows[0].user_id;
     const tagsMap = await getTagsForUsers([userId]);
     const editedIds = await getUserIdsWithTags([userId]);
-    const tags = buildTagsForUser(userId, tagsMap, editedIds);
+    const tags = buildTagsForUser(userId, tagsMap, editedIds, rows[0].role);
 
     res.json(mapUserRow(rows[0], tags));
   } catch (err) { next(err); }

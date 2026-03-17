@@ -284,8 +284,11 @@ router.get('/users/count', async (req, res, next) => {
 router.get('/users/tags', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
-    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__' ORDER BY tag");
-    res.json(rows.map(r => r.tag));
+    // Теги из wl_admin_user_tags + роли из users
+    const [tagRows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
+    const [roleRows] = await dbPool.query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != ''");
+    const all = new Set([...tagRows.map(r => r.tag), ...roleRows.map(r => r.role)]);
+    res.json(Array.from(all).sort());
   } catch (err) { next(err); }
 });
 
