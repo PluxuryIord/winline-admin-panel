@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
-  Loader, Users, MessageCircle, Filter
+  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -19,11 +19,104 @@ const TABS = [
   { id: 'groups', label: 'Группы', icon: MessageCircle },
 ];
 
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* ═══ Компонент прикрепления медиа ═══ */
+function MediaAttach({ media, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('wl_admin_token');
+      const res = await fetch('/api/broadcasts/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      // Превью для картинок
+      let previewUrl = null;
+      if (data.mimeType.startsWith('image/')) {
+        previewUrl = URL.createObjectURL(file);
+      }
+
+      onChange({ ...data, previewUrl });
+    } catch (err) {
+      alert('Ошибка загрузки: ' + err.message);
+    }
+    setUploading(false);
+  };
+
+  const handleRemove = () => {
+    if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl);
+    onChange(null);
+  };
+
+  const MediaIcon = media?.mimeType?.startsWith('image/') ? Image
+    : media?.mimeType?.startsWith('video/') ? Film
+    : FileText;
+
+  return (
+    <div className="bc-media-attach">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt"
+        style={{ display: 'none' }}
+        onChange={handleFileSelect}
+      />
+
+      {!media ? (
+        <button
+          className="bc-media-btn"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? <Loader size={14} className="spin" /> : <Paperclip size={14} />}
+          {uploading ? 'Загрузка...' : 'Прикрепить файл'}
+        </button>
+      ) : (
+        <div className="bc-media-preview">
+          {media.previewUrl ? (
+            <img src={media.previewUrl} alt="" className="bc-media-thumb" />
+          ) : (
+            <div className="bc-media-icon">
+              <MediaIcon size={24} />
+            </div>
+          )}
+          <div className="bc-media-info">
+            <span className="bc-media-name">{media.originalName}</span>
+            <span className="bc-media-size">{formatSize(media.size)}</span>
+          </div>
+          <button className="bc-media-remove" onClick={handleRemove} title="Удалить вложение">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══ Вкладка «Каналы» ═══ */
 function ChannelsTab({ onSendResult }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [text, setText] = useState('');
+  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
@@ -62,18 +155,24 @@ function ChannelsTab({ onSendResult }) {
     );
   };
 
+  const canSend = (text.trim() || media) && selectedChannels.length > 0;
+
   const handleSend = async () => {
-    if (!text.trim() || !selectedChannels.length) return;
+    if (!canSend) return;
     setSending(true);
     setSendResult(null);
     try {
-      const res = await api.post('/api/broadcasts', { text: text.trim(), channelIds: selectedChannels });
+      const body = { channelIds: selectedChannels };
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const res = await api.post('/api/broadcasts', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
         setText('');
+        setMedia(null);
         setSelectedChannels([]);
         onSendResult?.(data);
       }
@@ -125,11 +224,12 @@ function ChannelsTab({ onSendResult }) {
           onChange={e => setText(e.target.value)}
           rows={4}
         />
+        <MediaAttach media={media} onChange={setMedia} />
         <div className="bc-compose-footer">
           <span className="bc-compose-hint">
             {selectedChannels.length > 0 ? `Выбрано каналов: ${selectedChannels.length}` : 'Выберите каналы выше'}
           </span>
-          <button className="broadcasts-create-btn" disabled={sending || !text.trim() || !selectedChannels.length} onClick={handleSend}>
+          <button className="broadcasts-create-btn" disabled={sending || !canSend} onClick={handleSend}>
             {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
             {sending ? 'Отправка...' : 'Отправить'}
           </button>
@@ -156,6 +256,7 @@ function ChannelsTab({ onSendResult }) {
 /* ═══ Вкладка «Пользователи» ═══ */
 function UsersTab({ onSendResult }) {
   const [text, setText] = useState('');
+  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
@@ -183,21 +284,28 @@ function UsersTab({ onSendResult }) {
       .finally(() => setCountLoading(false));
   }, [filterTag]);
 
+  const canSend = (text.trim() || media) && userCount > 0;
+
   const handleSend = async () => {
-    if (!text.trim() || userCount === 0) return;
+    if (!canSend) return;
     setSending(true);
     setSendResult(null);
     try {
       const filters = {};
       if (filterTag !== 'all') filters.tag = filterTag;
 
-      const res = await api.post('/api/broadcasts/users', { text: text.trim(), filters });
+      const body = { filters };
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+
+      const res = await api.post('/api/broadcasts/users', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
         setText('');
+        setMedia(null);
         onSendResult?.(data);
       }
     } catch (err) {
@@ -245,13 +353,14 @@ function UsersTab({ onSendResult }) {
           onChange={e => setText(e.target.value)}
           rows={4}
         />
+        <MediaAttach media={media} onChange={setMedia} />
         <div className="bc-compose-footer">
           <span className="bc-compose-hint">
             {userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
           </span>
           <button
             className="broadcasts-create-btn"
-            disabled={sending || !text.trim() || !userCount}
+            disabled={sending || !canSend}
             onClick={handleSend}
           >
             {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
@@ -273,6 +382,7 @@ function GroupsTab({ onSendResult }) {
   const [groups, setGroups] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [text, setText] = useState('');
+  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
@@ -311,18 +421,24 @@ function GroupsTab({ onSendResult }) {
     );
   };
 
+  const canSend = (text.trim() || media) && selectedGroups.length > 0;
+
   const handleSend = async () => {
-    if (!text.trim() || !selectedGroups.length) return;
+    if (!canSend) return;
     setSending(true);
     setSendResult(null);
     try {
-      const res = await api.post('/api/broadcasts/groups/send', { text: text.trim(), groupIds: selectedGroups });
+      const body = { groupIds: selectedGroups };
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const res = await api.post('/api/broadcasts/groups/send', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
         setText('');
+        setMedia(null);
         setSelectedGroups([]);
         onSendResult?.(data);
       }
@@ -374,11 +490,12 @@ function GroupsTab({ onSendResult }) {
           onChange={e => setText(e.target.value)}
           rows={4}
         />
+        <MediaAttach media={media} onChange={setMedia} />
         <div className="bc-compose-footer">
           <span className="bc-compose-hint">
             {selectedGroups.length > 0 ? `Выбрано групп: ${selectedGroups.length}` : 'Выберите группы выше'}
           </span>
-          <button className="broadcasts-create-btn" disabled={sending || !text.trim() || !selectedGroups.length} onClick={handleSend}>
+          <button className="broadcasts-create-btn" disabled={sending || !canSend} onClick={handleSend}>
             {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
             {sending ? 'Отправка...' : 'Отправить'}
           </button>
@@ -434,7 +551,7 @@ export default function Broadcasts() {
   };
 
   const filtered = broadcasts.filter(b =>
-    b.text.toLowerCase().includes(search.toLowerCase())
+    (b.text || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const TYPE_ICONS = { users: '👤', groups: '💬' };
@@ -505,7 +622,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span>{b.text}</span>
+                    <span>{b.media ? `[${b.media.originalName}] ` : ''}{b.text}</span>
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}

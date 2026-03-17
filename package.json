@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.574.0",
+    "multer": "^2.1.1",
     "mysql2": "^3.20.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
