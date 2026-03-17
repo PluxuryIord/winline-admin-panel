@@ -25,6 +25,43 @@ export default function Chats() {
     api.get('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
   }, []);
 
+  // SSE — реалтайм обновление списка чатов
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
+    const es = new EventSource(url);
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'new_message') {
+          setChats(prev => {
+            const idx = prev.findIndex(c => c.id === data.chatId);
+            if (idx >= 0) {
+              // Обновляем существующий чат — добавляем сообщение
+              const updated = [...prev];
+              const chat = { ...updated[idx] };
+              if (!chat.messages.some(m => m.id === data.message.id)) {
+                chat.messages = [...chat.messages, data.message];
+              }
+              updated.splice(idx, 1);
+              return [chat, ...updated]; // Наверх
+            } else {
+              // Новый чат
+              return [{
+                id: data.chatId,
+                userId: data.userId,
+                messages: [data.message],
+              }, ...prev];
+            }
+          });
+        }
+      } catch {}
+    };
+
+    return () => es.close();
+  }, []);
+
   const getUser = (userId) => users.find(u => u.id === userId);
 
   const handleDelete = (e, chatId, userName) => {

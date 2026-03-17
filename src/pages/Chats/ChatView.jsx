@@ -80,6 +80,29 @@ export default function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat?.messages]);
 
+  // SSE — реалтайм входящие сообщения
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
+    const es = new EventSource(url);
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'new_message' && data.chatId === Number(id)) {
+          setChat(prev => {
+            if (!prev) return prev;
+            // Не добавляем дубли
+            if (prev.messages.some(m => m.id === data.message.id)) return prev;
+            return { ...prev, messages: [...prev.messages, data.message] };
+          });
+        }
+      } catch {}
+    };
+
+    return () => es.close();
+  }, [id]);
+
   // Сохранение тегов на сервер
   const saveTags = async (newTags) => {
     setTags(newTags);
@@ -205,7 +228,7 @@ export default function ChatView() {
                 <div className="chatview-hero-avatar">{user.fullName.charAt(0)}</div>
                 <div className="chatview-hero-name">{user.fullName}</div>
                 <span className="chatview-hero-badge badge-guest">
-                  {user.role !== '—' ? user.role : 'Пользователь'}
+                  {(tags[0]) || 'Пользователь'}
                 </span>
               </Link>
 
@@ -220,10 +243,6 @@ export default function ChatView() {
                       </button>
                     </span>
                   ))}
-                  {user.role && user.role !== '—' && (
-                    <span className="chatview-tag-editable">{user.role}</span>
-                  )}
-
                   <div className="chatview-tag-add-wrapper" ref={tagDropdownRef}>
                     <button className="chatview-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
                       <Plus size={13} />
@@ -257,10 +276,6 @@ export default function ChatView() {
                   <div className="chatview-info-row">
                     <span className="chatview-info-label">Telegram</span>
                     <span className="chatview-info-value">{user.telegram}</span>
-                  </div>
-                  <div className="chatview-info-row">
-                    <span className="chatview-info-label">Роль</span>
-                    <span className="chatview-info-value">{user.role}</span>
                   </div>
                   <div className="chatview-info-row">
                     <span className="chatview-info-label">Телефон</span>

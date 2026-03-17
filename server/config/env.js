@@ -20,6 +20,7 @@ const projectEnv = parseProjectEnv();
 export const API_PORT = Number(process.env.API_PORT || projectEnv.API_PORT || 3001);
 export const BOT_TOKEN = process.env.BOT_TOKEN || projectEnv.BOT_TOKEN || '';
 export const JWT_SECRET = process.env.JWT_SECRET || projectEnv.JWT_SECRET || '';
+export const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || projectEnv.WEBHOOK_SECRET || '';
 
 export const MYSQL_HOST = process.env.MYSQL_HOST || projectEnv.MYSQL_HOST || '';
 export const MYSQL_PORT = Number(process.env.MYSQL_PORT || projectEnv.MYSQL_PORT || 3306);
