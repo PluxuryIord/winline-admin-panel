@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
-  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film
+  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film, BarChart2
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -521,6 +522,7 @@ function GroupsTab({ onSendResult }) {
 
 /* ═══ Главный компонент ═══ */
 export default function Broadcasts() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState('channels');
   const [broadcasts, setBroadcasts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -582,6 +584,10 @@ export default function Broadcasts() {
             </button>
           );
         })}
+        <button className="bc-tab bc-tab--constructor" onClick={() => navigate('/mailings/new')}>
+          <BarChart2 size={16} />
+          Конструктор
+        </button>
       </div>
 
       {/* Контент вкладки */}
