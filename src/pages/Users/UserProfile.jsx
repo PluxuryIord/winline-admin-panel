@@ -201,9 +201,6 @@ export default function UserProfile() {
               {user.banned && (
                 <span className="profile-tag">Забанен</span>
               )}
-              {user.role && user.role !== '—' && (
-                <span className="profile-tag">{user.role}</span>
-              )}
 
               <div className="profile-tag-add-wrapper" ref={tagDropdownRef}>
                 <button className="profile-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
