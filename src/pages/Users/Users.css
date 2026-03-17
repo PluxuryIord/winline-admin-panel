@@ -73,8 +73,14 @@
   outline: none;
 }
 
+.filter-select:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+}
+
 .filter-select:focus {
   border-color: var(--color-orange);
+  color: var(--color-orange);
 }
 
 .filter-select option {
