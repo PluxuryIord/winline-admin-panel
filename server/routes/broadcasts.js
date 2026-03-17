@@ -23,6 +23,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
+// ===================== ПРОВЕРКА СХЕМЫ =====================
+
+let hasMediaColumn = null; // кэш
+async function checkMediaColumn() {
+  if (hasMediaColumn !== null) return hasMediaColumn;
+  try {
+    const [cols] = await dbPool.query("SHOW COLUMNS FROM wl_admin_broadcasts LIKE 'media_json'");
+    hasMediaColumn = cols.length > 0;
+  } catch {
+    hasMediaColumn = false;
+  }
+  return hasMediaColumn;
+}
+
 // ===================== ХЕЛПЕРЫ =====================
 
 function safeJsonArray(val) {
@@ -156,9 +170,10 @@ router.post('/groups/send', async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query(
-      'SELECT id, text, type, channels_json, channel_ids_json, total, success, failed, results_json, media_json, status, created_at AS date FROM wl_admin_broadcasts ORDER BY created_at DESC LIMIT 200'
-    );
+    const withMedia = await checkMediaColumn();
+    const cols = 'id, text, type, channels_json, channel_ids_json, total, success, failed, results_json, ' +
+      (withMedia ? 'media_json, ' : '') + 'status, created_at AS date';
+    const [rows] = await dbPool.query(`SELECT ${cols} FROM wl_admin_broadcasts ORDER BY created_at DESC LIMIT 200`);
     res.json(rows.map(r => ({
       id: r.id,
       text: r.text,
@@ -169,7 +184,7 @@ router.get('/', async (req, res, next) => {
       success: r.success,
       failed: r.failed,
       results: safeJsonParse(r.results_json, []),
-      media: safeJsonParse(r.media_json, null),
+      media: withMedia ? safeJsonParse(r.media_json, null) : null,
       date: r.date,
       status: r.status,
     })));
@@ -292,15 +307,24 @@ router.get('/users/tags', async (req, res, next) => {
 
 async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media }) {
   const status = success === total ? 'published' : (success > 0 ? 'partial' : 'failed');
-  const [result] = await dbPool.query(
-    `INSERT INTO wl_admin_broadcasts (text, type, channels_json, channel_ids_json, total, success, failed, results_json, media_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      (text || '').substring(0, 500), type, JSON.stringify(channels), JSON.stringify(channelIds),
-      total, success, failed, JSON.stringify(results),
-      media ? JSON.stringify(media) : null,
-      status,
-    ]
-  );
+  const withMedia = await checkMediaColumn();
+
+  const baseCols = 'text, type, channels_json, channel_ids_json, total, success, failed, results_json, status';
+  const baseVals = [
+    (text || '').substring(0, 500), type, JSON.stringify(channels), JSON.stringify(channelIds),
+    total, success, failed, JSON.stringify(results), status,
+  ];
+
+  let sql, params;
+  if (withMedia) {
+    sql = `INSERT INTO wl_admin_broadcasts (${baseCols}, media_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    params = [...baseVals, media ? JSON.stringify(media) : null];
+  } else {
+    sql = `INSERT INTO wl_admin_broadcasts (${baseCols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    params = baseVals;
+  }
+
+  const [result] = await dbPool.query(sql, params);
   return {
     id: result.insertId, text: (text || '').substring(0, 200), type, channels, channelIds,
     total, success, failed, results, media: media || null, date: new Date().toISOString(), status,
