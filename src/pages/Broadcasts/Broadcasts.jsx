@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle, Loader } from 'lucide-react';
+import {
+  Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
+  Loader, Users, MessageCircle, Filter
+} from 'lucide-react';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Broadcasts.css';
 
@@ -9,44 +12,29 @@ const STATUS_LABELS = {
   failed: 'Ошибка',
 };
 
-export default function Broadcasts() {
-  const [channels, setChannels] = useState([]);
-  const [broadcasts, setBroadcasts] = useState([]);
-  const [loading, setLoading] = useState(true);
+const TABS = [
+  { id: 'channels', label: 'Каналы', icon: Hash },
+  { id: 'users', label: 'Пользователи', icon: Users },
+  { id: 'groups', label: 'Группы', icon: MessageCircle },
+];
 
-  // Форма новой рассылки
-  const [text, setText] = useState('');
+/* ═══ Вкладка «Каналы» ═══ */
+function ChannelsTab({ onSendResult }) {
+  const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
+  const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
+  const [addModal, setAddModal] = useState(false);
 
-  // Модалки
-  const [addChannelModal, setAddChannelModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState(null);
-
-  // Поиск
-  const [search, setSearch] = useState('');
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [chRes, brRes] = await Promise.all([
-        fetch('/api/broadcasts/channels'),
-        fetch('/api/broadcasts'),
-      ]);
-      setChannels(await chRes.json());
-      setBroadcasts(await brRes.json());
-    } catch { /* ignore */ }
-    setLoading(false);
+  useEffect(() => {
+    fetch('/api/broadcasts/channels').then(r => r.json()).then(setChannels).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Добавить канал
   const handleAddChannel = async (input) => {
-    setAddChannelModal(false);
+    setAddModal(false);
     const chatId = input.trim();
     if (!chatId) return;
-    // Если ввели @username — оставляем как есть, Telegram примет
     const title = chatId.startsWith('@') ? chatId : `Канал ${chatId}`;
     try {
       const res = await fetch('/api/broadcasts/channels', {
@@ -60,17 +48,11 @@ export default function Broadcasts() {
     } catch (err) { alert(err.message); }
   };
 
-  // Удалить канал
   const handleDeleteChannel = async (id) => {
     await fetch(`/api/broadcasts/channels/${id}`, { method: 'DELETE' });
     setChannels(prev => prev.filter(c => c.id !== id));
-    setSelectedChannels(prev => prev.filter(cid => {
-      const ch = channels.find(c => c.id === id);
-      return ch ? cid !== ch.chatId : true;
-    }));
   };
 
-  // Выбор/снятие канала
   const toggleChannel = (chatId) => {
     setSelectedChannels(prev =>
       prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
@@ -78,14 +60,11 @@ export default function Broadcasts() {
   };
 
   const selectAll = () => {
-    if (selectedChannels.length === channels.length) {
-      setSelectedChannels([]);
-    } else {
-      setSelectedChannels(channels.map(c => c.chatId));
-    }
+    setSelectedChannels(prev =>
+      prev.length === channels.length ? [] : channels.map(c => c.chatId)
+    );
   };
 
-  // Отправить рассылку
   const handleSend = async () => {
     if (!text.trim() || !selectedChannels.length) return;
     setSending(true);
@@ -103,7 +82,7 @@ export default function Broadcasts() {
         setSendResult(data);
         setText('');
         setSelectedChannels([]);
-        setBroadcasts(prev => [data, ...prev]);
+        onSendResult?.(data);
       }
     } catch (err) {
       setSendResult({ error: err.message });
@@ -111,7 +90,385 @@ export default function Broadcasts() {
     setSending(false);
   };
 
-  // Удалить рассылку из истории
+  return (
+    <>
+      <div className="bc-section">
+        <div className="bc-section-header">
+          <h3 className="bc-section-title">Каналы</h3>
+          <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+            <Plus size={16} /> Добавить
+          </button>
+        </div>
+        {channels.length === 0 ? (
+          <div className="bc-channels-empty">
+            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
+          </div>
+        ) : (
+          <div className="bc-channels-list">
+            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
+              <input type="checkbox" checked={selectedChannels.length === channels.length && channels.length > 0} readOnly />
+              <span>Все каналы ({channels.length})</span>
+            </label>
+            {channels.map(ch => (
+              <label key={ch.id} className="bc-channel-item">
+                <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
+                <Hash size={14} className="bc-channel-hash" />
+                <span className="bc-channel-name">{ch.title}</span>
+                <button className="bc-channel-remove" onClick={(e) => { e.preventDefault(); handleDeleteChannel(ch.id); }} title="Удалить канал">
+                  <Trash2 size={13} />
+                </button>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bc-section">
+        <h3 className="bc-section-title">Новая рассылка в каналы</h3>
+        <textarea
+          className="bc-compose-textarea"
+          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={4}
+        />
+        <div className="bc-compose-footer">
+          <span className="bc-compose-hint">
+            {selectedChannels.length > 0 ? `Выбрано каналов: ${selectedChannels.length}` : 'Выберите каналы выше'}
+          </span>
+          <button className="broadcasts-create-btn" disabled={sending || !text.trim() || !selectedChannels.length} onClick={handleSend}>
+            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+            {sending ? 'Отправка...' : 'Отправить'}
+          </button>
+        </div>
+        {sendResult && (
+          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
+            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+          </div>
+        )}
+      </div>
+
+      {addModal && (
+        <PromptModal
+          title="Добавить канал"
+          placeholder="@username или chat_id (например -1001234567890)"
+          onConfirm={handleAddChannel}
+          onCancel={() => setAddModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Вкладка «Пользователи» ═══ */
+function UsersTab({ onSendResult }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  // Фильтры
+  const [roles, setRoles] = useState([]);
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterBanned, setFilterBanned] = useState('all');
+  const [filterRegistered, setFilterRegistered] = useState('all');
+  const [userCount, setUserCount] = useState(null);
+  const [countLoading, setCountLoading] = useState(false);
+
+  // Загрузка ролей
+  useEffect(() => {
+    fetch('/api/broadcasts/users/roles').then(r => r.json()).then(setRoles).catch(() => {});
+  }, []);
+
+  // Подсчёт по фильтрам
+  useEffect(() => {
+    setCountLoading(true);
+    const params = new URLSearchParams();
+    if (filterRole !== 'all') params.set('role', filterRole);
+    if (filterBanned !== 'all') params.set('banned', filterBanned);
+    if (filterRegistered !== 'all') params.set('registered', filterRegistered);
+
+    fetch(`/api/broadcasts/users/count?${params}`)
+      .then(r => r.json())
+      .then(data => setUserCount(data.count))
+      .catch(() => setUserCount(null))
+      .finally(() => setCountLoading(false));
+  }, [filterRole, filterBanned, filterRegistered]);
+
+  const handleSend = async () => {
+    if (!text.trim() || userCount === 0) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const filters = {};
+      if (filterRole !== 'all') filters.role = filterRole;
+      if (filterBanned !== 'all') filters.banned = filterBanned;
+      if (filterRegistered !== 'all') filters.registered = filterRegistered;
+
+      const res = await fetch('/api/broadcasts/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.trim(), filters }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: data.error });
+      } else {
+        setSendResult(data);
+        setText('');
+        onSendResult?.(data);
+      }
+    } catch (err) {
+      setSendResult({ error: err.message });
+    }
+    setSending(false);
+  };
+
+  return (
+    <>
+      <div className="bc-section">
+        <div className="bc-section-header">
+          <h3 className="bc-section-title">
+            <Filter size={14} style={{ marginRight: 6, display: 'inline', verticalAlign: 'middle' }} />
+            Фильтры аудитории
+          </h3>
+        </div>
+
+        <div className="bc-filters-grid">
+          <div className="bc-filter-group">
+            <label className="bc-filter-label">Роль</label>
+            <select className="bc-filter-select" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+              <option value="all">Все роли</option>
+              {roles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          <div className="bc-filter-group">
+            <label className="bc-filter-label">Статус</label>
+            <select className="bc-filter-select" value={filterBanned} onChange={e => setFilterBanned(e.target.value)}>
+              <option value="all">Все</option>
+              <option value="active">Активные</option>
+              <option value="banned">Забаненные</option>
+            </select>
+          </div>
+
+          <div className="bc-filter-group">
+            <label className="bc-filter-label">Регистрация</label>
+            <select className="bc-filter-select" value={filterRegistered} onChange={e => setFilterRegistered(e.target.value)}>
+              <option value="all">Все</option>
+              <option value="yes">Зарегистрированные</option>
+              <option value="no">Не зарегистрированные</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="bc-user-count">
+          <Users size={15} />
+          {countLoading ? (
+            <span>Подсчёт...</span>
+          ) : (
+            <span>Получателей: <b>{userCount ?? '—'}</b></span>
+          )}
+        </div>
+      </div>
+
+      <div className="bc-section">
+        <h3 className="bc-section-title">Рассылка пользователям бота</h3>
+        <textarea
+          className="bc-compose-textarea"
+          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={4}
+        />
+        <div className="bc-compose-footer">
+          <span className="bc-compose-hint">
+            {userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
+          </span>
+          <button
+            className="broadcasts-create-btn"
+            disabled={sending || !text.trim() || !userCount}
+            onClick={handleSend}
+          >
+            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+            {sending ? 'Отправка...' : 'Отправить'}
+          </button>
+        </div>
+        {sendResult && (
+          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
+            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ═══ Вкладка «Группы» ═══ */
+function GroupsTab({ onSendResult }) {
+  const [groups, setGroups] = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [addModal, setAddModal] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/broadcasts/groups').then(r => r.json()).then(setGroups).catch(() => {});
+  }, []);
+
+  const handleAddGroup = async (input) => {
+    setAddModal(false);
+    const chatId = input.trim();
+    if (!chatId) return;
+    const title = chatId.startsWith('@') ? chatId : `Группа ${chatId}`;
+    try {
+      const res = await fetch('/api/broadcasts/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, title }),
+      });
+      const g = await res.json();
+      if (!res.ok) return alert(g.error);
+      setGroups(prev => [...prev, g]);
+    } catch (err) { alert(err.message); }
+  };
+
+  const handleDeleteGroup = async (id) => {
+    await fetch(`/api/broadcasts/groups/${id}`, { method: 'DELETE' });
+    setGroups(prev => prev.filter(g => g.id !== id));
+  };
+
+  const toggleGroup = (chatId) => {
+    setSelectedGroups(prev =>
+      prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedGroups(prev =>
+      prev.length === groups.length ? [] : groups.map(g => g.chatId)
+    );
+  };
+
+  const handleSend = async () => {
+    if (!text.trim() || !selectedGroups.length) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch('/api/broadcasts/groups/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.trim(), groupIds: selectedGroups }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: data.error });
+      } else {
+        setSendResult(data);
+        setText('');
+        setSelectedGroups([]);
+        onSendResult?.(data);
+      }
+    } catch (err) {
+      setSendResult({ error: err.message });
+    }
+    setSending(false);
+  };
+
+  return (
+    <>
+      <div className="bc-section">
+        <div className="bc-section-header">
+          <h3 className="bc-section-title">Группы / чаты</h3>
+          <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+            <Plus size={16} /> Добавить
+          </button>
+        </div>
+        {groups.length === 0 ? (
+          <div className="bc-channels-empty">
+            Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
+          </div>
+        ) : (
+          <div className="bc-channels-list">
+            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
+              <input type="checkbox" checked={selectedGroups.length === groups.length && groups.length > 0} readOnly />
+              <span>Все группы ({groups.length})</span>
+            </label>
+            {groups.map(g => (
+              <label key={g.id} className="bc-channel-item">
+                <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
+                <MessageCircle size={14} className="bc-channel-hash" />
+                <span className="bc-channel-name">{g.title}</span>
+                <button className="bc-channel-remove" onClick={(e) => { e.preventDefault(); handleDeleteGroup(g.id); }} title="Удалить группу">
+                  <Trash2 size={13} />
+                </button>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bc-section">
+        <h3 className="bc-section-title">Рассылка в группы</h3>
+        <textarea
+          className="bc-compose-textarea"
+          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={4}
+        />
+        <div className="bc-compose-footer">
+          <span className="bc-compose-hint">
+            {selectedGroups.length > 0 ? `Выбрано групп: ${selectedGroups.length}` : 'Выберите группы выше'}
+          </span>
+          <button className="broadcasts-create-btn" disabled={sending || !text.trim() || !selectedGroups.length} onClick={handleSend}>
+            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+            {sending ? 'Отправка...' : 'Отправить'}
+          </button>
+        </div>
+        {sendResult && (
+          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
+            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+          </div>
+        )}
+      </div>
+
+      {addModal && (
+        <PromptModal
+          title="Добавить группу"
+          placeholder="Chat ID группы (например -1001234567890)"
+          onConfirm={handleAddGroup}
+          onCancel={() => setAddModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Главный компонент ═══ */
+export default function Broadcasts() {
+  const [tab, setTab] = useState('channels');
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [deleteModal, setDeleteModal] = useState(null);
+
+  const fetchBroadcasts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/broadcasts');
+      setBroadcasts(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchBroadcasts(); }, [fetchBroadcasts]);
+
+  const handleSendResult = (data) => {
+    if (data && !data.error) {
+      setBroadcasts(prev => [data, ...prev]);
+    }
+  };
+
   const handleDeleteBroadcast = async () => {
     if (!deleteModal) return;
     await fetch(`/api/broadcasts/${deleteModal}`, { method: 'DELETE' });
@@ -119,10 +476,11 @@ export default function Broadcasts() {
     setDeleteModal(null);
   };
 
-  // Фильтр истории
   const filtered = broadcasts.filter(b =>
     b.text.toLowerCase().includes(search.toLowerCase())
   );
+
+  const TYPE_ICONS = { users: '👤', groups: '💬' };
 
   if (loading) {
     return (
@@ -135,85 +493,29 @@ export default function Broadcasts() {
   return (
     <div className="broadcasts-container">
 
-      {/* === БЛОК: КАНАЛЫ === */}
-      <div className="bc-section">
-        <div className="bc-section-header">
-          <h3 className="bc-section-title">Каналы</h3>
-          <button className="bc-add-channel-btn" onClick={() => setAddChannelModal(true)}>
-            <Plus size={16} /> Добавить
-          </button>
-        </div>
-
-        {channels.length === 0 ? (
-          <div className="bc-channels-empty">
-            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
-          </div>
-        ) : (
-          <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
-              <input type="checkbox" checked={selectedChannels.length === channels.length} readOnly />
-              <span>Все каналы ({channels.length})</span>
-            </label>
-            {channels.map(ch => (
-              <label key={ch.id} className="bc-channel-item">
-                <input
-                  type="checkbox"
-                  checked={selectedChannels.includes(ch.chatId)}
-                  onChange={() => toggleChannel(ch.chatId)}
-                />
-                <Hash size={14} className="bc-channel-hash" />
-                <span className="bc-channel-name">{ch.title}</span>
-                <button
-                  className="bc-channel-remove"
-                  onClick={(e) => { e.preventDefault(); handleDeleteChannel(ch.id); }}
-                  title="Удалить канал"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </label>
-            ))}
-          </div>
-        )}
+      {/* Табы */}
+      <div className="bc-tabs">
+        {TABS.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              className={`bc-tab${tab === t.id ? ' bc-tab--active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              <Icon size={16} />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* === БЛОК: НОВАЯ РАССЫЛКА === */}
-      <div className="bc-section">
-        <h3 className="bc-section-title">Новая рассылка</h3>
-        <textarea
-          className="bc-compose-textarea"
-          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={4}
-        />
-        <div className="bc-compose-footer">
-          <span className="bc-compose-hint">
-            {selectedChannels.length > 0
-              ? `Выбрано каналов: ${selectedChannels.length}`
-              : 'Выберите каналы выше'}
-          </span>
-          <button
-            className="broadcasts-create-btn"
-            disabled={sending || !text.trim() || !selectedChannels.length}
-            onClick={handleSend}
-          >
-            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-            {sending ? 'Отправка...' : 'Отправить'}
-          </button>
-        </div>
+      {/* Контент вкладки */}
+      {tab === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
+      {tab === 'users' && <UsersTab onSendResult={handleSendResult} />}
+      {tab === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
 
-        {sendResult && (
-          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-            {sendResult.error ? (
-              <><AlertCircle size={16} /> {sendResult.error}</>
-            ) : (
-              <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* === БЛОК: ИСТОРИЯ === */}
+      {/* История */}
       <div className="bc-section bc-section--grow">
         <div className="bc-section-header">
           <h3 className="bc-section-title">История рассылок</h3>
@@ -233,7 +535,7 @@ export default function Broadcasts() {
             <thead>
               <tr>
                 <th>Текст</th>
-                <th>Каналы</th>
+                <th>Получатели</th>
                 <th>Статус</th>
                 <th>Дата</th>
                 <th></th>
@@ -245,7 +547,7 @@ export default function Broadcasts() {
               ) : filtered.map(b => (
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
-                    <Send size={14} className="bc-type-icon" />
+                    <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
                     <span>{b.text}</span>
                   </td>
                   <td className="bc-channel">
@@ -257,6 +559,7 @@ export default function Broadcasts() {
                       {b.status === 'failed' && <XCircle size={12} />}
                       {b.status === 'partial' && <AlertCircle size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
+                      {b.total > 1 && ` ${b.success}/${b.total}`}
                     </span>
                   </td>
                   <td className="bc-date">
@@ -264,11 +567,7 @@ export default function Broadcasts() {
                     {new Date(b.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="bc-actions">
-                    <button
-                      className="bc-action-btn bc-action-delete"
-                      title="Удалить из истории"
-                      onClick={() => setDeleteModal(b.id)}
-                    >
+                    <button className="bc-action-btn bc-action-delete" title="Удалить из истории" onClick={() => setDeleteModal(b.id)}>
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -278,16 +577,6 @@ export default function Broadcasts() {
           </table>
         </div>
       </div>
-
-      {/* Модалки */}
-      {addChannelModal && (
-        <PromptModal
-          title="Добавить канал"
-          placeholder="@username или chat_id (например -1001234567890)"
-          onConfirm={handleAddChannel}
-          onCancel={() => setAddChannelModal(false)}
-        />
-      )}
 
       {deleteModal && (
         <PromptModal

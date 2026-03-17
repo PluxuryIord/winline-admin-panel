@@ -75,9 +75,11 @@ for (const name of dataFiles) {
 const BROADCASTS_FILE = path.join(__dirname, 'data', 'broadcasts.json');
 const CHANNELS_FILE = path.join(__dirname, 'data', 'channels.json');
 const TAGS_FILE = path.join(__dirname, 'data', 'tags.json');
+const GROUPS_FILE = path.join(__dirname, 'data', 'groups.json');
 if (!fs.existsSync(BROADCASTS_FILE)) fs.writeFileSync(BROADCASTS_FILE, '[]', 'utf-8');
 if (!fs.existsSync(CHANNELS_FILE)) fs.writeFileSync(CHANNELS_FILE, '[]', 'utf-8');
 if (!fs.existsSync(TAGS_FILE)) fs.writeFileSync(TAGS_FILE, '{}', 'utf-8');
+if (!fs.existsSync(GROUPS_FILE)) fs.writeFileSync(GROUPS_FILE, '[]', 'utf-8');
 
 const readJSON = (file) => JSON.parse(fs.readFileSync(file, 'utf-8'));
 const writeJSON = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
@@ -420,6 +422,222 @@ app.delete('/api/broadcasts/:id', (req, res) => {
     writeJSON(BROADCASTS_FILE, broadcasts);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// =====================================================
+// === Рассылка пользователям бота (в личку) ===
+// =====================================================
+
+// POST /api/broadcasts/users — отправить сообщение пользователям бота
+app.post('/api/broadcasts/users', async (req, res) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен — добавьте в .env' });
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+
+  const { text, filters } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+
+  try {
+    // Строим SQL с фильтрами
+    let where = ['user_id IS NOT NULL'];
+    const params = [];
+
+    if (filters) {
+      if (filters.role && filters.role !== 'all') {
+        where.push('role = ?');
+        params.push(filters.role);
+      }
+      if (filters.banned === 'active') {
+        where.push('(banned = 0 OR banned IS NULL)');
+      } else if (filters.banned === 'banned') {
+        where.push('banned = 1');
+      }
+      if (filters.registered === 'yes') {
+        where.push('registered = 1');
+      } else if (filters.registered === 'no') {
+        where.push('(registered = 0 OR registered IS NULL)');
+      }
+    }
+
+    const [rows] = await dbPool.query(
+      `SELECT user_id FROM users WHERE ${where.join(' AND ')}`,
+      params
+    );
+
+    if (!rows.length) {
+      return res.json({ success: 0, total: 0, failed: 0, results: [], status: 'failed', error: 'Нет пользователей по заданным фильтрам' });
+    }
+
+    const results = [];
+    let successCount = 0;
+
+    for (const row of rows) {
+      try {
+        const data = await tgSend(row.user_id, text.trim());
+        results.push({ chatId: row.user_id, ok: data.ok, error: data.description || null });
+        if (data.ok) successCount++;
+      } catch (err) {
+        results.push({ chatId: row.user_id, ok: false, error: err.message });
+      }
+    }
+
+    // Сохраняем в историю
+    const broadcasts = readJSON(BROADCASTS_FILE);
+    const record = {
+      id: (broadcasts[0]?.id || 0) + 1,
+      text: text.trim().substring(0, 200),
+      channels: [`Пользователи (${rows.length})`],
+      channelIds: [],
+      type: 'users',
+      total: rows.length,
+      success: successCount,
+      failed: rows.length - successCount,
+      results,
+      date: new Date().toISOString(),
+      status: successCount === rows.length ? 'published' : (successCount > 0 ? 'partial' : 'failed'),
+    };
+    broadcasts.unshift(record);
+    if (broadcasts.length > 200) broadcasts.length = 200;
+    writeJSON(BROADCASTS_FILE, broadcasts);
+
+    res.json(record);
+  } catch (err) {
+    console.error('[broadcast/users] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/broadcasts/users/count — подсчёт пользователей по фильтрам
+app.get('/api/broadcasts/users/count', async (req, res) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    let where = ['user_id IS NOT NULL'];
+    const params = [];
+
+    if (req.query.role && req.query.role !== 'all') {
+      where.push('role = ?');
+      params.push(req.query.role);
+    }
+    if (req.query.banned === 'active') {
+      where.push('(banned = 0 OR banned IS NULL)');
+    } else if (req.query.banned === 'banned') {
+      where.push('banned = 1');
+    }
+    if (req.query.registered === 'yes') {
+      where.push('registered = 1');
+    } else if (req.query.registered === 'no') {
+      where.push('(registered = 0 OR registered IS NULL)');
+    }
+
+    const [[{ count }]] = await dbPool.query(
+      `SELECT COUNT(*) as count FROM users WHERE ${where.join(' AND ')}`,
+      params
+    );
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/broadcasts/users/roles — уникальные роли для фильтра
+app.get('/api/broadcasts/users/roles', async (req, res) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    const [rows] = await dbPool.query(
+      "SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != '' ORDER BY role"
+    );
+    res.json(rows.map(r => r.role));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================================
+// === Рассылка в группы/чаты где есть бот ===
+// =====================================================
+
+// GET /api/broadcasts/groups
+app.get('/api/broadcasts/groups', (req, res) => {
+  try { res.json(readJSON(GROUPS_FILE)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/broadcasts/groups — добавить группу
+app.post('/api/broadcasts/groups', (req, res) => {
+  try {
+    const { chatId, title } = req.body;
+    if (!chatId) return res.status(400).json({ error: 'chatId is required' });
+    const groups = readJSON(GROUPS_FILE);
+    if (groups.some(g => String(g.chatId) === String(chatId))) {
+      return res.status(409).json({ error: 'Группа уже добавлена' });
+    }
+    const g = {
+      id: (groups.at(-1)?.id || 0) + 1,
+      chatId: String(chatId),
+      title: title || chatId,
+      addedAt: new Date().toISOString(),
+    };
+    groups.push(g);
+    writeJSON(GROUPS_FILE, groups);
+    res.status(201).json(g);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/broadcasts/groups/:id
+app.delete('/api/broadcasts/groups/:id', (req, res) => {
+  try {
+    const groups = readJSON(GROUPS_FILE);
+    const idx = groups.findIndex(g => g.id === Number(req.params.id));
+    if (idx === -1) return res.status(404).json({ error: 'Not found' });
+    groups.splice(idx, 1);
+    writeJSON(GROUPS_FILE, groups);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/broadcasts/groups/send — отправить в группы
+app.post('/api/broadcasts/groups/send', async (req, res) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен — добавьте в .env' });
+
+  const { text, groupIds } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+  if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
+
+  const results = [];
+  for (const chatId of groupIds) {
+    try {
+      const data = await tgSend(chatId, text.trim());
+      results.push({ chatId, ok: data.ok, error: data.description || null });
+    } catch (err) {
+      results.push({ chatId, ok: false, error: err.message });
+    }
+  }
+
+  const success = results.filter(r => r.ok).length;
+  const groups = readJSON(GROUPS_FILE);
+  const groupNames = groupIds.map(id => {
+    const g = groups.find(gr => String(gr.chatId) === String(id));
+    return g?.title || id;
+  });
+
+  const broadcasts = readJSON(BROADCASTS_FILE);
+  const record = {
+    id: (broadcasts[0]?.id || 0) + 1,
+    text: text.trim().substring(0, 200),
+    channels: groupNames,
+    channelIds: groupIds,
+    type: 'groups',
+    total: groupIds.length,
+    success,
+    failed: groupIds.length - success,
+    results,
+    date: new Date().toISOString(),
+    status: success === groupIds.length ? 'published' : (success > 0 ? 'partial' : 'failed'),
+  };
+  broadcasts.unshift(record);
+  if (broadcasts.length > 200) broadcasts.length = 200;
+  writeJSON(BROADCASTS_FILE, broadcasts);
+
+  res.json(record);
 });
 
 // GET /api/bot/status — диагностика
