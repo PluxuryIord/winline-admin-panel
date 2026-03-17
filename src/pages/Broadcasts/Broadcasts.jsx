@@ -162,8 +162,6 @@ function UsersTab({ onSendResult }) {
   // Фильтры
   const [tags, setTags] = useState([]);
   const [filterTag, setFilterTag] = useState('all');
-  const [filterBanned, setFilterBanned] = useState('all');
-  const [filterRegistered, setFilterRegistered] = useState('all');
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
@@ -177,15 +175,13 @@ function UsersTab({ onSendResult }) {
     setCountLoading(true);
     const params = new URLSearchParams();
     if (filterTag !== 'all') params.set('tag', filterTag);
-    if (filterBanned !== 'all') params.set('banned', filterBanned);
-    if (filterRegistered !== 'all') params.set('registered', filterRegistered);
 
     api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [filterTag, filterBanned, filterRegistered]);
+  }, [filterTag]);
 
   const handleSend = async () => {
     if (!text.trim() || userCount === 0) return;
@@ -194,8 +190,6 @@ function UsersTab({ onSendResult }) {
     try {
       const filters = {};
       if (filterTag !== 'all') filters.tag = filterTag;
-      if (filterBanned !== 'all') filters.banned = filterBanned;
-      if (filterRegistered !== 'all') filters.registered = filterRegistered;
 
       const res = await api.post('/api/broadcasts/users', { text: text.trim(), filters });
       const data = await res.json();
@@ -228,24 +222,6 @@ function UsersTab({ onSendResult }) {
             <select className="bc-filter-select" value={filterTag} onChange={e => setFilterTag(e.target.value)}>
               <option value="all">Все теги</option>
               {tags.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-
-          <div className="bc-filter-group">
-            <label className="bc-filter-label">Статус</label>
-            <select className="bc-filter-select" value={filterBanned} onChange={e => setFilterBanned(e.target.value)}>
-              <option value="all">Все</option>
-              <option value="active">Активные</option>
-              <option value="banned">Забаненные</option>
-            </select>
-          </div>
-
-          <div className="bc-filter-group">
-            <label className="bc-filter-label">Регистрация</label>
-            <select className="bc-filter-select" value={filterRegistered} onChange={e => setFilterRegistered(e.target.value)}>
-              <option value="all">Все</option>
-              <option value="yes">Зарегистрированные</option>
-              <option value="no">Не зарегистрированные</option>
             </select>
           </div>
         </div>
