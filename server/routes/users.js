@@ -54,21 +54,15 @@ async function getUserIdsWithTags(userIds) {
 // Решение: при сохранении пустых тегов — вставляем специальную строку с tag = '__edited__'
 const EDITED_MARKER = '__edited__';
 
-function buildTagsForUser(userId, tagsMap, editedIds, role) {
+function buildTagsForUser(userId, tagsMap, editedIds) {
   const uid = String(userId);
-  let tags;
   if (tagsMap[uid]) {
-    tags = tagsMap[uid].filter(t => t !== EDITED_MARKER);
+    return tagsMap[uid].filter(t => t !== EDITED_MARKER);
   } else if (editedIds.has(uid)) {
-    tags = []; // был отредактирован, но все теги удалены
+    return []; // был отредактирован, но все теги удалены
   } else {
-    tags = ['Старый пользователь']; // никогда не редактировался
+    return ['Старый пользователь']; // никогда не редактировался
   }
-  // Добавляем роль из таблицы users как тег (если есть и ещё не в списке)
-  if (role && role !== '—' && !tags.includes(role)) {
-    tags.push(role);
-  }
-  return tags;
 }
 
 const USER_COLUMNS = 'user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr';
@@ -99,18 +93,16 @@ router.get('/', async (req, res, next) => {
     const tagsMap = await getTagsForUsers(userIds);
     const editedIds = await getUserIdsWithTags(userIds);
 
-    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.role)));
+    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds)));
     res.json({ users, total, limit, offset });
   } catch (err) { next(err); }
 });
 
-// GET /api/users/all-tags — все уникальные теги (из wl_admin_user_tags + roles из users)
+// GET /api/users/all-tags — все уникальные теги из wl_admin_user_tags
 router.get('/all-tags', async (req, res, next) => {
   try {
-    const [tagRows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
-    const [roleRows] = await dbPool.query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != ''");
-    const all = new Set([...tagRows.map(r => r.tag), ...roleRows.map(r => r.role)]);
-    res.json(Array.from(all).sort());
+    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
+    res.json(rows.map(r => r.tag).sort());
   } catch (err) { next(err); }
 });
 
@@ -127,7 +119,7 @@ router.get('/:id', async (req, res, next) => {
     const userId = rows[0].user_id;
     const tagsMap = await getTagsForUsers([userId]);
     const editedIds = await getUserIdsWithTags([userId]);
-    const tags = buildTagsForUser(userId, tagsMap, editedIds, rows[0].role);
+    const tags = buildTagsForUser(userId, tagsMap, editedIds);
 
     res.json(mapUserRow(rows[0], tags));
   } catch (err) { next(err); }
