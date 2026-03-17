@@ -348,22 +348,36 @@ export default function BroadcastEditor() {
   }, [type, text, question, pollOptions, quizOptions, correctIndex]);
 
   const handlePublish = useCallback(async () => {
-    const msgText = buildText().trim();
-    if (!msgText) {
-      alert('Заполните содержимое рассылки!');
-      return;
-    }
-
     if (!selectedIds.length) {
       alert('Выберите хотя бы один канал!');
       return;
+    }
+
+    // Валидация и построение body
+    const body = { channelIds: selectedIds };
+
+    if (type === 'poll') {
+      const opts = pollOptions.filter(o => o.trim());
+      if (!question.trim()) { alert('Введите вопрос опроса!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      body.poll = { question: question.trim(), options: opts, type: 'regular' };
+    } else if (type === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      if (!question.trim()) { alert('Введите вопрос викторины!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      if (correctIndex >= opts.length) { alert('Выберите правильный ответ!'); return; }
+      body.poll = { question: question.trim(), options: opts, type: 'quiz', correctIndex };
+    } else {
+      const msgText = buildText().trim();
+      if (!msgText) { alert('Заполните содержимое рассылки!'); return; }
+      body.text = msgText;
     }
 
     setSending(true);
     setSendResult(null);
 
     try {
-      const r = await api.post('/api/broadcasts', { text: msgText, channelIds: selectedIds });
+      const r = await api.post('/api/broadcasts', body);
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
 
@@ -378,7 +392,7 @@ export default function BroadcastEditor() {
     } finally {
       setSending(false);
     }
-  }, [buildText, selectedIds]);
+  }, [type, buildText, selectedIds, question, pollOptions, quizOptions, correctIndex]);
 
   // Успешная отправка — показываем результат
   if (sendResult?.success) {

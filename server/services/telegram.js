@@ -53,3 +53,34 @@ export async function tgSendMedia(chatId, filePath, mimeType, caption = '') {
   });
   return r.json();
 }
+
+/**
+ * Отправить нативный опрос/викторину в Telegram.
+ * @param {string|number} chatId
+ * @param {string} question — вопрос (1-300 символов)
+ * @param {string[]} options — варианты ответов (2-10 штук)
+ * @param {object} [opts] — доп. параметры
+ * @param {string} [opts.type] — 'regular' (опрос) или 'quiz' (викторина)
+ * @param {number} [opts.correct_option_id] — индекс правильного ответа (для quiz)
+ * @param {boolean} [opts.is_anonymous] — анонимный (по умолчанию true)
+ * @returns {Promise<object>} ответ Telegram API
+ */
+export async function tgSendPoll(chatId, question, options, opts = {}) {
+  const body = {
+    chat_id: chatId,
+    question,
+    options: JSON.stringify(options),
+    is_anonymous: opts.is_anonymous !== false,
+  };
+  if (opts.type) body.type = opts.type;
+  if (opts.type === 'quiz' && opts.correct_option_id != null) {
+    body.correct_option_id = opts.correct_option_id;
+  }
+
+  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPoll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}

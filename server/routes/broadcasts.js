@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN } from '../config/env.js';
-import { tgSend, tgSendMedia } from '../services/telegram.js';
+import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
@@ -54,8 +54,14 @@ function safeJsonParse(val, fallback = []) {
   try { return JSON.parse(val); } catch { return fallback; }
 }
 
-/** Отправить сообщение (текст и/или медиа) одному chatId */
-async function sendToChat(chatId, text, media) {
+/** Отправить сообщение (текст/медиа/опрос) одному chatId */
+async function sendToChat(chatId, text, media, poll) {
+  if (poll) {
+    return tgSendPoll(chatId, poll.question, poll.options, {
+      type: poll.type || 'regular',
+      correct_option_id: poll.type === 'quiz' ? poll.correctIndex : undefined,
+    });
+  }
   if (media?.filename) {
     const filePath = path.join(UPLOADS_DIR, media.filename);
     return tgSendMedia(chatId, filePath, media.mimeType, text || '');
@@ -136,14 +142,14 @@ router.delete('/groups/:id', async (req, res, next) => {
 router.post('/groups/send', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
   try {
-    const { text, groupIds, media } = req.body;
-    if (!text?.trim() && !media) return res.status(400).json({ error: 'Введите текст или прикрепите файл' });
+    const { text, groupIds, media, poll } = req.body;
+    if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
     if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
 
     const results = [];
     for (const chatId of groupIds) {
       try {
-        const data = await sendToChat(chatId, text?.trim() || '', media);
+        const data = await sendToChat(chatId, text?.trim() || '', media, poll);
         results.push({ chatId, ok: data.ok, error: data.description || null });
       } catch (err) {
         results.push({ chatId, ok: false, error: err.message });
@@ -195,14 +201,14 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
   try {
-    const { text, channelIds, media } = req.body;
-    if (!text?.trim() && !media) return res.status(400).json({ error: 'Введите текст или прикрепите файл' });
+    const { text, channelIds, media, poll } = req.body;
+    if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
     if (!channelIds?.length) return res.status(400).json({ error: 'Выберите хотя бы один канал' });
 
     const results = [];
     for (const chatId of channelIds) {
       try {
-        const data = await sendToChat(chatId, text?.trim() || '', media);
+        const data = await sendToChat(chatId, text?.trim() || '', media, poll);
         results.push({ chatId, ok: data.ok, error: data.description || null });
       } catch (err) {
         results.push({ chatId, ok: false, error: err.message });
@@ -216,8 +222,11 @@ router.post('/', async (req, res, next) => {
       return ch?.title || id;
     });
 
+    const broadcastType = poll ? (poll.type === 'quiz' ? 'quiz' : 'poll') : 'channels';
+    const broadcastText = poll ? `${poll.question}` : (text || '').trim();
+
     const record = await saveBroadcast({
-      text: (text || '').trim(), type: 'channels', channels: channelNames, channelIds,
+      text: broadcastText, type: broadcastType, channels: channelNames, channelIds,
       total: channelIds.length, success, failed: channelIds.length - success, results, media,
     });
 
@@ -239,8 +248,8 @@ router.post('/users', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
-    const { text, filters, media } = req.body;
-    if (!text?.trim() && !media) return res.status(400).json({ error: 'Введите текст или прикрепите файл' });
+    const { text, filters, media, poll } = req.body;
+    if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
 
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
@@ -262,7 +271,7 @@ router.post('/users', async (req, res, next) => {
     let successCount = 0;
     for (const row of rows) {
       try {
-        const data = await sendToChat(row.user_id, text?.trim() || '', media);
+        const data = await sendToChat(row.user_id, text?.trim() || '', media, poll);
         results.push({ chatId: row.user_id, ok: data.ok, error: data.description || null });
         if (data.ok) successCount++;
       } catch (err) {
