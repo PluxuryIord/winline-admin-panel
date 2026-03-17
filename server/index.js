@@ -123,7 +123,9 @@ function saveUserTags(data) {
 
 function mapUserRow(r, tagsMap) {
   const userId = String(r.user_id);
-  const tags = tagsMap[userId] || [];
+  // Если у пользователя нет записи в tags.json — даём дефолт ['Старый пользователь']
+  // Если запись есть (даже пустой массив []) — значит админ уже редактировал, уважаем его выбор
+  const tags = userId in tagsMap ? tagsMap[userId] : ['Старый пользователь'];
   return {
     id: r.user_id,
     fullName: r.rl_full_name || r.full_name || '—',

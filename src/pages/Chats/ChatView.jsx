@@ -227,6 +227,9 @@ export default function ChatView() {
                       </button>
                     </span>
                   ))}
+                  {user.role && user.role !== '—' && (
+                    <span className="chatview-tag-editable">{user.role}</span>
+                  )}
 
                   <div className="chatview-tag-add-wrapper" ref={tagDropdownRef}>
                     <button className="chatview-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
