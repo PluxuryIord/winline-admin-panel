@@ -24,6 +24,10 @@ export default function Users() {
   // Сортировка
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
 
+  // Tag filter dropdown
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const tagFilterRef = useRef(null);
+
   // Export dropdown
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const exportRef = useRef(null);
@@ -84,11 +88,14 @@ export default function Users() {
     return () => observer.disconnect();
   }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch]);
 
-  // Close export dropdown
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
         setShowExportDropdown(false);
+      }
+      if (tagFilterRef.current && !tagFilterRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -230,12 +237,34 @@ export default function Users() {
         </div>
 
         <div className="filters-row">
-          <select className="filter-select" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
-            <option value="all">Все теги</option>
-            {allTags.map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
+          <div className="tag-filter-wrapper" ref={tagFilterRef}>
+            <button
+              className={`filter-select${filterTag !== 'all' ? ' filter-select--active' : ''}`}
+              onClick={() => setShowTagDropdown(!showTagDropdown)}
+            >
+              {filterTag === 'all' ? 'Все теги' : filterTag}
+              <ChevronDown size={14} className={`filter-chevron${showTagDropdown ? ' filter-chevron--open' : ''}`} />
+            </button>
+            {showTagDropdown && (
+              <div className="tag-filter-dropdown">
+                <div
+                  className={`tag-filter-item${filterTag === 'all' ? ' tag-filter-item--active' : ''}`}
+                  onClick={() => { setFilterTag('all'); setShowTagDropdown(false); }}
+                >
+                  Все теги
+                </div>
+                {allTags.map(tag => (
+                  <div
+                    key={tag}
+                    className={`tag-filter-item${filterTag === tag ? ' tag-filter-item--active' : ''}`}
+                    onClick={() => { setFilterTag(tag); setShowTagDropdown(false); }}
+                  >
+                    {tag}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             className={`btn-sort${sortConfig.key === 'registrationDate' ? ' btn-sort-active' : ''}`}

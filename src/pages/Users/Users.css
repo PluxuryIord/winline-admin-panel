@@ -62,38 +62,94 @@
   flex-wrap: wrap;
 }
 
+/* --- КАСТОМНЫЙ DROPDOWN ДЛЯ ФИЛЬТРА ТЕГОВ --- */
+.tag-filter-wrapper {
+  position: relative;
+}
+
 .filter-select {
-  appearance: none;
-  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background-color: rgba(0, 0, 0, 0.3);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--color-white);
-  padding: 8px 30px 8px 12px;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 8px 12px;
   border-radius: 8px;
   font-size: 0.9rem;
+  font-family: inherit;
   cursor: pointer;
   outline: none;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .filter-select:hover {
   border-color: var(--color-orange);
   color: var(--color-orange);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF7E00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
-.filter-select:focus {
+.filter-select--active {
   border-color: var(--color-orange);
   color: var(--color-orange);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF7E00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-color: rgba(255, 126, 0, 0.1);
 }
 
-.filter-select option {
-  background-color: var(--color-black);
-  color: var(--color-white);
+.filter-chevron {
+  transition: transform 0.2s;
+}
+
+.filter-chevron--open {
+  transform: rotate(180deg);
+}
+
+.tag-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  background-color: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.tag-filter-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tag-filter-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tag-filter-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.tag-filter-item {
+  padding: 9px 14px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tag-filter-item:hover {
+  background-color: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+}
+
+.tag-filter-item--active {
+  background-color: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+  font-weight: 600;
 }
 
 /* --- КНОПКИ СОРТИРОВКИ --- */
