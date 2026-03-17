@@ -5,6 +5,22 @@ import { tgSend } from '../services/telegram.js';
 
 const router = Router();
 
+// Безопасный JSON.parse — если невалидный JSON, оборачивает строку в массив
+function safeJsonArray(val) {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [val];
+  }
+}
+
+function safeJsonParse(val, fallback = []) {
+  if (!val) return fallback;
+  try { return JSON.parse(val); } catch { return fallback; }
+}
+
 // ===================== КАНАЛЫ =====================
 
 // GET /api/broadcasts/channels
@@ -135,12 +151,12 @@ router.get('/', async (req, res, next) => {
       id: r.id,
       text: r.text,
       type: r.type || 'channels',
-      channels: r.channels_json ? JSON.parse(r.channels_json) : [],
-      channelIds: r.channel_ids_json ? JSON.parse(r.channel_ids_json) : [],
+      channels: safeJsonArray(r.channels_json),
+      channelIds: safeJsonArray(r.channel_ids_json),
       total: r.total,
       success: r.success,
       failed: r.failed,
-      results: r.results_json ? JSON.parse(r.results_json) : [],
+      results: safeJsonParse(r.results_json, []),
       date: r.date,
       status: r.status,
     })));
