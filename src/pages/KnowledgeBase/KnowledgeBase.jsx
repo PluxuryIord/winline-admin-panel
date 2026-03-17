@@ -4,6 +4,7 @@ import {
   Folder, FileText, Plus, Edit3, Save, Trash2,
   ChevronRight, ChevronDown, Loader, MoreHorizontal
 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import WysiwygEditor from './WysiwygEditor';
 import PromptModal from './PromptModal';
 import './KnowledgeBase.css';
@@ -30,7 +31,7 @@ export default function KnowledgeBase() {
 
   // Загрузка данных из API
   useEffect(() => {
-    fetch('/api/knowledge')
+    api.get('/api/knowledge')
       .then(res => res.json())
       .then(data => {
         setTopics(data);
@@ -68,11 +69,7 @@ export default function KnowledgeBase() {
   };
 
   const handleSaveClick = async () => {
-    await fetch(`/api/knowledge/${activeItem.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: activeItem.data.title, content: editContent })
-    });
+    await api.put(`/api/knowledge/${activeItem.id}`, { title: activeItem.data.title, content: editContent });
     const updatedData = { ...activeItem.data, content: editContent };
     setActiveItem(prev => ({ ...prev, data: updatedData }));
     if (activeItem.type === 'topic') {
@@ -92,11 +89,7 @@ export default function KnowledgeBase() {
       placeholder: 'Введите название...',
       onConfirm: async (title) => {
         setModal(null);
-        const res = await fetch('/api/knowledge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: '' })
-        });
+        const res = await api.post('/api/knowledge', { title, content: '' });
         const newTopic = await res.json();
         const topicWithSubs = { ...newTopic, subtopics: [] };
         setTopics(prev => [...prev, topicWithSubs]);
@@ -111,11 +104,7 @@ export default function KnowledgeBase() {
       placeholder: 'Введите название...',
       onConfirm: async (title) => {
         setModal(null);
-        const res = await fetch('/api/knowledge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: '', parent_id: parentId })
-        });
+        const res = await api.post('/api/knowledge', { title, content: '', parent_id: parentId });
         const newSub = await res.json();
         setTopics(prev => prev.map(t =>
           t.id === parentId ? { ...t, subtopics: [...t.subtopics, newSub] } : t
@@ -136,11 +125,7 @@ export default function KnowledgeBase() {
     const { id, value, content } = editingTitle;
     setEditingTitle(null);
     if (!value.trim()) return;
-    await fetch(`/api/knowledge/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: value.trim(), content }),
-    });
+    await api.put(`/api/knowledge/${id}`, { title: value.trim(), content });
     setTopics(prev => prev.map(t => {
       if (t.id === id) return { ...t, title: value.trim() };
       return { ...t, subtopics: t.subtopics.map(s => s.id === id ? { ...s, title: value.trim() } : s) };
@@ -163,7 +148,7 @@ export default function KnowledgeBase() {
       placeholder: null,
       onConfirm: async () => {
         setModal(null);
-        await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
+        await api.delete(`/api/knowledge/${id}`);
         if (type === 'topic') {
           const updated = topics.filter(t => t.id !== id);
           setTopics(updated);

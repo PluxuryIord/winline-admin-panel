@@ -3,6 +3,7 @@ import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter
 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Broadcasts.css';
 
@@ -28,7 +29,7 @@ function ChannelsTab({ onSendResult }) {
   const [addModal, setAddModal] = useState(false);
 
   useEffect(() => {
-    fetch('/api/broadcasts/channels').then(r => r.json()).then(setChannels).catch(() => {});
+    api.get('/api/broadcasts/channels').then(r => r.json()).then(setChannels).catch(() => {});
   }, []);
 
   const handleAddChannel = async (input) => {
@@ -37,11 +38,7 @@ function ChannelsTab({ onSendResult }) {
     if (!chatId) return;
     const title = chatId.startsWith('@') ? chatId : `Канал ${chatId}`;
     try {
-      const res = await fetch('/api/broadcasts/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId, title }),
-      });
+      const res = await api.post('/api/broadcasts/channels', { chatId, title });
       const ch = await res.json();
       if (!res.ok) return alert(ch.error);
       setChannels(prev => [...prev, ch]);
@@ -49,7 +46,7 @@ function ChannelsTab({ onSendResult }) {
   };
 
   const handleDeleteChannel = async (id) => {
-    await fetch(`/api/broadcasts/channels/${id}`, { method: 'DELETE' });
+    await api.delete(`/api/broadcasts/channels/${id}`);
     setChannels(prev => prev.filter(c => c.id !== id));
   };
 
@@ -70,11 +67,7 @@ function ChannelsTab({ onSendResult }) {
     setSending(true);
     setSendResult(null);
     try {
-      const res = await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), channelIds: selectedChannels }),
-      });
+      const res = await api.post('/api/broadcasts', { text: text.trim(), channelIds: selectedChannels });
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
@@ -176,7 +169,7 @@ function UsersTab({ onSendResult }) {
 
   // Загрузка ролей
   useEffect(() => {
-    fetch('/api/broadcasts/users/roles').then(r => r.json()).then(setRoles).catch(() => {});
+    api.get('/api/broadcasts/users/roles').then(r => r.json()).then(setRoles).catch(() => {});
   }, []);
 
   // Подсчёт по фильтрам
@@ -187,7 +180,7 @@ function UsersTab({ onSendResult }) {
     if (filterBanned !== 'all') params.set('banned', filterBanned);
     if (filterRegistered !== 'all') params.set('registered', filterRegistered);
 
-    fetch(`/api/broadcasts/users/count?${params}`)
+    api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
@@ -204,11 +197,7 @@ function UsersTab({ onSendResult }) {
       if (filterBanned !== 'all') filters.banned = filterBanned;
       if (filterRegistered !== 'all') filters.registered = filterRegistered;
 
-      const res = await fetch('/api/broadcasts/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), filters }),
-      });
+      const res = await api.post('/api/broadcasts/users', { text: text.trim(), filters });
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
@@ -313,7 +302,7 @@ function GroupsTab({ onSendResult }) {
   const [addModal, setAddModal] = useState(false);
 
   useEffect(() => {
-    fetch('/api/broadcasts/groups').then(r => r.json()).then(setGroups).catch(() => {});
+    api.get('/api/broadcasts/groups').then(r => r.json()).then(setGroups).catch(() => {});
   }, []);
 
   const handleAddGroup = async (input) => {
@@ -322,11 +311,7 @@ function GroupsTab({ onSendResult }) {
     if (!chatId) return;
     const title = chatId.startsWith('@') ? chatId : `Группа ${chatId}`;
     try {
-      const res = await fetch('/api/broadcasts/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId, title }),
-      });
+      const res = await api.post('/api/broadcasts/groups', { chatId, title });
       const g = await res.json();
       if (!res.ok) return alert(g.error);
       setGroups(prev => [...prev, g]);
@@ -334,7 +319,7 @@ function GroupsTab({ onSendResult }) {
   };
 
   const handleDeleteGroup = async (id) => {
-    await fetch(`/api/broadcasts/groups/${id}`, { method: 'DELETE' });
+    await api.delete(`/api/broadcasts/groups/${id}`);
     setGroups(prev => prev.filter(g => g.id !== id));
   };
 
@@ -355,11 +340,7 @@ function GroupsTab({ onSendResult }) {
     setSending(true);
     setSendResult(null);
     try {
-      const res = await fetch('/api/broadcasts/groups/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), groupIds: selectedGroups }),
-      });
+      const res = await api.post('/api/broadcasts/groups/send', { text: text.trim(), groupIds: selectedGroups });
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
@@ -455,7 +436,7 @@ export default function Broadcasts() {
 
   const fetchBroadcasts = useCallback(async () => {
     try {
-      const res = await fetch('/api/broadcasts');
+      const res = await api.get('/api/broadcasts');
       setBroadcasts(await res.json());
     } catch { /* ignore */ }
     setLoading(false);
@@ -471,7 +452,7 @@ export default function Broadcasts() {
 
   const handleDeleteBroadcast = async () => {
     if (!deleteModal) return;
-    await fetch(`/api/broadcasts/${deleteModal}`, { method: 'DELETE' });
+    await api.delete(`/api/broadcasts/${deleteModal}`);
     setBroadcasts(prev => prev.filter(b => b.id !== deleteModal));
     setDeleteModal(null);
   };

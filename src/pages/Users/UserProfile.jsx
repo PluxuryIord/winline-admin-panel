@@ -4,6 +4,7 @@ import {
   ArrowLeft, X, Plus, Edit3, Trash2, Ban,
   MessageSquare, Download, ChevronDown, Save, Loader
 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import './UserProfile.css';
 
 export default function UserProfile() {
@@ -35,7 +36,7 @@ export default function UserProfile() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/users/${id}`);
+        const res = await api.get(`/api/users/${id}`);
         if (!res.ok) throw new Error(`Ошибка ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
@@ -69,11 +70,7 @@ export default function UserProfile() {
   const saveTags = useCallback(async (newTags) => {
     setTags(newTags);
     try {
-      await fetch(`/api/users/${id}/tags`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
-      });
+      await api.put(`/api/users/${id}/tags`, { tags: newTags });
     } catch (err) {
       console.error('Failed to save tags:', err);
     }
@@ -127,7 +124,7 @@ export default function UserProfile() {
 
   const handleOpenChat = async () => {
     try {
-      const res = await fetch(`/api/chats/by-user/${user.id}`);
+      const res = await api.get(`/api/chats/by-user/${user.id}`);
       const chat = await res.json();
       navigate(`/chats/${chat.id}`);
     } catch {

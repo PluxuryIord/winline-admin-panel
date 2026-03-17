@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext.jsx';
+import { Loader } from 'lucide-react';
 
 import Layout from './components/Layout/Layout.jsx';
+import Login from './pages/Auth/Login.jsx';
 import KnowledgeBase from './pages/KnowledgeBase/KnowledgeBase.jsx';
 import Analytics from './pages/Analytics/Analytics.jsx';
 import Placeholder from './pages/Placeholder.jsx';
@@ -14,14 +17,34 @@ import Broadcasts from './pages/Broadcasts/Broadcasts.jsx';
 import BroadcastNew from './pages/Broadcasts/BroadcastNew.jsx';
 import BroadcastEditor from './pages/Broadcasts/BroadcastEditor.jsx';
 
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a0a12' }}>
+        <Loader size={32} style={{ animation: 'spin 1s linear infinite', color: '#FF7E00' }} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Standalone страница хостес — без Layout */}
+        {/* Публичные страницы */}
+        <Route path="/login" element={<Login />} />
         <Route path="/hostess" element={<Hostess />} />
 
-        <Route path="/" element={<Layout />}>
+        {/* Защищённые страницы */}
+        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/users" replace />} />
 
           <Route path="users" element={<Users />} />

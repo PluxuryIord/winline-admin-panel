@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, List, LayoutGrid } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
 
@@ -20,8 +21,8 @@ export default function Chats() {
   const [deleteModal, setDeleteModal] = useState(null);
 
   useEffect(() => {
-    fetch('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
-    fetch('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
+    api.get('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
+    api.get('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
   }, []);
 
   const getUser = (userId) => users.find(u => u.id === userId);
@@ -34,7 +35,7 @@ export default function Chats() {
   const confirmDelete = async () => {
     const { chatId } = deleteModal;
     setDeleteModal(null);
-    await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+    await api.delete(`/api/chats/${chatId}`);
     setChats(prev => prev.filter(c => c.id !== chatId));
   };
 

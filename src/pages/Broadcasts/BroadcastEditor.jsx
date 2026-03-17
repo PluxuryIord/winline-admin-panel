@@ -5,6 +5,7 @@ import {
   Plus, Trash2, Image, Paperclip, Check, Shuffle,
   Send, CheckCircle, AlertCircle, Loader, Hash
 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import './BroadcastEditor.css';
 
 /* ── метаданные типов ── */
@@ -301,7 +302,7 @@ export default function BroadcastEditor() {
 
   // Загружаем каналы
   useEffect(() => {
-    fetch('/api/broadcasts/channels')
+    api.get('/api/broadcasts/channels')
       .then(r => r.json())
       .then(data => {
         setChannels(data);
@@ -362,11 +363,7 @@ export default function BroadcastEditor() {
     setSendResult(null);
 
     try {
-      const r = await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: msgText, channelIds: selectedIds }),
-      });
+      const r = await api.post('/api/broadcasts', { text: msgText, channelIds: selectedIds });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
 

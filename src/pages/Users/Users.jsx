@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import './Users.css';
 
 const PAGE_SIZE = 50;
@@ -46,7 +47,7 @@ export default function Users() {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
       if (searchQuery) params.set('search', searchQuery);
 
-      const res = await fetch(`/api/users?${params}`);
+      const res = await api.get(`/api/users?${params}`);
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const data = await res.json();
 
@@ -160,7 +161,7 @@ export default function Users() {
 
   const handleOpenChat = async (userId) => {
     try {
-      const res = await fetch(`/api/chats/by-user/${userId}`);
+      const res = await api.get(`/api/chats/by-user/${userId}`);
       const chat = await res.json();
       navigate(`/chats/${chat.id}`);
     } catch {

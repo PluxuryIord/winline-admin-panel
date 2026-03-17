@@ -10,11 +10,15 @@
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate": "node server/migrations/migrate.js",
+    "migrate:data": "node server/migrations/migrate-data.js"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "dompurify": "^3.3.1",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.574.0",
     "mysql2": "^3.20.0",

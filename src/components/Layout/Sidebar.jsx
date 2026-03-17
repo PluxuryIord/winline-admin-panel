@@ -1,10 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  Users, MessageSquare, Send, BookOpen, 
-  Database, BarChart, Calendar, LogOut, X 
+import {
+  Users, MessageSquare, Send, BookOpen,
+  Database, BarChart, Calendar, LogOut, X
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 
 export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
+  const { user, logout } = useAuth();
   return (
     <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
       <div className="logo-area">
@@ -39,11 +41,11 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
       </nav>
 
       <div className="admin-profile">
-        <div className="admin-avatar">AD</div>
+        <div className="admin-avatar">{(user?.username || 'AD').slice(0, 2).toUpperCase()}</div>
         <div className="admin-info">
-          <span className="admin-name">admin</span>
+          <span className="admin-name">{user?.username || 'admin'}</span>
         </div>
-        <LogOut size={18} className="logout-icon" />
+        <LogOut size={18} className="logout-icon" onClick={logout} title="Выйти" />
       </div>
     </aside>
   );

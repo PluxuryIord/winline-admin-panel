@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Send, X, Plus } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import './ChatView.css';
 
 function formatTime(iso) {
@@ -46,14 +47,14 @@ export default function ChatView() {
 
   // Загрузка чата
   useEffect(() => {
-    fetch('/api/chats')
+    api.get('/api/chats')
       .then(r => r.json())
       .then(chats => {
         const found = chats.find(c => c.id === Number(id));
         setChat(found || null);
         // Загрузить пользователя
         if (found?.userId) {
-          fetch(`/api/users/${found.userId}`)
+          api.get(`/api/users/${found.userId}`)
             .then(r => r.ok ? r.json() : null)
             .then(u => {
               setUser(u);
@@ -84,11 +85,7 @@ export default function ChatView() {
     setTags(newTags);
     if (!user) return;
     try {
-      await fetch(`/api/users/${user.id}/tags`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
-      });
+      await api.put(`/api/users/${user.id}/tags`, { tags: newTags });
     } catch (err) {
       console.error('Failed to save tags:', err);
     }
@@ -114,11 +111,7 @@ export default function ChatView() {
     if (!text || sending) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/chats/${id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
+      const res = await api.post(`/api/chats/${id}/messages`, { text });
       const newMsg = await res.json();
       setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
       setInput('');
