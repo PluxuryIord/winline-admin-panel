@@ -216,17 +216,22 @@ router.post('/users', async (req, res, next) => {
     const { text, filters } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
 
-    let where = ['user_id IS NOT NULL'];
+    let where = ['u.user_id IS NOT NULL'];
     const params = [];
+    let join = '';
     if (filters) {
-      if (filters.role && filters.role !== 'all') { where.push('role = ?'); params.push(filters.role); }
-      if (filters.banned === 'active') where.push('(banned = 0 OR banned IS NULL)');
-      else if (filters.banned === 'banned') where.push('banned = 1');
-      if (filters.registered === 'yes') where.push('registered = 1');
-      else if (filters.registered === 'no') where.push('(registered = 0 OR registered IS NULL)');
+      if (filters.tag && filters.tag !== 'all') {
+        join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
+        where.push('t.tag = ?');
+        params.push(filters.tag);
+      }
+      if (filters.banned === 'active') where.push('(u.banned = 0 OR u.banned IS NULL)');
+      else if (filters.banned === 'banned') where.push('u.banned = 1');
+      if (filters.registered === 'yes') where.push('u.registered = 1');
+      else if (filters.registered === 'no') where.push('(u.registered = 0 OR u.registered IS NULL)');
     }
 
-    const [rows] = await dbPool.query(`SELECT user_id FROM users WHERE ${where.join(' AND ')}`, params);
+    const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
     if (!rows.length) {
       return res.json({ success: 0, total: 0, failed: 0, results: [], status: 'failed', error: 'Нет пользователей по заданным фильтрам' });
     }
@@ -256,25 +261,31 @@ router.post('/users', async (req, res, next) => {
 router.get('/users/count', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
-    let where = ['user_id IS NOT NULL'];
+    let where = ['u.user_id IS NOT NULL'];
     const params = [];
-    if (req.query.role && req.query.role !== 'all') { where.push('role = ?'); params.push(req.query.role); }
-    if (req.query.banned === 'active') where.push('(banned = 0 OR banned IS NULL)');
-    else if (req.query.banned === 'banned') where.push('banned = 1');
-    if (req.query.registered === 'yes') where.push('registered = 1');
-    else if (req.query.registered === 'no') where.push('(registered = 0 OR registered IS NULL)');
+    let join = '';
 
-    const [[{ count }]] = await dbPool.query(`SELECT COUNT(*) as count FROM users WHERE ${where.join(' AND ')}`, params);
+    if (req.query.tag && req.query.tag !== 'all') {
+      join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
+      where.push('t.tag = ?');
+      params.push(req.query.tag);
+    }
+    if (req.query.banned === 'active') where.push('(u.banned = 0 OR u.banned IS NULL)');
+    else if (req.query.banned === 'banned') where.push('u.banned = 1');
+    if (req.query.registered === 'yes') where.push('u.registered = 1');
+    else if (req.query.registered === 'no') where.push('(u.registered = 0 OR u.registered IS NULL)');
+
+    const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
     res.json({ count });
   } catch (err) { next(err); }
 });
 
-// GET /api/broadcasts/users/roles
-router.get('/users/roles', async (req, res, next) => {
+// GET /api/broadcasts/users/tags
+router.get('/users/tags', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
-    const [rows] = await dbPool.query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != '' ORDER BY role");
-    res.json(rows.map(r => r.role));
+    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__' ORDER BY tag");
+    res.json(rows.map(r => r.tag));
   } catch (err) { next(err); }
 });
 

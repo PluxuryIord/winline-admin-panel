@@ -160,23 +160,23 @@ function UsersTab({ onSendResult }) {
   const [sendResult, setSendResult] = useState(null);
 
   // Фильтры
-  const [roles, setRoles] = useState([]);
-  const [filterRole, setFilterRole] = useState('all');
+  const [tags, setTags] = useState([]);
+  const [filterTag, setFilterTag] = useState('all');
   const [filterBanned, setFilterBanned] = useState('all');
   const [filterRegistered, setFilterRegistered] = useState('all');
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
-  // Загрузка ролей
+  // Загрузка тегов
   useEffect(() => {
-    api.get('/api/broadcasts/users/roles').then(r => r.json()).then(setRoles).catch(() => {});
+    api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
   }, []);
 
   // Подсчёт по фильтрам
   useEffect(() => {
     setCountLoading(true);
     const params = new URLSearchParams();
-    if (filterRole !== 'all') params.set('role', filterRole);
+    if (filterTag !== 'all') params.set('tag', filterTag);
     if (filterBanned !== 'all') params.set('banned', filterBanned);
     if (filterRegistered !== 'all') params.set('registered', filterRegistered);
 
@@ -185,7 +185,7 @@ function UsersTab({ onSendResult }) {
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [filterRole, filterBanned, filterRegistered]);
+  }, [filterTag, filterBanned, filterRegistered]);
 
   const handleSend = async () => {
     if (!text.trim() || userCount === 0) return;
@@ -193,7 +193,7 @@ function UsersTab({ onSendResult }) {
     setSendResult(null);
     try {
       const filters = {};
-      if (filterRole !== 'all') filters.role = filterRole;
+      if (filterTag !== 'all') filters.tag = filterTag;
       if (filterBanned !== 'all') filters.banned = filterBanned;
       if (filterRegistered !== 'all') filters.registered = filterRegistered;
 
@@ -224,10 +224,10 @@ function UsersTab({ onSendResult }) {
 
         <div className="bc-filters-grid">
           <div className="bc-filter-group">
-            <label className="bc-filter-label">Роль</label>
-            <select className="bc-filter-select" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-              <option value="all">Все роли</option>
-              {roles.map(r => <option key={r} value={r}>{r}</option>)}
+            <label className="bc-filter-label">Тег</label>
+            <select className="bc-filter-select" value={filterTag} onChange={e => setFilterTag(e.target.value)}>
+              <option value="all">Все теги</option>
+              {tags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
 
