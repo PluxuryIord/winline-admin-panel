@@ -420,12 +420,6 @@
   line-height: 1;
 }
 
-.chatview-tag-old {
-  background-color: rgba(100, 100, 255, 0.12) !important;
-  color: #8888ff !important;
-  border-color: rgba(100, 100, 255, 0.25) !important;
-}
-
 .chatview-tag-editable:hover .chatview-tag-x {
   opacity: 0.7;
 }

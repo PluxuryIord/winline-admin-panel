@@ -15,6 +15,7 @@ export default function Users() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [hasMore, setHasMore] = useState(true);
+  const searchRef = useRef(null);
 
   // Фильтры
   const [filterRole, setFilterRole] = useState('all');
@@ -29,26 +30,27 @@ export default function Users() {
   const exportRef = useRef(null);
   const sentinelRef = useRef(null);
 
-  // Дебаунс поиска
+  // Дебаунс поиска — не теряем фокус
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
 
   // Загрузка пользователей
-  const fetchUsers = useCallback(async (offset = 0, append = false) => {
+  const fetchUsers = useCallback(async (offset = 0, searchQuery = '') => {
     try {
-      if (!append) setLoading(true);
+      const isAppend = offset > 0;
+      if (!isAppend) setLoading(true);
       else setLoadingMore(true);
 
-      const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
-      if (debouncedSearch) params.set('search', debouncedSearch);
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (searchQuery) params.set('search', searchQuery);
 
       const res = await fetch(`/api/users?${params}`);
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const data = await res.json();
 
-      if (append) {
+      if (isAppend) {
         setUsers(prev => [...prev, ...data.users]);
       } else {
         setUsers(data.users);
@@ -61,14 +63,12 @@ export default function Users() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [debouncedSearch]);
+  }, []);
 
   // Перезагрузка при смене поиска
   useEffect(() => {
-    setUsers([]);
-    setHasMore(true);
-    fetchUsers(0, false);
-  }, [fetchUsers]);
+    fetchUsers(0, debouncedSearch);
+  }, [debouncedSearch, fetchUsers]);
 
   // Infinite scroll — IntersectionObserver
   useEffect(() => {
@@ -76,14 +76,14 @@ export default function Users() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchUsers(users.length, true);
+          fetchUsers(users.length, debouncedSearch);
         }
       },
       { rootMargin: '200px' }
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, users.length, fetchUsers]);
+  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch]);
 
   // Close export dropdown
   useEffect(() => {
@@ -220,6 +220,7 @@ export default function Users() {
           <div className="search-box">
             <Search size={18} className="search-icon" />
             <input
+              ref={searchRef}
               type="text"
               className="search-input"
               placeholder="Поиск по ФИО или Telegram..."
@@ -227,7 +228,9 @@ export default function Users() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <span style={{ color: '#888', fontSize: 14 }}>Всего: {total} | Загружено: {users.length}</span>
+          <span style={{ color: '#888', fontSize: 14 }}>
+            Всего: {total}{filteredAndSortedUsers.length !== users.length ? ` | Найдено: ${filteredAndSortedUsers.length}` : ''}
+          </span>
           <div className="export-wrapper" ref={exportRef}>
             <button className="btn-control primary" onClick={() => setShowExportDropdown(!showExportDropdown)}>
               <Download size={18} /> Экспорт <ChevronDown size={14} />
@@ -316,14 +319,22 @@ export default function Users() {
                     {(user.tags || []).map(tag => (
                       <span
                         key={tag}
-                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}${tag === 'Старый пользователь' ? ' tag-old' : ''}`}
+                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}`}
                         onClick={() => handleTagClick(tag)}
                       >
                         {tag}
                       </span>
                     ))}
-                    {user.banned && <span className="tag-badge tag-banned">Забанен</span>}
-                    {user.role && user.role !== '—' && <span className="tag-badge">{user.role}</span>}
+                    {user.banned && (
+                      <span className="tag-badge" onClick={() => setFilterBanned(filterBanned === 'banned' ? 'all' : 'banned')}>
+                        Забанен
+                      </span>
+                    )}
+                    {user.role && user.role !== '—' && (
+                      <span className="tag-badge" onClick={() => setFilterRole(filterRole === user.role ? 'all' : user.role)}>
+                        {user.role}
+                      </span>
+                    )}
                   </div>
                 </td>
 

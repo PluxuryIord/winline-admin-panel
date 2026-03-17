@@ -95,7 +95,6 @@ export default function ChatView() {
   };
 
   const handleRemoveTag = (tag) => {
-    if (tag === 'Старый пользователь') return;
     saveTags(tags.filter(t => t !== tag));
   };
 
@@ -153,7 +152,7 @@ export default function ChatView() {
   }
 
   const items = groupByDate(chat.messages);
-  const knownTags = ['VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
+  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
   const availableTags = knownTags.filter(t => !tags.includes(t));
 
   return (
@@ -221,13 +220,11 @@ export default function ChatView() {
                 <h4 className="chatview-sidebar-title">Теги</h4>
                 <div className="chatview-tags-row">
                   {tags.map(tag => (
-                    <span key={tag} className={`chatview-tag-editable${tag === 'Старый пользователь' ? ' chatview-tag-old' : ''}`}>
+                    <span key={tag} className="chatview-tag-editable">
                       {tag}
-                      {tag !== 'Старый пользователь' && (
-                        <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}>
-                          <X size={11} />
-                        </button>
-                      )}
+                      <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}>
+                        <X size={11} />
+                      </button>
                     </span>
                   ))}
 

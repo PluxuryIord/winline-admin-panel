@@ -185,18 +185,6 @@
   background-color: rgba(255, 126, 0, 0.18);
 }
 
-.profile-tag-old {
-  background-color: rgba(100, 100, 255, 0.12) !important;
-  color: #8888ff !important;
-  border-color: rgba(100, 100, 255, 0.25) !important;
-}
-
-.profile-tag-banned {
-  background-color: rgba(255, 60, 60, 0.12) !important;
-  color: #ff5555 !important;
-  border-color: rgba(255, 60, 60, 0.25) !important;
-}
-
 .spinner {
   animation: spin 1s linear infinite;
 }

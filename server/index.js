@@ -123,9 +123,7 @@ function saveUserTags(data) {
 
 function mapUserRow(r, tagsMap) {
   const userId = String(r.user_id);
-  const customTags = tagsMap[userId] || [];
-  // Всегда добавляем «Старый пользователь» как первый тег
-  const tags = ['Старый пользователь', ...customTags.filter(t => t !== 'Старый пользователь')];
+  const tags = tagsMap[userId] || [];
   return {
     id: r.user_id,
     fullName: r.rl_full_name || r.full_name || '—',
@@ -199,10 +197,9 @@ app.put('/api/users/:id/tags', (req, res) => {
     const { tags } = req.body;
     if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags must be an array' });
     const tagsMap = getUserTags();
-    // Убираем «Старый пользователь» из сохраняемых — он добавляется автоматически
-    tagsMap[userId] = tags.filter(t => t !== 'Старый пользователь');
+    tagsMap[userId] = tags;
     saveUserTags(tagsMap);
-    res.json({ success: true, tags: ['Старый пользователь', ...tagsMap[userId]] });
+    res.json({ success: true, tags: tagsMap[userId] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -269,20 +269,7 @@
   color: var(--color-white);
 }
 
-.tag-badge.tag-old {
-  background-color: rgba(100, 100, 255, 0.12);
-  color: #8888ff;
-  border-color: rgba(100, 100, 255, 0.25);
-}
-
-.tag-badge.tag-banned {
-  background-color: rgba(255, 60, 60, 0.12);
-  color: #ff5555;
-  border-color: rgba(255, 60, 60, 0.25);
-  cursor: default;
-}
-
-/* tag-role убран — роли отображаются как обычные теги */
+/* Все теги одинаковые оранжевые */
 
 .row-banned {
   opacity: 0.55;

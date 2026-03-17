@@ -99,7 +99,6 @@ export default function UserProfile() {
 
   // --- Tag operations ---
   const handleRemoveTag = (tag) => {
-    if (tag === 'Старый пользователь') return; // нельзя удалить
     const newTags = tags.filter(t => t !== tag);
     saveTags(newTags);
   };
@@ -159,7 +158,7 @@ export default function UserProfile() {
 
   const exportPDF = () => { window.print(); setShowExportDropdown(false); };
 
-  const knownTags = ['VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
+  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
   const availableTags = knownTags.filter(t => !tags.includes(t));
 
   return (
@@ -195,16 +194,13 @@ export default function UserProfile() {
             {/* Теги */}
             <div className="profile-tags-row">
               {tags.map(tag => (
-                <span key={tag} className={`profile-tag${tag === 'Старый пользователь' ? ' profile-tag-old' : ''}`}>
+                <span key={tag} className="profile-tag">
                   {tag}
-                  {tag !== 'Старый пользователь' && (
-                    <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
-                      <X size={12} />
-                    </button>
-                  )}
+                  <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
+                    <X size={12} />
+                  </button>
                 </span>
               ))}
-              {user.banned && <span className="profile-tag profile-tag-banned">Забанен</span>}
 
               <div className="profile-tag-add-wrapper" ref={tagDropdownRef}>
                 <button className="profile-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
