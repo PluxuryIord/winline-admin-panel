@@ -19,7 +19,6 @@ export default function Users() {
   const searchRef = useRef(null);
 
   // Фильтры
-  const [filterRole, setFilterRole] = useState('all');
   const [filterBanned, setFilterBanned] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
 
@@ -104,20 +103,10 @@ export default function Users() {
     return Array.from(tags);
   }, [users]);
 
-  // Все уникальные роли
-  const allRoles = useMemo(() => {
-    const roles = new Set();
-    users.forEach(user => { if (user.role && user.role !== '—') roles.add(user.role); });
-    return Array.from(roles).sort();
-  }, [users]);
-
   // Фильтрация и сортировка (клиентская, по загруженным)
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
-    if (filterRole !== 'all') {
-      result = result.filter(u => u.role === filterRole);
-    }
     if (filterBanned !== 'all') {
       const banned = filterBanned === 'banned';
       result = result.filter(u => u.banned === banned);
@@ -149,11 +138,10 @@ export default function Users() {
     setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
-  const hasActiveFilters = filterRole !== 'all' || filterBanned !== 'all' || filterTag !== 'all' || search;
+  const hasActiveFilters = filterBanned !== 'all' || filterTag !== 'all' || search;
 
   const resetFilters = () => {
     setSearch('');
-    setFilterRole('all');
     setFilterBanned('all');
     setFilterTag('all');
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
@@ -172,11 +160,10 @@ export default function Users() {
   // Экспорт CSV
   const exportCSV = (list) => {
     const BOM = '\uFEFF';
-    const headers = ['ФИО', 'Telegram', 'Роль', 'Дата регистрации', 'Забанен', 'Теги'];
+    const headers = ['ФИО', 'Telegram', 'Дата регистрации', 'Забанен', 'Теги'];
     const rows = list.map(u => [
       u.fullName,
       u.telegram,
-      u.role,
       u.registrationDate,
       u.banned ? 'Да' : 'Нет',
       (u.tags || []).join('; ')
@@ -250,13 +237,6 @@ export default function Users() {
         </div>
 
         <div className="filters-row">
-          <select className="filter-select" value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
-            <option value="all">Все роли</option>
-            {allRoles.map(role => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-
           <select className="filter-select" value={filterBanned} onChange={(e) => setFilterBanned(e.target.value)}>
             <option value="all">Все статусы</option>
             <option value="active">Активные</option>
@@ -329,11 +309,6 @@ export default function Users() {
                     {user.banned && (
                       <span className="tag-badge" onClick={() => setFilterBanned(filterBanned === 'banned' ? 'all' : 'banned')}>
                         Забанен
-                      </span>
-                    )}
-                    {user.role && user.role !== '—' && (
-                      <span className="tag-badge" onClick={() => setFilterRole(filterRole === user.role ? 'all' : user.role)}>
-                        {user.role}
                       </span>
                     )}
                   </div>
