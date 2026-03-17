@@ -104,6 +104,16 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/users/all-tags — все уникальные теги (из wl_admin_user_tags + roles из users)
+router.get('/all-tags', async (req, res, next) => {
+  try {
+    const [tagRows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
+    const [roleRows] = await dbPool.query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != ''");
+    const all = new Set([...tagRows.map(r => r.tag), ...roleRows.map(r => r.role)]);
+    res.json(Array.from(all).sort());
+  } catch (err) { next(err); }
+});
+
 // GET /api/users/:id
 router.get('/:id', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });

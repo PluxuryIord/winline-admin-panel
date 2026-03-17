@@ -95,12 +95,11 @@ export default function Users() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Все уникальные теги
-  const allTags = useMemo(() => {
-    const tags = new Set();
-    users.forEach(user => (user.tags || []).forEach(t => tags.add(t)));
-    return Array.from(tags);
-  }, [users]);
+  // Все уникальные теги — загружаем с сервера
+  const [allTags, setAllTags] = useState([]);
+  useEffect(() => {
+    api.get('/api/users/all-tags').then(r => r.json()).then(setAllTags).catch(() => {});
+  }, []);
 
   // Фильтрация и сортировка (клиентская, по загруженным)
   const filteredAndSortedUsers = useMemo(() => {
