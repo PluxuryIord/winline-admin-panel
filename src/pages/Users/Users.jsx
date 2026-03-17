@@ -124,7 +124,7 @@ export default function Users() {
     }
 
     return result;
-  }, [users, filterRole, filterBanned, filterTag, sortConfig]);
+  }, [users, filterBanned, filterTag, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';
