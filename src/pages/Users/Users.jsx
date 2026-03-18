@@ -180,7 +180,21 @@ export default function Users() {
   };
 
   const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
-  const handleExportGoogle = () => { exportCSV(filteredAndSortedUsers); setShowExportDropdown(false); };
+  const handleExportTxt = () => {
+    const BOM = '\uFEFF';
+    const lines = filteredAndSortedUsers.map(u =>
+      `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${(u.tags || []).join(', ')}`
+    );
+    const txt = lines.join('\n');
+    const blob = new Blob([BOM + txt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'users.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportDropdown(false);
+  };
 
   if (loading && users.length === 0 && !search && !debouncedSearch) {
     return (
@@ -228,8 +242,8 @@ export default function Users() {
                 <div className="export-dropdown-item" onClick={handleExportExcel}>
                   <Download size={14} /> Excel (CSV)
                 </div>
-                <div className="export-dropdown-item" onClick={handleExportGoogle}>
-                  <Download size={14} /> Google Таблицы (CSV)
+                <div className="export-dropdown-item" onClick={handleExportTxt}>
+                  <Download size={14} /> Текст (TXT)
                 </div>
               </div>
             )}
