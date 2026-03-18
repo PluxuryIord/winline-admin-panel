@@ -14,8 +14,7 @@
   gap: 12px;
   padding: 10px 16px;
   background: var(--color-panel);
-  border-radius: 16px 16px 0 0;
-  border-bottom: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .chatview-back-btn {
@@ -105,7 +104,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 0 0 16px 16px;
+  border-radius: 16px;
   position: relative;
 }
 
@@ -214,11 +213,11 @@
 
 .chatview-bubble--photo .chatview-meta {
   padding: 2px 10px 5px;
-  background: rgba(255, 255, 255, 0.08);
+  background: none;
 }
 
 .chatview-msg--admin .chatview-bubble--photo .chatview-meta {
-  background: linear-gradient(135deg, rgba(255, 126, 0, 0.22), rgba(255, 100, 0, 0.16));
+  background: none;
 }
 
 /* Фото без подписи — время поверх фото */
@@ -966,7 +965,7 @@
   }
 
   .chatview-main {
-    border-radius: 0 0 16px 16px;
+    border-radius: 16px;
   }
 
   .chatview-messages {

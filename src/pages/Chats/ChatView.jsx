@@ -249,26 +249,22 @@ export default function ChatView() {
 
   return (
     <div className="chatview-container">
-      {/* Шапка */}
-      <div className="chatview-header">
-        <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
-          <ArrowLeft size={18} />
-        </button>
-        {user && (
-          <Link to={`/users/${user.id}`} className="chatview-header-user">
-            <div className="chatview-header-avatar">{user.fullName.charAt(0)}</div>
-            <div className="chatview-header-info">
-              <span className="chatview-header-name">{user.fullName}</span>
-              <span className="chatview-header-status">
-                {user.telegram ? `@${user.telegram.replace('@', '')}` : 'Telegram'}
-              </span>
-            </div>
-          </Link>
-        )}
-      </div>
-
       <div className="chatview-body">
         <div className="chatview-main">
+          {/* Шапка */}
+          <div className="chatview-header">
+            <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
+              <ArrowLeft size={18} />
+            </button>
+            {user && (
+              <Link to={`/users/${user.id}`} className="chatview-header-user">
+                <div className="chatview-header-avatar">{user.fullName.charAt(0)}</div>
+                <div className="chatview-header-info">
+                  <span className="chatview-header-name">{user.fullName}</span>
+                </div>
+              </Link>
+            )}
+          </div>
           {/* Сообщения */}
           <div className="chatview-messages" ref={messagesContainerRef}>
             {items.map((item, i) => {
