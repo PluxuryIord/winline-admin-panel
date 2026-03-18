@@ -69,7 +69,7 @@ export async function tgSendPoll(chatId, question, options, opts = {}) {
   const body = {
     chat_id: chatId,
     question,
-    options: JSON.stringify(options),
+    options: options.map(text => ({ text })),
     is_anonymous: opts.is_anonymous !== false,
   };
   if (opts.type) body.type = opts.type;
