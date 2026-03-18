@@ -15,6 +15,7 @@
     "migrate:data": "node server/migrations/migrate-data.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1012.0",
     "bcrypt": "^6.0.0",
     "dompurify": "^3.3.1",
     "express": "^5.2.1",

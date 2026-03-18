@@ -1,13 +1,9 @@
 import { Router } from 'express';
-import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import dbPool from '../config/db.js';
 import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
 import { tgSend, tgSendMedia } from '../services/telegram.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
+import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
 
@@ -80,31 +76,22 @@ async function handleWebhook(req, res, next) {
     let mediaObj = null;
     if (media?.file_id) {
       try {
-        // Скачать файл через Telegram API
         const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${media.file_id}`);
         const fileData = await fileRes.json();
         if (fileData.ok) {
           const filePath = fileData.result.file_path;
           const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
-          const ext = path.extname(filePath) || (media.mime_type?.startsWith('image/') ? '.jpg' : '.bin');
-          const localName = `tg_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
-          const localPath = path.join(UPLOADS_DIR, localName);
+          const originalName = media.file_name || path.basename(filePath);
+          const mimeType = media.mime_type || 'application/octet-stream';
 
-          // Создать папку если нет
-          if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+          // Скачать и загрузить в S3
+          const buffer = await downloadBuffer(fileUrl);
+          const { key, url } = await uploadToS3(buffer, originalName, mimeType);
 
-          const imgRes = await fetch(fileUrl);
-          const buffer = Buffer.from(await imgRes.arrayBuffer());
-          fs.writeFileSync(localPath, buffer);
-
-          mediaObj = {
-            filename: localName,
-            originalName: media.file_name || localName,
-            mimeType: media.mime_type || 'application/octet-stream',
-          };
+          mediaObj = { filename: key, originalName, mimeType, url };
         }
       } catch (e) {
-        console.error('[webhook] Failed to download media:', e.message);
+        console.error('[webhook] Failed to download/upload media:', e.message);
       }
     }
 
@@ -228,9 +215,9 @@ router.post('/:id/messages', async (req, res, next) => {
     let tgError = null;
     try {
       let tgResult;
-      if (media?.filename) {
-        const filePath = path.join(UPLOADS_DIR, media.filename);
-        tgResult = await tgSendMedia(userId, filePath, media.mimeType, caption);
+      if (media?.url) {
+        const buffer = await downloadBuffer(media.url);
+        tgResult = await tgSendMedia(userId, { buffer, filename: media.originalName || 'file', mimeType: media.mimeType }, caption);
       } else {
         tgResult = await tgSend(userId, caption);
       }

@@ -27,3 +27,9 @@ export const MYSQL_PORT = Number(process.env.MYSQL_PORT || projectEnv.MYSQL_PORT
 export const MYSQL_USER = process.env.MYSQL_USER || projectEnv.MYSQL_USER || '';
 export const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || projectEnv.MYSQL_PASSWORD || '';
 export const MYSQL_DATABASE = process.env.MYSQL_DATABASE || projectEnv.MYSQL_DATABASE || '';
+
+// S3 (Timeweb Cloud)
+export const S3_ENDPOINT = process.env.S3_ENDPOINT || projectEnv.S3_ENDPOINT || '';
+export const S3_BUCKET = process.env.S3_BUCKET || projectEnv.S3_BUCKET || '';
+export const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || projectEnv.S3_ACCESS_KEY || '';
+export const S3_SECRET_KEY = process.env.S3_SECRET_KEY || projectEnv.S3_SECRET_KEY || '';

@@ -57,7 +57,7 @@ function MediaAttach({ media, onChange }) {
 
       let previewUrl = null;
       if (data.mimeType.startsWith('image/')) {
-        previewUrl = URL.createObjectURL(file);
+        previewUrl = data.url || URL.createObjectURL(file);
       }
 
       onChange({ ...data, previewUrl });
@@ -160,7 +160,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
     if (mode === 'text') {
       const body = {};
       if (text.trim()) body.text = text.trim();
-      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
       onSend(body, () => { setText(''); setMedia(null); });
     } else if (mode === 'poll') {
       const opts = pollOptions.filter(o => o.trim());

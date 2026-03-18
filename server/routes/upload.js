@@ -2,6 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { uploadToS3 } from '../services/s3.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
@@ -10,7 +11,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const router = Router();
 
 // POST /api/upload — загрузка изображения (base64)
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
     const { data } = req.body;
     if (!data) return res.status(400).json({ error: 'No data' });
@@ -20,10 +21,10 @@ router.post('/', (req, res, next) => {
 
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const buffer = Buffer.from(match[2], 'base64');
-    const name = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    fs.writeFileSync(path.join(uploadsDir, name), buffer);
+    const name = `image.${ext}`;
 
-    res.json({ url: `/uploads/${name}` });
+    const { url } = await uploadToS3(buffer, name, `image/${match[1]}`, 'knowledge');
+    res.json({ url });
   } catch (err) { next(err); }
 });
 

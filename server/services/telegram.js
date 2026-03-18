@@ -14,12 +14,27 @@ export async function tgSend(chatId, text, parseMode = 'HTML') {
 /**
  * Отправить медиа-файл в Telegram.
  * @param {string|number} chatId
- * @param {string} filePath — абсолютный путь к файлу на диске
- * @param {string} mimeType — MIME-тип файла
+ * @param {string|object} source — путь к файлу (string) ИЛИ { buffer, filename, mimeType }
+ * @param {string} [mimeTypeOrCaption] — MIME (если source строка) или caption (если source объект)
  * @param {string} [caption] — подпись (HTML)
  * @returns {Promise<object>} ответ Telegram API
  */
-export async function tgSendMedia(chatId, filePath, mimeType, caption = '') {
+export async function tgSendMedia(chatId, source, mimeTypeOrCaption = '', caption = '') {
+  let fileBuffer, fileName, mimeType;
+
+  if (typeof source === 'string') {
+    // Legacy: file path on disk
+    fileBuffer = fs.readFileSync(source);
+    fileName = path.basename(source);
+    mimeType = mimeTypeOrCaption;
+  } else {
+    // New: { buffer, filename, mimeType }
+    fileBuffer = source.buffer;
+    fileName = source.filename || 'file';
+    mimeType = source.mimeType || 'application/octet-stream';
+    caption = mimeTypeOrCaption; // second arg is caption in this case
+  }
+
   let method = 'sendDocument';
   let fieldName = 'document';
 
@@ -34,8 +49,6 @@ export async function tgSendMedia(chatId, filePath, mimeType, caption = '') {
     fieldName = 'audio';
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
-  const fileName = path.basename(filePath);
   const blob = new Blob([fileBuffer], { type: mimeType });
   const file = new File([blob], fileName, { type: mimeType });
 

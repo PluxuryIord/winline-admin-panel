@@ -149,10 +149,11 @@ export default function ChatView() {
       const data = await res.json();
       setMedia({
         filename: data.filename,
+        url: data.url,
         originalName: data.originalName,
         mimeType: data.mimeType,
         size: data.size,
-        previewUrl: data.mimeType.startsWith('image/') ? URL.createObjectURL(file) : null,
+        previewUrl: data.mimeType.startsWith('image/') ? data.url : null,
       });
     } catch (err) {
       alert('Ошибка загрузки: ' + err.message);
@@ -170,7 +171,7 @@ export default function ChatView() {
     try {
       const body = {};
       if (text) body.text = text;
-      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
       const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
       setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
@@ -234,20 +235,23 @@ export default function ChatView() {
               ) : (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
                   <div className="chatview-msg-bubble">
-                    {item.media && (
-                      <div className="chatview-msg-media">
-                        {item.media.mimeType?.startsWith('image/') ? (
-                          <a href={`/uploads/${item.media.filename}`} target="_blank" rel="noopener noreferrer">
-                            <img src={`/uploads/${item.media.filename}`} alt="" className="chatview-msg-img" />
-                          </a>
-                        ) : (
-                          <a href={`/uploads/${item.media.filename}`} download={item.media.originalName} className="chatview-msg-file">
-                            <FileText size={20} />
-                            <span className="chatview-msg-file-name">{item.media.originalName}</span>
-                          </a>
-                        )}
-                      </div>
-                    )}
+                    {item.media && (() => {
+                      const mediaUrl = item.media.url || `/uploads/${item.media.filename}`;
+                      return (
+                        <div className="chatview-msg-media">
+                          {item.media.mimeType?.startsWith('image/') ? (
+                            <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                              <img src={mediaUrl} alt="" className="chatview-msg-img" />
+                            </a>
+                          ) : (
+                            <a href={mediaUrl} download={item.media.originalName} className="chatview-msg-file">
+                              <FileText size={20} />
+                              <span className="chatview-msg-file-name">{item.media.originalName}</span>
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {item.text && <span className="chatview-msg-text">{item.text}</span>}
                     <span className="chatview-msg-time">{formatTime(item.time)}</span>
                   </div>

@@ -1,27 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
+import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
 
-// ===================== MULTER =====================
+// ===================== MULTER (memory) =====================
 
-const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${ext}`);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
 // ===================== ПРОВЕРКА СХЕМЫ =====================
 
@@ -62,9 +51,9 @@ async function sendToChat(chatId, text, media, poll) {
       correct_option_id: poll.type === 'quiz' ? poll.correctIndex : undefined,
     });
   }
-  if (media?.filename) {
-    const filePath = path.join(UPLOADS_DIR, media.filename);
-    return tgSendMedia(chatId, filePath, media.mimeType, text || '');
+  if (media?.url) {
+    const buffer = await downloadBuffer(media.url);
+    return tgSendMedia(chatId, { buffer, filename: media.originalName || 'file', mimeType: media.mimeType }, text || '');
   }
   return tgSend(chatId, text);
 }
@@ -72,14 +61,18 @@ async function sendToChat(chatId, text, media, poll) {
 // ===================== ЗАГРУЗКА ФАЙЛОВ =====================
 
 // POST /api/broadcasts/upload
-router.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-  res.json({
-    filename: req.file.filename,
-    originalName: req.file.originalname,
-    mimeType: req.file.mimetype,
-    size: req.file.size,
-  });
+router.post('/upload', upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+    const { key, url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+    res.json({
+      filename: key,
+      url,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+  } catch (err) { next(err); }
 });
 
 // ===================== КАНАЛЫ =====================
