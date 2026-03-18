@@ -391,8 +391,8 @@ function ChannelsTab({ onSendResult }) {
           </div>
         ) : (
           <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
-              <input type="checkbox" checked={selectedChannels.length === channels.length && channels.length > 0} readOnly />
+            <label className="bc-channel-item bc-channel-item--all">
+              <input type="checkbox" checked={selectedChannels.length === channels.length && channels.length > 0} onChange={selectAll} />
               <span>Все каналы ({channels.length})</span>
             </label>
             {channels.map(ch => (
@@ -604,8 +604,8 @@ function GroupsTab({ onSendResult }) {
           </div>
         ) : (
           <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
-              <input type="checkbox" checked={selectedGroups.length === groups.length && groups.length > 0} readOnly />
+            <label className="bc-channel-item bc-channel-item--all">
+              <input type="checkbox" checked={selectedGroups.length === groups.length && groups.length > 0} onChange={selectAll} />
               <span>Все группы ({groups.length})</span>
             </label>
             {groups.map(g => (
