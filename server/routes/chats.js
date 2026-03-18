@@ -2,7 +2,7 @@ import { Router } from 'express';
 import path from 'path';
 import dbPool from '../config/db.js';
 import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
-import { tgSend, tgSendMedia } from '../services/telegram.js';
+import { tgSend, tgSendMedia, tgSendMediaGroup } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
@@ -235,14 +235,27 @@ router.post('/:id/messages', async (req, res, next) => {
     let tgError = null;
     try {
       const mediaArr = Array.isArray(media) ? media : (media ? [media] : []);
-      if (mediaArr.length > 0) {
-        // Отправляем каждый файл по отдельности (Telegram sendMediaGroup не через Bot API просто)
-        for (let i = 0; i < mediaArr.length; i++) {
-          const m = mediaArr[i];
+      if (mediaArr.length > 1) {
+        // Альбом: скачиваем все файлы и отправляем sendMediaGroup
+        const items = [];
+        for (const m of mediaArr) {
           if (!m.url) continue;
           const buffer = await downloadBuffer(m.url);
-          const cap = i === 0 ? caption : ''; // подпись только к первому
-          const tgResult = await tgSendMedia(userId, { buffer, filename: m.originalName || 'file', mimeType: m.mimeType }, cap);
+          items.push({ buffer, filename: m.originalName || 'file', mimeType: m.mimeType });
+        }
+        if (items.length > 1) {
+          const tgResult = await tgSendMediaGroup(userId, items, caption);
+          if (!tgResult.ok) tgError = tgResult.description || 'Telegram error';
+        } else if (items.length === 1) {
+          const tgResult = await tgSendMedia(userId, items[0], caption);
+          if (!tgResult.ok) tgError = tgResult.description || 'Telegram error';
+        }
+      } else if (mediaArr.length === 1) {
+        // Одиночный файл
+        const m = mediaArr[0];
+        if (m.url) {
+          const buffer = await downloadBuffer(m.url);
+          const tgResult = await tgSendMedia(userId, { buffer, filename: m.originalName || 'file', mimeType: m.mimeType }, caption);
           if (!tgResult.ok) tgError = tgResult.description || 'Telegram error';
         }
       } else {

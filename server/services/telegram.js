@@ -68,6 +68,44 @@ export async function tgSendMedia(chatId, source, mimeTypeOrCaption = '', captio
 }
 
 /**
+ * Отправить альбом (media group) в Telegram.
+ * @param {string|number} chatId
+ * @param {Array<{buffer: Buffer, filename: string, mimeType: string}>} items
+ * @param {string} [caption] — подпись к первому элементу
+ * @returns {Promise<object>} ответ Telegram API
+ */
+export async function tgSendMediaGroup(chatId, items, caption = '') {
+  const form = new FormData();
+  form.set('chat_id', String(chatId));
+
+  const mediaArr = items.map((item, i) => {
+    const attachName = `file${i}`;
+    const blob = new Blob([item.buffer], { type: item.mimeType });
+    const file = new File([blob], item.filename, { type: item.mimeType });
+    form.set(attachName, file);
+
+    let type = 'document';
+    if (item.mimeType.startsWith('image/')) type = 'photo';
+    else if (item.mimeType.startsWith('video/')) type = 'video';
+
+    const entry = { type, media: `attach://${attachName}` };
+    if (i === 0 && caption) {
+      entry.caption = caption;
+      entry.parse_mode = 'HTML';
+    }
+    return entry;
+  });
+
+  form.set('media', JSON.stringify(mediaArr));
+
+  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
+    method: 'POST',
+    body: form,
+  });
+  return r.json();
+}
+
+/**
  * Отправить нативный опрос/викторину в Telegram.
  * @param {string|number} chatId
  * @param {string} question — вопрос (1-300 символов)
