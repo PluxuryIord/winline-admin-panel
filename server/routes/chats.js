@@ -7,7 +7,7 @@ import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
 import { tgSend, tgSendMedia } from '../services/telegram.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
 
 const router = Router();
 
