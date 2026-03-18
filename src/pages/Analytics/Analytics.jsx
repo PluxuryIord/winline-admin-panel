@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Calendar, RefreshCw, Download, ChevronDown,
   Users, UserCheck, UserPlus, MessageCircle, Ban, Share2, FileText, BarChart2, FolderOpen,
@@ -16,9 +16,10 @@ const PERIOD_MAP = {
 
 const emptyStats = { totalUsers: 0, partners: 0, guests: 0, blocked: 0, requests: 0, newUsers: 0, channels: 0, groups: 0, posts: 0 };
 
-async function fetchStats(period) {
+async function fetchStats(params) {
   const token = localStorage.getItem('wl_admin_token');
-  const res = await fetch(`/api/analytics?period=${period}`, {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/api/analytics?${qs}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -33,13 +34,25 @@ export default function Analytics() {
   const [stats, setStats] = useState(emptyStats);
   const [error, setError] = useState(null);
 
+  // Custom date range
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [isCustomRange, setIsCustomRange] = useState(false);
+
   const periods = ["За всё время", "Сегодня", "За 24 часа", "За неделю", "За месяц", "За год"];
 
-  const loadData = async (period) => {
+  const loadData = async (opts) => {
     setIsGenerating(true);
     setError(null);
     try {
-      const data = await fetchStats(PERIOD_MAP[period] || 'month');
+      const params = {};
+      if (opts?.from && opts?.to) {
+        params.from = opts.from;
+        params.to = opts.to;
+      } else {
+        params.period = PERIOD_MAP[opts?.period || selectedPeriod] || 'month';
+      }
+      const data = await fetchStats(params);
       setStats(data);
     } catch (err) {
       console.error('Analytics fetch error:', err);
@@ -49,9 +62,35 @@ export default function Analytics() {
     }
   };
 
-  useEffect(() => { loadData(selectedPeriod); }, []);
+  useEffect(() => { loadData({ period: selectedPeriod }); }, []);
 
-  const handleGenerate = () => loadData(selectedPeriod);
+  const handlePeriodSelect = (period) => {
+    setSelectedPeriod(period);
+    setIsCustomRange(false);
+    setDateFrom('');
+    setDateTo('');
+    setIsPeriodOpen(false);
+    loadData({ period });
+  };
+
+  const handleCustomRange = () => {
+    setIsPeriodOpen(false);
+    setIsCustomRange(true);
+    setSelectedPeriod('Произвольный период');
+  };
+
+  const handleApplyRange = () => {
+    if (!dateFrom || !dateTo) return;
+    loadData({ from: dateFrom, to: dateTo });
+  };
+
+  const handleGenerate = () => {
+    if (isCustomRange && dateFrom && dateTo) {
+      loadData({ from: dateFrom, to: dateTo });
+    } else {
+      loadData({ period: selectedPeriod });
+    }
+  };
 
   const triggerDownload = (content, filename, mime) => {
     const blob = new Blob([content], { type: mime });
@@ -70,10 +109,14 @@ export default function Analytics() {
 
   const conversionRatio = stats.partners > 0 ? (stats.totalUsers / stats.partners).toFixed(1) : '—';
 
+  const periodLabel = isCustomRange && dateFrom && dateTo
+    ? `${new Date(dateFrom).toLocaleDateString('ru-RU')} — ${new Date(dateTo).toLocaleDateString('ru-RU')}`
+    : selectedPeriod;
+
   const handleExportExcel = () => {
     const rows = [
       ['Отчёт по аналитике'],
-      ['Период', selectedPeriod],
+      ['Период', periodLabel],
       ['Дата формирования', new Date().toLocaleDateString('ru-RU')],
       [],
       ['Аудитория бота'],
@@ -101,7 +144,7 @@ export default function Analytics() {
     const sep = '─'.repeat(42);
     const lines = [
       'ОТЧЁТ ПО АНАЛИТИКЕ',
-      `Период: ${selectedPeriod}`,
+      `Период: ${periodLabel}`,
       `Дата:   ${new Date().toLocaleDateString('ru-RU')}`,
       sep,
       'АУДИТОРИЯ БОТА',
@@ -133,7 +176,7 @@ export default function Analytics() {
         <div className="control-wrapper">
           <button className="btn-control" onClick={() => { setIsPeriodOpen(!isPeriodOpen); setIsExportOpen(false); }}>
             <Calendar size={18} />
-            {selectedPeriod}
+            {isCustomRange ? 'Произвольный' : selectedPeriod}
             <ChevronDown size={16} />
           </button>
 
@@ -142,15 +185,34 @@ export default function Analytics() {
               {periods.map(period => (
                 <button
                   key={period}
-                  className={`dropdown-item ${selectedPeriod === period ? 'active' : ''}`}
-                  onClick={() => { setSelectedPeriod(period); setIsPeriodOpen(false); }}
+                  className={`dropdown-item ${selectedPeriod === period && !isCustomRange ? 'active' : ''}`}
+                  onClick={() => handlePeriodSelect(period)}
                 >
                   {period}
                 </button>
               ))}
+              <div className="dropdown-separator" />
+              <button
+                className={`dropdown-item ${isCustomRange ? 'active' : ''}`}
+                onClick={handleCustomRange}
+              >
+                <Calendar size={14} style={{ marginRight: 8 }} />
+                Выбрать даты...
+              </button>
             </div>
           )}
         </div>
+
+        {isCustomRange && (
+          <div className="date-range-picker">
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="date-input" />
+            <span className="date-sep">—</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="date-input" />
+            <button className="btn-control primary btn-sm" onClick={handleApplyRange} disabled={!dateFrom || !dateTo || isGenerating}>
+              OK
+            </button>
+          </div>
+        )}
 
         <button className="btn-control primary" onClick={handleGenerate} disabled={isGenerating}>
           <RefreshCw size={18} className={isGenerating ? 'spin' : ''} />
@@ -175,7 +237,7 @@ export default function Analytics() {
 
       {/* Метка активного периода */}
       <div className="analytics-period-label">
-        Данные: <span>{selectedPeriod}</span>
+        Данные: <span>{periodLabel}</span>
       </div>
 
       {error && <div className="analytics-error">Ошибка загрузки: {error}</div>}
