@@ -332,6 +332,12 @@
   border-top-right-radius: 4px;
 }
 
+/* Одиночное фото + подпись = единый блок: убираем нижнее скругление у фото */
+.chatview-bubble--photo:has(.chatview-text) .chatview-album:not([class*="chatview-album--"]) .chatview-album-item img {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 /* 2 фото — горизонтально */
 .chatview-album--2 {
   display: grid;
