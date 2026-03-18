@@ -165,7 +165,7 @@ router.post('/groups/send', async (req, res, next) => {
     });
 
     const record = await saveBroadcast({
-      text: (text || '').trim(), type: 'groups', channels: groupNames, channelIds: groupIds,
+      text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'groups', channels: groupNames, channelIds: groupIds,
       total: groupIds.length, success, failed: groupIds.length - success, results, media,
     });
 
@@ -224,11 +224,10 @@ router.post('/', async (req, res, next) => {
       return ch?.title || id;
     });
 
-    const broadcastType = poll ? (poll.type === 'quiz' ? 'quiz' : 'poll') : 'channels';
-    const broadcastText = poll ? `${poll.question}` : (text || '').trim();
+    const broadcastText = poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim();
 
     const record = await saveBroadcast({
-      text: broadcastText, type: broadcastType, channels: channelNames, channelIds,
+      text: broadcastText, type: 'channels', channels: channelNames, channelIds,
       total: channelIds.length, success, failed: channelIds.length - success, results, media,
     });
 
@@ -283,7 +282,7 @@ router.post('/users', async (req, res, next) => {
     }
 
     const record = await saveBroadcast({
-      text: (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
+      text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
       total: rows.length, success: successCount, failed: rows.length - successCount, results, media,
     });
 
