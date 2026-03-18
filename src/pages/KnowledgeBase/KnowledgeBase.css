@@ -27,6 +27,9 @@
 .kb-sidebar-header h3 {
   font-size: 1.1rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .add-topic-btn {
@@ -184,6 +187,50 @@
   gap: 16px;
   flex: 1;         /* ЗАСТАВЛЯЕМ БЛОК ЗАНЯТЬ ВСЮ ВЫСОТУ */
   min-height: 0;   /* КРИТИЧЕСКИ ВАЖНО ДЛЯ СКРОЛЛА ВО FLEXBOX */
+}
+
+/* Textarea-редактор для Telegram HTML */
+.kb-editor-area {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.kb-editor-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.5;
+}
+
+.kb-textarea {
+  flex: 1;
+  resize: none;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  tab-size: 2;
+  overflow-y: auto;
+}
+
+.kb-textarea:focus {
+  outline: none;
+  border-color: var(--color-orange);
+}
+
+.kb-article-photo {
+  padding: 0 32px;
 }
 
 .editor-toolbar {

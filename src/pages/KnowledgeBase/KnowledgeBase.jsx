@@ -1,199 +1,77 @@
-import { useState, useEffect, useRef } from 'react';
-import DOMPurify from 'dompurify';
+import { useState, useEffect } from 'react';
 import {
-  Folder, FileText, Plus, Edit3, Save, Trash2,
-  ChevronRight, ChevronDown, Loader, MoreHorizontal
+  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
-import WysiwygEditor from './WysiwygEditor';
-import PromptModal from './PromptModal';
 import './KnowledgeBase.css';
 
 export default function KnowledgeBase() {
-  const [topics, setTopics] = useState([]);
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedFolders, setExpandedFolders] = useState([]);
-  const [activeItem, setActiveItem] = useState(null);
+  const [activeKey, setActiveKey] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
-  const [modal, setModal] = useState(null);
-  const [editingTitle, setEditingTitle] = useState(null); // { id, value, content }
-  const [openMenu, setOpenMenu] = useState(null); // id элемента с открытым меню
-  const [lightboxSrc, setLightboxSrc] = useState(null); // src открытой картинки
+  const [saving, setSaving] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
 
-  // Закрываем меню по клику снаружи
-  useEffect(() => {
-    if (!openMenu) return;
-    const handler = () => setOpenMenu(null);
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, [openMenu]);
-
-  // Загрузка данных из API
   useEffect(() => {
     api.get('/api/knowledge')
       .then(res => res.json())
       .then(data => {
-        setTopics(data);
-        if (data.length > 0) {
-          setActiveItem({ type: 'topic', id: data[0].id, data: data[0] });
-          setExpandedFolders([data[0].id]);
-        }
+        const list = data.articles || [];
+        setArticles(list);
+        if (list.length > 0) setActiveKey(list[0].key);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
-  const toggleFolder = (id) => {
-    setExpandedFolders(prev =>
-      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
-    );
-  };
+  const active = articles.find(a => a.key === activeKey);
 
-  const handleSelectTopic = (topic) => {
-    setActiveItem({ type: 'topic', id: topic.id, data: topic });
-    setIsEditing(false);
-    if (!expandedFolders.includes(topic.id)) {
-      setExpandedFolders(prev => [...prev, topic.id]);
-    }
-  };
-
-  const handleSelectSubtopic = (subtopic, parentTopic) => {
-    setActiveItem({ type: 'subtopic', id: subtopic.id, data: subtopic, parentTitle: parentTopic.title });
-    setIsEditing(false);
-  };
-
-  const handleEditClick = () => {
-    setEditContent(activeItem.data.content);
+  const handleEdit = () => {
+    if (!active) return;
+    setEditContent(active.content);
     setIsEditing(true);
   };
 
-  const handleSaveClick = async () => {
-    await api.put(`/api/knowledge/${activeItem.id}`, { title: activeItem.data.title, content: editContent });
-    const updatedData = { ...activeItem.data, content: editContent };
-    setActiveItem(prev => ({ ...prev, data: updatedData }));
-    if (activeItem.type === 'topic') {
-      setTopics(prev => prev.map(t => t.id === activeItem.id ? { ...t, content: editContent } : t));
-    } else {
-      setTopics(prev => prev.map(t => ({
-        ...t,
-        subtopics: t.subtopics.map(s => s.id === activeItem.id ? { ...s, content: editContent } : s)
-      })));
+  const handleSave = async () => {
+    if (!active) return;
+    setSaving(true);
+    try {
+      await api.put(`/api/knowledge/${active.key}`, { content: editContent });
+      setArticles(prev => prev.map(a => a.key === active.key ? { ...a, content: editContent } : a));
+      setIsEditing(false);
+    } catch (err) {
+      alert('Ошибка сохранения: ' + err.message);
     }
+    setSaving(false);
+  };
+
+  const handleCancel = () => {
     setIsEditing(false);
+    setEditContent('');
   };
 
-  const handleAddTopic = () => {
-    setModal({
-      title: 'Название новой темы',
-      placeholder: 'Введите название...',
-      onConfirm: async (title) => {
-        setModal(null);
-        const res = await api.post('/api/knowledge', { title, content: '' });
-        const newTopic = await res.json();
-        const topicWithSubs = { ...newTopic, subtopics: [] };
-        setTopics(prev => [...prev, topicWithSubs]);
-        setActiveItem({ type: 'topic', id: newTopic.id, data: topicWithSubs });
-      }
-    });
-  };
-
-  const handleAddSubtopic = (parentId) => {
-    setModal({
-      title: 'Название подтемы',
-      placeholder: 'Введите название...',
-      onConfirm: async (title) => {
-        setModal(null);
-        const res = await api.post('/api/knowledge', { title, content: '', parent_id: parentId });
-        const newSub = await res.json();
-        setTopics(prev => prev.map(t =>
-          t.id === parentId ? { ...t, subtopics: [...t.subtopics, newSub] } : t
-        ));
-        if (!expandedFolders.includes(parentId)) {
-          setExpandedFolders(prev => [...prev, parentId]);
-        }
-      }
-    });
-  };
-
-  const handleRenameStart = (item) => {
-    setEditingTitle({ id: item.id, value: item.title, content: item.content || '' });
-  };
-
-  const handleRenameSave = async () => {
-    if (!editingTitle) return;
-    const { id, value, content } = editingTitle;
-    setEditingTitle(null);
-    if (!value.trim()) return;
-    await api.put(`/api/knowledge/${id}`, { title: value.trim(), content });
-    setTopics(prev => prev.map(t => {
-      if (t.id === id) return { ...t, title: value.trim() };
-      return { ...t, subtopics: t.subtopics.map(s => s.id === id ? { ...s, title: value.trim() } : s) };
-    }));
-    if (activeItem?.id === id) {
-      setActiveItem(prev => ({ ...prev, data: { ...prev.data, title: value.trim() } }));
-    }
-  };
-
-  const handleRenameKeyDown = (e) => {
-    e.stopPropagation();
-    if (e.key === 'Enter') handleRenameSave();
-    if (e.key === 'Escape') setEditingTitle(null);
-  };
-
-  const handleDelete = (id, type, parentId) => {
-    const label = type === 'topic' ? 'тему и все подтемы' : 'подтему';
-    setModal({
-      title: `Удалить ${label}?`,
-      placeholder: null,
-      onConfirm: async () => {
-        setModal(null);
-        await api.delete(`/api/knowledge/${id}`);
-        if (type === 'topic') {
-          const updated = topics.filter(t => t.id !== id);
-          setTopics(updated);
-          if (activeItem?.id === id) {
-            setActiveItem(updated.length > 0 ? { type: 'topic', id: updated[0].id, data: updated[0] } : null);
-          }
-        } else {
-          setTopics(prev => prev.map(t => ({
-            ...t,
-            subtopics: t.subtopics.filter(s => s.id !== id)
-          })));
-          if (activeItem?.id === id) {
-            const parent = topics.find(t => t.id === parentId);
-            if (parent) setActiveItem({ type: 'topic', id: parent.id, data: parent });
-          }
-        }
-        setIsEditing(false);
-      }
-    });
-  };
-
-  // Кнопка ⋯ с выпадающим меню
-  const ItemMenu = ({ id, actions }) => (
-    <div className="kb-item-menu-wrapper" onClick={e => e.stopPropagation()}>
-      <button
-        className={`kb-item-menu-btn${openMenu === id ? ' open' : ''}`}
-        onClick={(e) => { e.stopPropagation(); setOpenMenu(prev => prev === id ? null : id); }}
-      >
-        <MoreHorizontal size={15} />
-      </button>
-      {openMenu === id && (
-        <div className="kb-item-menu-dropdown">
-          {actions.map(action => (
-            <button
-              key={action.label}
-              className={`kb-item-menu-item${action.danger ? ' danger' : ''}`}
-              onClick={() => { setOpenMenu(null); action.fn(); }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  /** Telegram HTML → безопасный HTML для отображения. \n → <br> */
+  function tgHtmlToDisplay(text) {
+    if (!text) return '';
+    // Заменяем \n на <br>, убираем опасные теги
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Восстанавливаем разрешённые теги
+      .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
+      .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
+      .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>')
+      .replace(/&lt;s&gt;/g, '<s>').replace(/&lt;\/s&gt;/g, '</s>')
+      .replace(/&lt;code&gt;/g, '<code>').replace(/&lt;\/code&gt;/g, '</code>')
+      .replace(/&lt;pre&gt;/g, '<pre>').replace(/&lt;\/pre&gt;/g, '</pre>')
+      .replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
+      .replace(/&lt;a href="([^"]*)"&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
+      .replace(/&lt;\/a&gt;/g, '</a>')
+      .replace(/\n/g, '<br>');
+  }
 
   if (loading) {
     return (
@@ -206,134 +84,88 @@ export default function KnowledgeBase() {
   return (
     <div className="kb-container">
 
-      {/* ЛЕВАЯ КОЛОНКА */}
+      {/* ЛЕВАЯ КОЛОНКА — список статей */}
       <div className="kb-sidebar">
         <div className="kb-sidebar-header">
-          <h3>Разделы Wiki</h3>
-          <button className="add-topic-btn" title="Создать новую тему" onClick={handleAddTopic}>
-            <Plus size={18} />
-          </button>
+          <h3><BookOpen size={18} /> База знаний</h3>
         </div>
 
         <div className="kb-topic-list">
-          {topics.map((topic) => {
-            const isFolderExpanded = expandedFolders.includes(topic.id);
-            const isTopicActive = activeItem?.type === 'topic' && activeItem?.id === topic.id;
-
-            return (
-              <div key={topic.id}>
-                <div
-                  className={`kb-topic-item ${isTopicActive ? 'active' : ''}`}
-                  onClick={() => handleSelectTopic(topic)}
-                >
-                  <span onClick={(e) => { e.stopPropagation(); toggleFolder(topic.id); }}>
-                    {isFolderExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </span>
-                  <Folder size={18} color={isTopicActive ? "#FF7E00" : "currentColor"} />
-                  {editingTitle?.id === topic.id ? (
-                    <input
-                      className="kb-title-input"
-                      value={editingTitle.value}
-                      onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
-                      onBlur={handleRenameSave}
-                      onKeyDown={handleRenameKeyDown}
-                      onClick={e => e.stopPropagation()}
-                      autoFocus
-                    />
-                  ) : (
-                    <span style={{ flex: 1 }}>{topic.title}</span>
-                  )}
-                  <ItemMenu
-                    id={topic.id}
-                    actions={[
-                      { label: 'Переименовать', fn: () => handleRenameStart(topic) },
-                      { label: 'Добавить подтему', fn: () => handleAddSubtopic(topic.id) },
-                      { label: 'Удалить', fn: () => handleDelete(topic.id, 'topic'), danger: true },
-                    ]}
-                  />
-                </div>
-
-                {isFolderExpanded && topic.subtopics.length > 0 && (
-                  <div className="kb-subtopics">
-                    {topic.subtopics.map(sub => {
-                      const isSubActive = activeItem?.type === 'subtopic' && activeItem?.id === sub.id;
-                      return (
-                        <div
-                          key={sub.id}
-                          className={`kb-subtopic-item ${isSubActive ? 'active' : ''}`}
-                          onClick={() => handleSelectSubtopic(sub, topic)}
-                        >
-                          <FileText size={14} />
-                          {editingTitle?.id === sub.id ? (
-                            <input
-                              className="kb-title-input"
-                              value={editingTitle.value}
-                              onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
-                              onBlur={handleRenameSave}
-                              onKeyDown={handleRenameKeyDown}
-                              onClick={e => e.stopPropagation()}
-                              autoFocus
-                            />
-                          ) : (
-                            <span style={{ flex: 1 }}>{sub.title}</span>
-                          )}
-                          <ItemMenu
-                            id={sub.id}
-                            actions={[
-                              { label: 'Переименовать', fn: () => handleRenameStart(sub) },
-                              { label: 'Удалить', fn: () => handleDelete(sub.id, 'subtopic', topic.id), danger: true },
-                            ]}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {articles.map((article) => (
+            <div
+              key={article.key}
+              className={`kb-topic-item ${activeKey === article.key ? 'active' : ''}`}
+              onClick={() => { setActiveKey(article.key); setIsEditing(false); }}
+            >
+              <FileText size={16} />
+              <span style={{ flex: 1 }}>{article.title}</span>
+              {article.photoFileId && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ПРАВАЯ КОЛОНКА */}
+      {/* ПРАВАЯ КОЛОНКА — содержимое */}
       <div className="kb-content">
-        {activeItem ? (
+        {active ? (
           <>
             <div className="kb-content-header">
-              <div className="kb-breadcrumbs">
-                База знаний {activeItem.type === 'subtopic' && <> <ChevronRight size={12} /> {activeItem.parentTitle} </>}
-              </div>
+              <div className="kb-breadcrumbs">База знаний</div>
               <div className="kb-header-row">
-                <h2>{activeItem.data.title}</h2>
+                <h2>{active.title}</h2>
                 {!isEditing ? (
-                  <button className="kb-edit-btn" onClick={handleEditClick}>
+                  <button className="kb-edit-btn" onClick={handleEdit}>
                     <Edit3 size={18} /> Редактировать
                   </button>
                 ) : (
-                  <button className="kb-edit-btn kb-save-btn" onClick={handleSaveClick}>
-                    <Save size={18} /> Сохранить
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="kb-edit-btn" onClick={handleCancel}>
+                      <X size={18} /> Отмена
+                    </button>
+                    <button className="kb-edit-btn kb-save-btn" onClick={handleSave} disabled={saving}>
+                      {saving ? <Loader size={18} className="spin" /> : <Save size={18} />}
+                      {saving ? 'Сохранение...' : 'Сохранить'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
 
+            {/* Фото статьи */}
+            {active.photoFileId && !isEditing && (
+              <div className="kb-article-photo">
+                <img
+                  src={`/api/knowledge/photo/${active.photoFileId}`}
+                  alt=""
+                  onClick={(e) => setLightboxSrc(e.target.src)}
+                  style={{ cursor: 'pointer', maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', marginBottom: '16px' }}
+                />
+              </div>
+            )}
+
             {!isEditing ? (
               <div
                 className="kb-article html-content"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(activeItem.data.content) }}
-                onClick={(e) => { if (e.target.tagName === 'IMG') setLightboxSrc(e.target.src); }}
+                dangerouslySetInnerHTML={{ __html: tgHtmlToDisplay(active.content) }}
               />
             ) : (
-              <WysiwygEditor
-                key={activeItem.id}
-                initialContent={activeItem.data.content}
-                onContentChange={setEditContent}
-              />
+              <div className="kb-editor-area">
+                <div className="kb-editor-hint">
+                  Telegram HTML: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;u&gt;подчёркнутый&lt;/u&gt;, &lt;a href="url"&gt;ссылка&lt;/a&gt;. Перенос строки: \n
+                </div>
+                <textarea
+                  className="kb-textarea"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={25}
+                  spellCheck={false}
+                />
+              </div>
             )}
           </>
         ) : (
           <div className="kb-empty">
-            <p>Выберите тему или создайте новую</p>
+            <p>Выберите статью из списка слева</p>
           </div>
         )}
       </div>
@@ -342,16 +174,6 @@ export default function KnowledgeBase() {
         <div className="kb-lightbox" onClick={() => setLightboxSrc(null)}>
           <img src={lightboxSrc} alt="" className="kb-lightbox-img" />
         </div>
-      )}
-
-      {modal && (
-        <PromptModal
-          title={modal.title}
-          placeholder={modal.placeholder}
-          isConfirm={!modal.placeholder}
-          onConfirm={modal.onConfirm}
-          onCancel={() => setModal(null)}
-        />
       )}
     </div>
   );

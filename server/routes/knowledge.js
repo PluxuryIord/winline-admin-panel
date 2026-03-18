@@ -1,115 +1,103 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
+import { BOT_TOKEN } from '../config/env.js';
 
 const router = Router();
 
-// Преобразование плоских строк в nested формат (topics → subtopics)
-function buildNested(rows) {
-  const topLevel = [];
-  const subtopicsMap = {};
+// Маппинг ключей статей → человекочитаемые названия
+const ARTICLE_TITLES = {
+  lk_overview: 'Обзор личного кабинета',
+  offer_info: 'Информация по офферу',
+  ref_link: 'Генерация реф.ссылки',
+  postback: 'Настройка постбэка',
+  download_report: 'Скачивание отчета',
+  download_report_2: 'Отчет «Конверсии»',
+};
 
-  for (const r of rows) {
-    if (r.parent_id) {
-      if (!subtopicsMap[r.parent_id]) subtopicsMap[r.parent_id] = [];
-      subtopicsMap[r.parent_id].push({
-        id: r.id,
-        parent_id: r.parent_id,
-        title: r.title,
-        content: r.content || '',
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-      });
-    } else {
-      topLevel.push({
-        id: r.id,
-        title: r.title,
-        content: r.content || '',
-        subtopics: [],
-        created_at: r.created_at,
-        updated_at: r.updated_at,
-      });
+// Ключи фото, привязанные к статьям
+const PHOTO_MAP = {
+  postback: 'postback_photo',
+  download_report: 'report_photo',
+  download_report_2: 'report_photo_2',
+};
+
+// Порядок отображения
+const ARTICLE_ORDER = ['lk_overview', 'offer_info', 'ref_link', 'postback', 'download_report', 'download_report_2'];
+
+/** Получить file_id → URL через Telegram getFile API */
+async function getPhotoUrl(fileId) {
+  if (!fileId || !BOT_TOKEN) return null;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+    const data = await r.json();
+    if (data.ok && data.result?.file_path) {
+      return `https://api.telegram.org/file/bot${BOT_TOKEN}/${data.result.file_path}`;
     }
-  }
-
-  for (const topic of topLevel) {
-    topic.subtopics = subtopicsMap[topic.id] || [];
-  }
-
-  return topLevel;
+  } catch { /* ignore */ }
+  return null;
 }
 
-// GET /api/knowledge
+// ===================== BOT TEXTS API =====================
+
+// GET /api/knowledge — список статей из таблицы texts (category=knowledge_base)
 router.get('/', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query(
-      'SELECT id, parent_id, title, content, sort_order, created_at, updated_at FROM wl_admin_knowledge ORDER BY sort_order ASC, id ASC'
-    );
-    res.json(buildNested(rows));
-  } catch (err) { next(err); }
-});
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+    if (!rows.length) return res.json([]);
 
-// GET /api/knowledge/:id
-router.get('/:id', async (req, res, next) => {
-  try {
-    const [rows] = await dbPool.query('SELECT * FROM wl_admin_knowledge WHERE id = ?', [Number(req.params.id)]);
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const article = rows[0];
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const dbId = rows[0].id;
 
-    // Если это топ-уровень, подгрузить subtopics
-    if (!article.parent_id) {
-      const [subs] = await dbPool.query('SELECT * FROM wl_admin_knowledge WHERE parent_id = ? ORDER BY sort_order ASC, id ASC', [article.id]);
-      article.subtopics = subs;
+    const articles = [];
+    for (const key of ARTICLE_ORDER) {
+      if (data[key] === undefined) continue;
+      const photoKey = PHOTO_MAP[key] || null;
+      const photoFileId = photoKey ? (data[photoKey] || null) : null;
+      articles.push({
+        key,
+        title: ARTICLE_TITLES[key] || key,
+        content: data[key] || '',
+        photoKey,
+        photoFileId,
+      });
     }
 
-    res.json(article);
+    res.json({ dbId, articles });
   } catch (err) { next(err); }
 });
 
-// POST /api/knowledge
-router.post('/', async (req, res, next) => {
+// GET /api/knowledge/photo/:fileId — proxy для фото из Telegram (чтобы не палить BOT_TOKEN на фронте)
+router.get('/photo/:fileId', async (req, res, next) => {
   try {
-    const { title, content, parent_id } = req.body;
-    if (!title) return res.status(400).json({ error: 'Title is required' });
-
-    const [result] = await dbPool.query(
-      'INSERT INTO wl_admin_knowledge (title, content, parent_id) VALUES (?, ?, ?)',
-      [title, content || '', parent_id || null]
-    );
-
-    const [rows] = await dbPool.query('SELECT * FROM wl_admin_knowledge WHERE id = ?', [result.insertId]);
-    res.status(201).json(rows[0]);
+    const url = await getPhotoUrl(req.params.fileId);
+    if (!url) return res.status(404).json({ error: 'Photo not found' });
+    // Проксируем файл
+    const fileRes = await fetch(url);
+    if (!fileRes.ok) return res.status(404).json({ error: 'Photo not found' });
+    res.set('Content-Type', fileRes.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    const buffer = Buffer.from(await fileRes.arrayBuffer());
+    res.send(buffer);
   } catch (err) { next(err); }
 });
 
-// PUT /api/knowledge/:id
-router.put('/:id', async (req, res, next) => {
+// PUT /api/knowledge/:key — обновить одну статью
+router.put('/:key', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    const [existing] = await dbPool.query('SELECT id FROM wl_admin_knowledge WHERE id = ?', [id]);
-    if (!existing.length) return res.status(404).json({ error: 'Not found' });
+    const { key } = req.params;
+    const { content } = req.body;
+    if (content === undefined) return res.status(400).json({ error: 'content is required' });
 
-    const fields = [];
-    const values = [];
-    if (req.body.title !== undefined) { fields.push('title = ?'); values.push(req.body.title); }
-    if (req.body.content !== undefined) { fields.push('content = ?'); values.push(req.body.content); }
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+    if (!rows.length) return res.status(404).json({ error: 'Knowledge base not found in DB' });
 
-    if (fields.length) {
-      values.push(id);
-      await dbPool.query(`UPDATE wl_admin_knowledge SET ${fields.join(', ')} WHERE id = ?`, values);
-    }
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    if (data[key] === undefined) return res.status(404).json({ error: `Article "${key}" not found` });
 
-    const [rows] = await dbPool.query('SELECT * FROM wl_admin_knowledge WHERE id = ?', [id]);
-    res.json(rows[0]);
-  } catch (err) { next(err); }
-});
+    data[key] = content;
+    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
 
-// DELETE /api/knowledge/:id
-router.delete('/:id', async (req, res, next) => {
-  try {
-    const [existing] = await dbPool.query('SELECT id FROM wl_admin_knowledge WHERE id = ?', [Number(req.params.id)]);
-    if (!existing.length) return res.status(404).json({ error: 'Not found' });
-    await dbPool.query('DELETE FROM wl_admin_knowledge WHERE id = ?', [Number(req.params.id)]);
-    res.json({ success: true });
+    res.json({ ok: true, key, content });
   } catch (err) { next(err); }
 });
 
