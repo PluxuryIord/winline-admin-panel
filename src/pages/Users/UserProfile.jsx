@@ -91,11 +91,11 @@ export default function UserProfile() {
   }, [id]);
 
   // Сохранение поля пользователя
-  const saveUserField = async (fieldName, value) => {
+  const saveUserField = async (fieldName, value, skipSetUser = false) => {
     setSaving(true);
     try {
       await api.put(`/api/users/${id}`, { [fieldName]: value });
-      setUser(prev => ({ ...prev, [fieldName]: value }));
+      if (!skipSetUser) setUser(prev => ({ ...prev, [fieldName]: value }));
     } catch (err) {
       console.error('Failed to save field:', err);
       alert('Ошибка сохранения');
@@ -177,14 +177,14 @@ export default function UserProfile() {
 
   const toggleBanned = () => {
     const newVal = !user.banned;
-    saveUserField('banned', newVal ? 1 : 0);
     setUser(prev => ({ ...prev, banned: newVal }));
+    saveUserField('banned', newVal ? 1 : 0, true);
   };
 
   const toggleRegistered = () => {
     const newVal = !user.registered;
-    saveUserField('registered', newVal ? 1 : 0);
     setUser(prev => ({ ...prev, registered: newVal }));
+    saveUserField('registered', newVal ? 1 : 0, true);
   };
 
   const handleOpenChat = async () => {
