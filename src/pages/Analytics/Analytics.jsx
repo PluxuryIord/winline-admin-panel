@@ -1,27 +1,57 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar, RefreshCw, Download, ChevronDown,
-  Users, UserCheck, UserPlus, MessageCircle, Ban, Share2, FileText, BarChart2,
+  Users, UserCheck, UserPlus, MessageCircle, Ban, Share2, FileText, BarChart2, FolderOpen,
 } from 'lucide-react';
 import './Analytics.css';
-import { analyticsByPeriod } from '../../data/analyticsData';
+
+const PERIOD_MAP = {
+  'За всё время': 'all',
+  'Сегодня': 'today',
+  'За 24 часа': '24h',
+  'За неделю': 'week',
+  'За месяц': 'month',
+  'За год': 'year',
+};
+
+const emptyStats = { totalUsers: 0, partners: 0, guests: 0, blocked: 0, requests: 0, newUsers: 0, channels: 0, groups: 0, posts: 0 };
+
+async function fetchStats(period) {
+  const token = localStorage.getItem('wl_admin_token');
+  const res = await fetch(`/api/analytics?period=${period}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export default function Analytics() {
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('За месяц');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [stats, setStats] = useState(analyticsByPeriod['За месяц']);
+  const [stats, setStats] = useState(emptyStats);
+  const [error, setError] = useState(null);
 
   const periods = ["За всё время", "Сегодня", "За 24 часа", "За неделю", "За месяц", "За год"];
 
-  const handleGenerate = () => {
+  const loadData = async (period) => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setStats(analyticsByPeriod[selectedPeriod] || analyticsByPeriod['За месяц']);
+    setError(null);
+    try {
+      const data = await fetchStats(PERIOD_MAP[period] || 'month');
+      setStats(data);
+    } catch (err) {
+      console.error('Analytics fetch error:', err);
+      setError(err.message);
+    } finally {
       setIsGenerating(false);
-    }, 700);
+    }
   };
+
+  useEffect(() => { loadData(selectedPeriod); }, []);
+
+  const handleGenerate = () => loadData(selectedPeriod);
 
   const triggerDownload = (content, filename, mime) => {
     const blob = new Blob([content], { type: mime });
@@ -37,6 +67,8 @@ export default function Analytics() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
+
+  const conversionRatio = stats.partners > 0 ? (stats.totalUsers / stats.partners).toFixed(1) : '—';
 
   const handleExportExcel = () => {
     const rows = [
@@ -57,7 +89,8 @@ export default function Analytics() {
       [],
       ['Контент'],
       ['Подключённых каналов', stats.channels],
-      ['Сделано постов', stats.posts],
+      ['Подключённых групп', stats.groups],
+      ['Рассылок отправлено', stats.posts],
     ];
     const csv = '\uFEFF' + rows.map(r => r.join(';')).join('\n');
     triggerDownload(csv, `analytics_${dateSuffix()}.csv`, 'text/csv;charset=utf-8;');
@@ -84,13 +117,12 @@ export default function Analytics() {
       sep,
       'КОНТЕНТ',
       `Подключённых каналов:  ${stats.channels}`,
-      `Сделано постов:        ${stats.posts}`,
+      `Подключённых групп:    ${stats.groups}`,
+      `Рассылок отправлено:   ${stats.posts}`,
     ];
     triggerDownload(lines.join('\n'), `analytics_${dateSuffix()}.txt`, 'text/plain;charset=utf-8;');
     setIsExportOpen(false);
   };
-
-  const conversionRatio = (stats.totalUsers / stats.partners).toFixed(1);
 
   return (
     <div className="analytics-container">
@@ -145,6 +177,8 @@ export default function Analytics() {
       <div className="analytics-period-label">
         Данные: <span>{selectedPeriod}</span>
       </div>
+
+      {error && <div className="analytics-error">Ошибка загрузки: {error}</div>}
 
       {/* 2. АУДИТОРИЯ */}
       <h3 className="section-title">Аудитория бота</h3>
@@ -223,8 +257,16 @@ export default function Analytics() {
 
         <div className="metric-card">
           <div className="metric-header">
+            <div className="metric-icon"><FolderOpen size={20} /></div>
+            Подключенных групп
+          </div>
+          <div className="metric-value">{stats.groups}</div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-header">
             <div className="metric-icon"><FileText size={20} /></div>
-            Сделано постов
+            Рассылок отправлено
           </div>
           <div className="metric-value">{stats.posts}</div>
         </div>

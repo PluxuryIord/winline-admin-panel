@@ -14,6 +14,7 @@ import knowledgeRouter from './routes/knowledge.js';
 import broadcastsRouter from './routes/broadcasts.js';
 import uploadRouter, { uploadsDir } from './routes/upload.js';
 import statusRouter from './routes/status.js';
+import analyticsRouter from './routes/analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/broadcasts', broadcastsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/bot/status', statusRouter);
+app.use('/api/analytics', analyticsRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {
