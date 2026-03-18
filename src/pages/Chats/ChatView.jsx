@@ -44,7 +44,10 @@ function albumGridClass(count) {
   if (count <= 1) return '';
   if (count === 2) return 'chatview-album--2';
   if (count === 3) return 'chatview-album--3';
-  return 'chatview-album--4plus';
+  if (count === 4) return 'chatview-album--4';
+  if (count <= 6) return 'chatview-album--5-6';
+  if (count <= 8) return 'chatview-album--7-8';
+  return 'chatview-album--9-10';
 }
 
 export default function ChatView() {

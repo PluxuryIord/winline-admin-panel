@@ -369,8 +369,8 @@
   height: 100%;
 }
 
-/* 4+ фото — сетка 2x2 (остальные скрыты) */
-.chatview-album--4plus {
+/* 4 фото — сетка 2x2 */
+.chatview-album--4 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
@@ -379,13 +379,51 @@
   height: 320px;
 }
 
-.chatview-album--4plus .chatview-album-item img {
+.chatview-album--4 .chatview-album-item img {
   width: 100%;
   height: 100%;
 }
 
-.chatview-album--4plus .chatview-album-item:nth-child(n+5) {
-  display: none;
+/* 5-6 фото — 3 колонки */
+.chatview-album--5-6 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-auto-rows: 110px;
+  gap: 2px;
+  width: 360px;
+}
+
+.chatview-album--5-6 .chatview-album-item img {
+  width: 100%;
+  height: 100%;
+}
+
+/* 7-8 фото — 4 колонки */
+.chatview-album--7-8 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-auto-rows: 95px;
+  gap: 2px;
+  width: 400px;
+}
+
+.chatview-album--7-8 .chatview-album-item img {
+  width: 100%;
+  height: 100%;
+}
+
+/* 9-10 фото — 5 колонок */
+.chatview-album--9-10 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-auto-rows: 80px;
+  gap: 2px;
+  width: 420px;
+}
+
+.chatview-album--9-10 .chatview-album-item img {
+  width: 100%;
+  height: 100%;
 }
 
 /* ===== ФАЙЛ (glass) ===== */
@@ -1020,15 +1058,27 @@
 
   .chatview-album--2,
   .chatview-album--3,
-  .chatview-album--4plus {
+  .chatview-album--4 {
     width: 240px;
+  }
+
+  .chatview-album--5-6 {
+    width: 270px;
+  }
+
+  .chatview-album--7-8 {
+    width: 300px;
+  }
+
+  .chatview-album--9-10 {
+    width: 300px;
   }
 
   .chatview-album--3 {
     height: 200px;
   }
 
-  .chatview-album--4plus {
+  .chatview-album--4 {
     height: 240px;
   }
 }
