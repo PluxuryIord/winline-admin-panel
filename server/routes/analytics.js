@@ -51,7 +51,7 @@ router.get('/', async (req, res, next) => {
 
     // Channels & groups
     const [[{ channels }]] = await dbPool.query('SELECT COUNT(*) AS channels FROM wl_admin_channels');
-    const [[{ groups }]] = await dbPool.query('SELECT COUNT(*) AS groups FROM wl_admin_groups');
+    const [[{ cnt: groups }]] = await dbPool.query('SELECT COUNT(*) AS cnt FROM wl_admin_groups');
 
     // Broadcasts (posts)
     const [[{ posts }]] = await dbPool.query(
