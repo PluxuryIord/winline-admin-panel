@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
-  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film, BarChart2
+  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
+  BarChart2, HelpCircle, Check
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -18,6 +18,12 @@ const TABS = [
   { id: 'channels', label: 'Каналы', icon: Hash },
   { id: 'users', label: 'Пользователи', icon: Users },
   { id: 'groups', label: 'Группы', icon: MessageCircle },
+];
+
+const COMPOSE_MODES = [
+  { id: 'text', label: 'Текст', icon: FileText },
+  { id: 'poll', label: 'Опрос', icon: BarChart2 },
+  { id: 'quiz', label: 'Викторина', icon: HelpCircle },
 ];
 
 function formatSize(bytes) {
@@ -49,7 +55,6 @@ function MediaAttach({ media, onChange }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-      // Превью для картинок
       let previewUrl = null;
       if (data.mimeType.startsWith('image/')) {
         previewUrl = URL.createObjectURL(file);
@@ -112,12 +117,205 @@ function MediaAttach({ media, onChange }) {
   );
 }
 
+/* ═══ Блок составления сообщения (текст / опрос / викторина) ═══ */
+function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend }) {
+  const [mode, setMode] = useState('text');
+  const [text, setText] = useState('');
+  const [media, setMedia] = useState(null);
+
+  // Poll state
+  const [question, setQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+
+  // Quiz state
+  const [quizQuestion, setQuizQuestion] = useState('');
+  const [quizOptions, setQuizOptions] = useState(['', '']);
+  const [correctIndex, setCorrectIndex] = useState(0);
+
+  const addPollOption = () => setPollOptions(prev => [...prev, '']);
+  const removePollOption = (i) => setPollOptions(prev => prev.filter((_, idx) => idx !== i));
+  const editPollOption = (i, val) => setPollOptions(prev => { const n = [...prev]; n[i] = val; return n; });
+
+  const addQuizOption = () => setQuizOptions(prev => [...prev, '']);
+  const removeQuizOption = (i) => {
+    setQuizOptions(prev => prev.filter((_, idx) => idx !== i));
+    if (correctIndex === i) setCorrectIndex(0);
+    else if (correctIndex > i) setCorrectIndex(prev => prev - 1);
+  };
+  const editQuizOption = (i, val) => setQuizOptions(prev => { const n = [...prev]; n[i] = val; return n; });
+
+  const isValid = () => {
+    if (mode === 'text') return !!(text.trim() || media);
+    if (mode === 'poll') {
+      return !!question.trim() && pollOptions.filter(o => o.trim()).length >= 2;
+    }
+    if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      return !!quizQuestion.trim() && opts.length >= 2 && correctIndex < opts.length;
+    }
+    return false;
+  };
+
+  const handleSend = () => {
+    if (mode === 'text') {
+      const body = {};
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      onSend(body, () => { setText(''); setMedia(null); });
+    } else if (mode === 'poll') {
+      const opts = pollOptions.filter(o => o.trim());
+      if (!question.trim()) { alert('Введите вопрос опроса!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      onSend({ poll: { question: question.trim(), options: opts, type: 'regular' } }, () => {
+        setQuestion(''); setPollOptions(['', '']);
+      });
+    } else if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      if (!quizQuestion.trim()) { alert('Введите вопрос викторины!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      if (correctIndex >= opts.length) { alert('Выберите правильный ответ!'); return; }
+      onSend({ poll: { question: quizQuestion.trim(), options: opts, type: 'quiz', correctIndex } }, () => {
+        setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0);
+      });
+    }
+  };
+
+  return (
+    <div className="bc-section">
+      <h3 className="bc-section-title">{title}</h3>
+
+      {/* Переключатель режима */}
+      <div className="bc-mode-tabs">
+        {COMPOSE_MODES.map(m => {
+          const MIcon = m.icon;
+          return (
+            <button
+              key={m.id}
+              className={`bc-mode-tab${mode === m.id ? ' bc-mode-tab--active' : ''}`}
+              onClick={() => setMode(m.id)}
+            >
+              <MIcon size={14} />
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Текстовый режим */}
+      {mode === 'text' && (
+        <>
+          <textarea
+            className="bc-compose-textarea"
+            placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            rows={4}
+          />
+          <MediaAttach media={media} onChange={setMedia} />
+        </>
+      )}
+
+      {/* Опрос */}
+      {mode === 'poll' && (
+        <div className="bc-poll-editor">
+          <input
+            className="bc-poll-question"
+            type="text"
+            placeholder="Вопрос опроса..."
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+          />
+          <div className="bc-poll-options">
+            {pollOptions.map((opt, i) => (
+              <div key={i} className="bc-poll-option-row">
+                <span className="bc-poll-option-num">{i + 1}</span>
+                <input
+                  className="bc-poll-option-input"
+                  type="text"
+                  placeholder={`Вариант ${i + 1}`}
+                  value={opt}
+                  onChange={e => editPollOption(i, e.target.value)}
+                />
+                {pollOptions.length > 2 && (
+                  <button className="bc-poll-option-remove" onClick={() => removePollOption(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {pollOptions.length < 10 && (
+            <button className="bc-poll-add-btn" onClick={addPollOption}>
+              <Plus size={14} /> Добавить вариант
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Викторина */}
+      {mode === 'quiz' && (
+        <div className="bc-poll-editor">
+          <input
+            className="bc-poll-question"
+            type="text"
+            placeholder="Вопрос викторины..."
+            value={quizQuestion}
+            onChange={e => setQuizQuestion(e.target.value)}
+          />
+          <div className="bc-poll-hint">Нажмите на галочку, чтобы отметить правильный ответ</div>
+          <div className="bc-poll-options">
+            {quizOptions.map((opt, i) => (
+              <div key={i} className={`bc-poll-option-row${correctIndex === i ? ' bc-poll-option-row--correct' : ''}`}>
+                <button
+                  className={`bc-quiz-correct-btn${correctIndex === i ? ' bc-quiz-correct-btn--active' : ''}`}
+                  onClick={() => setCorrectIndex(i)}
+                  title="Правильный ответ"
+                >
+                  <Check size={12} />
+                </button>
+                <input
+                  className="bc-poll-option-input"
+                  type="text"
+                  placeholder={`Вариант ${i + 1}`}
+                  value={opt}
+                  onChange={e => editQuizOption(i, e.target.value)}
+                />
+                {quizOptions.length > 2 && (
+                  <button className="bc-poll-option-remove" onClick={() => removeQuizOption(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {quizOptions.length < 10 && (
+            <button className="bc-poll-add-btn" onClick={addQuizOption}>
+              <Plus size={14} /> Добавить вариант
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="bc-compose-footer">
+        <span className="bc-compose-hint">{hintText}</span>
+        <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
+          {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+          {sending ? 'Отправка...' : 'Отправить'}
+        </button>
+      </div>
+      {sendResult && (
+        <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
+          {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══ Вкладка «Каналы» ═══ */
 function ChannelsTab({ onSendResult }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
-  const [text, setText] = useState('');
-  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
@@ -156,24 +354,19 @@ function ChannelsTab({ onSendResult }) {
     );
   };
 
-  const canSend = (text.trim() || media) && selectedChannels.length > 0;
-
-  const handleSend = async () => {
-    if (!canSend) return;
+  const handleSend = async (composeBody, resetCompose) => {
+    if (!selectedChannels.length) return;
     setSending(true);
     setSendResult(null);
     try {
-      const body = { channelIds: selectedChannels };
-      if (text.trim()) body.text = text.trim();
-      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const body = { channelIds: selectedChannels, ...composeBody };
       const res = await api.post('/api/broadcasts', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
-        setText('');
-        setMedia(null);
+        resetCompose();
         setSelectedChannels([]);
         onSendResult?.(data);
       }
@@ -216,31 +409,14 @@ function ChannelsTab({ onSendResult }) {
         )}
       </div>
 
-      <div className="bc-section">
-        <h3 className="bc-section-title">Новая рассылка в каналы</h3>
-        <textarea
-          className="bc-compose-textarea"
-          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={4}
-        />
-        <MediaAttach media={media} onChange={setMedia} />
-        <div className="bc-compose-footer">
-          <span className="bc-compose-hint">
-            {selectedChannels.length > 0 ? `Выбрано каналов: ${selectedChannels.length}` : 'Выберите каналы выше'}
-          </span>
-          <button className="broadcasts-create-btn" disabled={sending || !canSend} onClick={handleSend}>
-            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-            {sending ? 'Отправка...' : 'Отправить'}
-          </button>
-        </div>
-        {sendResult && (
-          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
-          </div>
-        )}
-      </div>
+      <ComposeBlock
+        title="Новая рассылка в каналы"
+        hintText={selectedChannels.length > 0 ? `Выбрано каналов: ${selectedChannels.length}` : 'Выберите каналы выше'}
+        canSend={selectedChannels.length > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+      />
 
       {addModal && (
         <PromptModal
@@ -256,8 +432,6 @@ function ChannelsTab({ onSendResult }) {
 
 /* ═══ Вкладка «Пользователи» ═══ */
 function UsersTab({ onSendResult }) {
-  const [text, setText] = useState('');
-  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
@@ -285,19 +459,14 @@ function UsersTab({ onSendResult }) {
       .finally(() => setCountLoading(false));
   }, [filterTag]);
 
-  const canSend = (text.trim() || media) && userCount > 0;
-
-  const handleSend = async () => {
-    if (!canSend) return;
+  const handleSend = async (composeBody, resetCompose) => {
     setSending(true);
     setSendResult(null);
     try {
       const filters = {};
       if (filterTag !== 'all') filters.tag = filterTag;
 
-      const body = { filters };
-      if (text.trim()) body.text = text.trim();
-      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const body = { filters, ...composeBody };
 
       const res = await api.post('/api/broadcasts/users', body);
       const data = await res.json();
@@ -305,8 +474,7 @@ function UsersTab({ onSendResult }) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
-        setText('');
-        setMedia(null);
+        resetCompose();
         onSendResult?.(data);
       }
     } catch (err) {
@@ -345,35 +513,14 @@ function UsersTab({ onSendResult }) {
         </div>
       </div>
 
-      <div className="bc-section">
-        <h3 className="bc-section-title">Рассылка пользователям бота</h3>
-        <textarea
-          className="bc-compose-textarea"
-          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={4}
-        />
-        <MediaAttach media={media} onChange={setMedia} />
-        <div className="bc-compose-footer">
-          <span className="bc-compose-hint">
-            {userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
-          </span>
-          <button
-            className="broadcasts-create-btn"
-            disabled={sending || !canSend}
-            onClick={handleSend}
-          >
-            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-            {sending ? 'Отправка...' : 'Отправить'}
-          </button>
-        </div>
-        {sendResult && (
-          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
-          </div>
-        )}
-      </div>
+      <ComposeBlock
+        title="Рассылка пользователям бота"
+        hintText={userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
+        canSend={userCount > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+      />
     </>
   );
 }
@@ -382,8 +529,6 @@ function UsersTab({ onSendResult }) {
 function GroupsTab({ onSendResult }) {
   const [groups, setGroups] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [text, setText] = useState('');
-  const [media, setMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
@@ -422,24 +567,19 @@ function GroupsTab({ onSendResult }) {
     );
   };
 
-  const canSend = (text.trim() || media) && selectedGroups.length > 0;
-
-  const handleSend = async () => {
-    if (!canSend) return;
+  const handleSend = async (composeBody, resetCompose) => {
+    if (!selectedGroups.length) return;
     setSending(true);
     setSendResult(null);
     try {
-      const body = { groupIds: selectedGroups };
-      if (text.trim()) body.text = text.trim();
-      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const body = { groupIds: selectedGroups, ...composeBody };
       const res = await api.post('/api/broadcasts/groups/send', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
-        setText('');
-        setMedia(null);
+        resetCompose();
         setSelectedGroups([]);
         onSendResult?.(data);
       }
@@ -482,31 +622,14 @@ function GroupsTab({ onSendResult }) {
         )}
       </div>
 
-      <div className="bc-section">
-        <h3 className="bc-section-title">Рассылка в группы</h3>
-        <textarea
-          className="bc-compose-textarea"
-          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={4}
-        />
-        <MediaAttach media={media} onChange={setMedia} />
-        <div className="bc-compose-footer">
-          <span className="bc-compose-hint">
-            {selectedGroups.length > 0 ? `Выбрано групп: ${selectedGroups.length}` : 'Выберите группы выше'}
-          </span>
-          <button className="broadcasts-create-btn" disabled={sending || !canSend} onClick={handleSend}>
-            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-            {sending ? 'Отправка...' : 'Отправить'}
-          </button>
-        </div>
-        {sendResult && (
-          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-            {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
-          </div>
-        )}
-      </div>
+      <ComposeBlock
+        title="Рассылка в группы"
+        hintText={selectedGroups.length > 0 ? `Выбрано групп: ${selectedGroups.length}` : 'Выберите группы выше'}
+        canSend={selectedGroups.length > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+      />
 
       {addModal && (
         <PromptModal
@@ -522,7 +645,6 @@ function GroupsTab({ onSendResult }) {
 
 /* ═══ Главный компонент ═══ */
 export default function Broadcasts() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState('channels');
   const [broadcasts, setBroadcasts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -556,7 +678,7 @@ export default function Broadcasts() {
     (b.text || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const TYPE_ICONS = { users: '👤', groups: '💬' };
+  const TYPE_ICONS = { users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
   if (loading) {
     return (
@@ -584,10 +706,6 @@ export default function Broadcasts() {
             </button>
           );
         })}
-        <button className="bc-tab bc-tab--constructor" onClick={() => navigate('/mailings/new')}>
-          <BarChart2 size={16} />
-          Конструктор
-        </button>
       </div>
 
       {/* Контент вкладки */}
