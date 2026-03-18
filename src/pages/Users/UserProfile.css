@@ -339,6 +339,129 @@
   text-align: right;
 }
 
+.info-value--editable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+
+.info-value--editable:hover {
+  color: var(--color-orange);
+}
+
+.info-edit-icon {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.info-value--editable:hover .info-edit-icon {
+  opacity: 0.6;
+}
+
+.info-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-edit-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 126, 0, 0.4);
+  color: var(--color-white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  min-width: 120px;
+}
+
+.info-edit-input:focus {
+  border-color: var(--color-orange);
+}
+
+.info-edit-save,
+.info-edit-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.info-edit-save {
+  background: var(--color-orange);
+  color: #fff;
+}
+
+.info-edit-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.info-edit-save:hover,
+.info-edit-cancel:hover {
+  opacity: 0.8;
+}
+
+/* --- Toggle buttons --- */
+.info-toggle {
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s;
+}
+
+.info-toggle:hover {
+  border-color: var(--color-orange);
+}
+
+.info-toggle--on {
+  background: rgba(255, 126, 0, 0.15);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: var(--color-orange);
+}
+
+/* --- Name edit icon --- */
+.profile-name-edit-icon {
+  opacity: 0;
+  margin-left: 8px;
+  transition: opacity 0.2s;
+  vertical-align: middle;
+}
+
+.profile-name:hover .profile-name-edit-icon {
+  opacity: 0.5;
+}
+
+/* --- Avatar image --- */
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* --- Banned tag --- */
+.profile-tag--banned {
+  background-color: rgba(255, 68, 68, 0.1);
+  border-color: rgba(255, 68, 68, 0.25);
+  color: #ff4444;
+}
+
 /* --- Комментарий --- */
 .profile-comment-edit-btn {
   display: inline-flex;

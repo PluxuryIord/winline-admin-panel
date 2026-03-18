@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
+import { BOT_TOKEN } from '../config/env.js';
 
 const router = Router();
+const COMMENT_PREFIX = '__comment__:';
 
-function mapUserRow(r, userTags) {
+function mapUserRow(r, userTags, comment = '') {
   return {
     id: r.user_id,
     fullName: r.rl_full_name || r.full_name || '—',
@@ -17,23 +19,29 @@ function mapUserRow(r, userTags) {
     personalLabel: !!r.personal_label,
     showQr: !!r.show_qr,
     tags: userTags,
+    comment,
   };
 }
 
-// Получить теги для массива user_id из MySQL
-async function getTagsForUsers(userIds) {
-  if (!userIds.length) return {};
+// Получить теги и комментарии для массива user_id из MySQL
+async function getTagsAndComments(userIds) {
+  if (!userIds.length) return { tags: {}, comments: {} };
   const [rows] = await dbPool.query(
     'SELECT user_id, tag FROM wl_admin_user_tags WHERE user_id IN (?)',
     [userIds]
   );
-  const map = {};
+  const tags = {};
+  const comments = {};
   for (const r of rows) {
     const uid = String(r.user_id);
-    if (!map[uid]) map[uid] = [];
-    map[uid].push(r.tag);
+    if (r.tag.startsWith(COMMENT_PREFIX)) {
+      comments[uid] = r.tag.slice(COMMENT_PREFIX.length);
+    } else {
+      if (!tags[uid]) tags[uid] = [];
+      tags[uid].push(r.tag);
+    }
   }
-  return map;
+  return { tags, comments };
 }
 
 // Какие user_id имеют хоть одну запись в wl_admin_user_tags (для определения «редактировался ли»)
@@ -100,10 +108,10 @@ router.get('/', async (req, res, next) => {
     );
 
     const userIds = rows.map(r => r.user_id);
-    const tagsMap = await getTagsForUsers(userIds);
+    const { tags: tagsMap, comments: commentsMap } = await getTagsAndComments(userIds);
     const editedIds = await getUserIdsWithTags(userIds);
 
-    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.date_reg)));
+    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.date_reg), commentsMap[String(r.user_id)] || ''));
     res.json({ users, total, limit, offset });
   } catch (err) { next(err); }
 });
@@ -127,11 +135,11 @@ router.get('/:id', async (req, res, next) => {
     if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
 
     const userId = rows[0].user_id;
-    const tagsMap = await getTagsForUsers([userId]);
+    const { tags: tagsMap, comments: commentsMap } = await getTagsAndComments([userId]);
     const editedIds = await getUserIdsWithTags([userId]);
     const tags = buildTagsForUser(userId, tagsMap, editedIds, rows[0].date_reg);
 
-    res.json(mapUserRow(rows[0], tags));
+    res.json(mapUserRow(rows[0], tags, commentsMap[String(userId)] || ''));
   } catch (err) { next(err); }
 });
 
@@ -155,6 +163,66 @@ router.put('/:id/tags', async (req, res, next) => {
     }
 
     res.json({ success: true, tags });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/users/:id — обновить поля пользователя
+router.put('/:id', async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    const allowed = ['rl_full_name', 'role', 'graph', 'phone_number', 'banned', 'registered'];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        vals.push(req.body[key]);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Нет полей для обновления' });
+    vals.push(userId);
+    await dbPool.query(`UPDATE users SET ${sets.join(', ')} WHERE user_id = ?`, vals);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/users/:id/comment — сохранить комментарий
+router.put('/:id/comment', async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    const { comment } = req.body;
+    // Удаляем старый комментарий
+    await dbPool.query('DELETE FROM wl_admin_user_tags WHERE user_id = ? AND tag LIKE ?', [userId, `${COMMENT_PREFIX}%`]);
+    // Вставляем новый если не пустой
+    if (comment && comment.trim()) {
+      await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES (?, ?)', [userId, COMMENT_PREFIX + comment.trim()]);
+    }
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// GET /api/users/:id/avatar — аватарка из Telegram
+router.get('/:id/avatar', async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    // Получаем фото профиля
+    const photosRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+    const photosData = await photosRes.json();
+    if (!photosData.ok || !photosData.result.total_count) {
+      return res.status(404).json({ error: 'Нет аватарки' });
+    }
+    const fileId = photosData.result.photos[0][photosData.result.photos[0].length - 1].file_id;
+    // Получаем путь к файлу
+    const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+    const fileData = await fileRes.json();
+    if (!fileData.ok) return res.status(404).json({ error: 'Файл не найден' });
+    // Проксируем файл
+    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+    const imgRes = await fetch(fileUrl);
+    res.set('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600');
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    res.send(buffer);
   } catch (err) { next(err); }
 });
 

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, X, Plus, Edit3, Trash2, Ban,
-  MessageSquare, Download, ChevronDown, Save, Loader
+  MessageSquare, Download, ChevronDown, Save, Loader, Check
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './UserProfile.css';
@@ -14,6 +14,7 @@ export default function UserProfile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const [tags, setTags] = useState([]);
   const [comment, setComment] = useState('');
@@ -21,13 +22,18 @@ export default function UserProfile() {
   const [fullName, setFullName] = useState('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
-  const [showEditDropdown, setShowEditDropdown] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
 
+  // Editable fields
+  const [editingField, setEditingField] = useState(null);
+  const [editFieldValue, setEditFieldValue] = useState('');
+
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState(null);
+
   const tagDropdownRef = useRef(null);
-  const editDropdownRef = useRef(null);
   const exportDropdownRef = useRef(null);
 
   // Загрузка пользователя из API
@@ -42,7 +48,7 @@ export default function UserProfile() {
         if (!cancelled) {
           setUser(data);
           setTags(data.tags || []);
-          setComment('');
+          setComment(data.comment || '');
           setFullName(data.fullName || '');
           setEditNameValue(data.fullName || '');
         }
@@ -55,11 +61,19 @@ export default function UserProfile() {
     return () => { cancelled = true; };
   }, [id]);
 
+  // Загрузка аватарки
+  useEffect(() => {
+    if (!id) return;
+    const token = localStorage.getItem('wl_admin_token');
+    setAvatarUrl(`/api/users/${id}/avatar?t=${token}`);
+  }, [id]);
+
+  const handleAvatarError = () => setAvatarUrl(null);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) setShowTagDropdown(false);
-      if (editDropdownRef.current && !editDropdownRef.current.contains(e.target)) setShowEditDropdown(false);
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) setShowExportDropdown(false);
     };
     document.addEventListener('mousedown', handler);
@@ -75,6 +89,29 @@ export default function UserProfile() {
       console.error('Failed to save tags:', err);
     }
   }, [id]);
+
+  // Сохранение поля пользователя
+  const saveUserField = async (fieldName, value) => {
+    setSaving(true);
+    try {
+      await api.put(`/api/users/${id}`, { [fieldName]: value });
+      setUser(prev => ({ ...prev, [fieldName]: value }));
+    } catch (err) {
+      console.error('Failed to save field:', err);
+      alert('Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Сохранение комментария
+  const saveComment = async (text) => {
+    try {
+      await api.put(`/api/users/${id}/comment`, { comment: text });
+    } catch (err) {
+      console.error('Failed to save comment:', err);
+    }
+  };
 
   if (loading) {
     return (
@@ -95,31 +132,59 @@ export default function UserProfile() {
   }
 
   // --- Tag operations ---
-  const handleRemoveTag = (tag) => {
-    const newTags = tags.filter(t => t !== tag);
-    saveTags(newTags);
-  };
-
-  const handleAddExistingTag = (tag) => {
-    if (!tags.includes(tag)) {
-      saveTags([...tags, tag]);
-    }
-  };
-
+  const handleRemoveTag = (tag) => saveTags(tags.filter(t => t !== tag));
+  const handleAddExistingTag = (tag) => { if (!tags.includes(tag)) saveTags([...tags, tag]); };
   const handleCreateTag = () => {
     const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      saveTags([...tags, trimmed]);
-    }
+    if (trimmed && !tags.includes(trimmed)) saveTags([...tags, trimmed]);
     setNewTagInput('');
   };
 
-  const handleSaveComment = () => setIsEditingComment(false);
+  const handleSaveComment = () => {
+    setIsEditingComment(false);
+    saveComment(comment);
+  };
 
   const handleSaveName = () => {
     const trimmed = editNameValue.trim();
-    if (trimmed) setFullName(trimmed);
+    if (trimmed && trimmed !== fullName) {
+      setFullName(trimmed);
+      saveUserField('rl_full_name', trimmed);
+    }
     setIsEditingName(false);
+  };
+
+  // Editable info field handlers
+  const fieldMap = {
+    role: { label: 'Роль', dbField: 'role' },
+    graph: { label: 'График', dbField: 'graph' },
+    phone: { label: 'Телефон', dbField: 'phone_number' },
+  };
+
+  const startEditField = (key) => {
+    setEditingField(key);
+    setEditFieldValue(user[key] || '');
+  };
+
+  const saveEditField = () => {
+    if (!editingField) return;
+    const { dbField } = fieldMap[editingField];
+    const val = editFieldValue.trim();
+    saveUserField(dbField, val);
+    setUser(prev => ({ ...prev, [editingField]: val || '—' }));
+    setEditingField(null);
+  };
+
+  const toggleBanned = () => {
+    const newVal = !user.banned;
+    saveUserField('banned', newVal ? 1 : 0);
+    setUser(prev => ({ ...prev, banned: newVal }));
+  };
+
+  const toggleRegistered = () => {
+    const newVal = !user.registered;
+    saveUserField('registered', newVal ? 1 : 0);
+    setUser(prev => ({ ...prev, registered: newVal }));
   };
 
   const handleOpenChat = async () => {
@@ -137,13 +202,14 @@ export default function UserProfile() {
       `Пользователь: ${fullName}`,
       `Telegram: ${user.telegram}`,
       `Роль: ${user.role}`,
+      `График: ${user.graph}`,
       `Дата регистрации: ${user.registrationDate}`,
       `Забанен: ${user.banned ? 'Да' : 'Нет'}`,
       `Телефон: ${user.phone}`,
       `Теги: ${tags.join(', ') || '—'}`,
       `Комментарий: ${comment || '—'}`,
     ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -168,7 +234,11 @@ export default function UserProfile() {
       <div className="profile-card">
         <div className="profile-header">
           <div className="profile-avatar-large">
-            {fullName.charAt(0)}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="profile-avatar-img" onError={handleAvatarError} />
+            ) : (
+              fullName.charAt(0)
+            )}
           </div>
           <div className="profile-header-info">
             {isEditingName ? (
@@ -185,7 +255,10 @@ export default function UserProfile() {
                 </button>
               </div>
             ) : (
-              <h1 className="profile-name">{fullName}</h1>
+              <h1 className="profile-name" onClick={() => { setEditNameValue(fullName); setIsEditingName(true); }} style={{ cursor: 'pointer' }}>
+                {fullName}
+                <Edit3 size={14} className="profile-name-edit-icon" />
+              </h1>
             )}
 
             {/* Теги */}
@@ -199,7 +272,7 @@ export default function UserProfile() {
                 </span>
               ))}
               {user.banned && (
-                <span className="profile-tag">Забанен</span>
+                <span className="profile-tag profile-tag--banned">Забанен</span>
               )}
 
               <div className="profile-tag-add-wrapper" ref={tagDropdownRef}>
@@ -236,13 +309,54 @@ export default function UserProfile() {
         <div className="profile-panel">
           <h3 className="profile-panel-title">Информация</h3>
           <div className="profile-info-grid">
-            <div className="info-row"><span className="info-label">Telegram</span><span className="info-value">{user.telegram}</span></div>
-            <div className="info-row"><span className="info-label">Роль</span><span className="info-value">{user.role}</span></div>
-            <div className="info-row"><span className="info-label">График</span><span className="info-value">{user.graph}</span></div>
-            <div className="info-row"><span className="info-label">Телефон</span><span className="info-value">{user.phone}</span></div>
-            <div className="info-row"><span className="info-label">Дата регистрации</span><span className="info-value">{user.registrationDate}</span></div>
-            <div className="info-row"><span className="info-label">Забанен</span><span className="info-value">{user.banned ? 'Да' : 'Нет'}</span></div>
-            <div className="info-row"><span className="info-label">Зарегистрирован</span><span className="info-value">{user.registered ? 'Да' : 'Нет'}</span></div>
+            <div className="info-row">
+              <span className="info-label">Telegram</span>
+              <span className="info-value">{user.telegram}</span>
+            </div>
+
+            {/* Редактируемые поля */}
+            {Object.entries(fieldMap).map(([key, { label }]) => (
+              <div className="info-row" key={key}>
+                <span className="info-label">{label}</span>
+                {editingField === key ? (
+                  <div className="info-edit-row">
+                    <input
+                      className="info-edit-input"
+                      value={editFieldValue}
+                      onChange={(e) => setEditFieldValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEditField()}
+                      autoFocus
+                    />
+                    <button className="info-edit-save" onClick={saveEditField}><Check size={14} /></button>
+                    <button className="info-edit-cancel" onClick={() => setEditingField(null)}><X size={14} /></button>
+                  </div>
+                ) : (
+                  <span className="info-value info-value--editable" onClick={() => startEditField(key)}>
+                    {user[key] || '—'}
+                    <Edit3 size={12} className="info-edit-icon" />
+                  </span>
+                )}
+              </div>
+            ))}
+
+            <div className="info-row">
+              <span className="info-label">Дата регистрации</span>
+              <span className="info-value">{user.registrationDate}</span>
+            </div>
+
+            {/* Переключатели */}
+            <div className="info-row">
+              <span className="info-label">Забанен</span>
+              <button className={`info-toggle ${user.banned ? 'info-toggle--on' : ''}`} onClick={toggleBanned}>
+                {user.banned ? 'Да' : 'Нет'}
+              </button>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Зарегистрирован</span>
+              <button className={`info-toggle ${user.registered ? 'info-toggle--on' : ''}`} onClick={toggleRegistered}>
+                {user.registered ? 'Да' : 'Нет'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -272,19 +386,6 @@ export default function UserProfile() {
 
       {/* НИЖНЯЯ ЧАСТЬ */}
       <div className="profile-actions">
-        <div className="profile-action-wrapper" ref={editDropdownRef}>
-          <button className="profile-action-btn" onClick={() => setShowEditDropdown(!showEditDropdown)}>
-            <Edit3 size={16} /> Редактировать <ChevronDown size={14} />
-          </button>
-          {showEditDropdown && (
-            <div className="profile-action-dropdown">
-              <div className="profile-action-dropdown-item" onClick={() => { setIsEditingName(true); setShowEditDropdown(false); }}>
-                <Edit3 size={14} /> Изменить имя
-              </div>
-            </div>
-          )}
-        </div>
-
         <button className="profile-action-btn" onClick={handleOpenChat}>
           <MessageSquare size={16} /> Чат
         </button>
@@ -304,6 +405,8 @@ export default function UserProfile() {
             </div>
           )}
         </div>
+
+        {saving && <Loader size={16} className="spinner" style={{ marginLeft: 12 }} />}
       </div>
     </div>
   );
