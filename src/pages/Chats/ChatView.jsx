@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus, Paperclip, FileText, Image } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, Paperclip, FileText, Check, CheckCheck } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
@@ -10,9 +10,14 @@ function formatTime(iso) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: 'numeric', month: 'long', year: 'numeric'
-  });
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (d.toDateString() === today.toDateString()) return 'Сегодня';
+  if (d.toDateString() === yesterday.toDateString()) return 'Вчера';
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function groupByDate(messages) {
@@ -55,7 +60,6 @@ export default function ChatView() {
       .then(chats => {
         const found = chats.find(c => c.id === Number(id));
         setChat(found || null);
-        // Загрузить пользователя
         if (found?.userId) {
           api.get(`/api/users/${found.userId}`)
             .then(r => r.ok ? r.json() : null)
@@ -83,7 +87,7 @@ export default function ChatView() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat?.messages]);
 
-  // SSE — реалтайм входящие сообщения
+  // SSE
   useEffect(() => {
     const token = localStorage.getItem('wl_admin_token');
     const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
@@ -95,7 +99,6 @@ export default function ChatView() {
         if (data.type === 'new_message' && data.chatId === Number(id)) {
           setChat(prev => {
             if (!prev) return prev;
-            // Не добавляем дубли
             if (prev.messages.some(m => m.id === data.message.id)) return prev;
             return { ...prev, messages: [...prev.messages, data.message] };
           });
@@ -106,7 +109,6 @@ export default function ChatView() {
     return () => es.close();
   }, [id]);
 
-  // Сохранение тегов на сервер
   const saveTags = async (newTags) => {
     setTags(newTags);
     if (!user) return;
@@ -117,9 +119,7 @@ export default function ChatView() {
     }
   };
 
-  const handleRemoveTag = (tag) => {
-    saveTags(tags.filter(t => t !== tag));
-  };
+  const handleRemoveTag = (tag) => saveTags(tags.filter(t => t !== tag));
 
   const handleAddExistingTag = (tag) => {
     if (!tags.includes(tag)) saveTags([...tags, tag]);
@@ -147,7 +147,6 @@ export default function ChatView() {
       });
       if (!res.ok) throw new Error('Upload failed ' + res.status);
       const data = await res.json();
-      console.log('[ChatView] upload response:', JSON.stringify(data));
       setMedia({
         filename: data.filename,
         url: data.url,
@@ -175,8 +174,12 @@ export default function ChatView() {
       if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
       const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
-      console.log('[ChatView] sent msg response:', JSON.stringify(newMsg));
-      setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
+      // Добавляем только если SSE ещё не добавил
+      setChat(prev => {
+        if (!prev) return prev;
+        if (prev.messages.some(m => m.id === newMsg.id)) return prev;
+        return { ...prev, messages: [...prev.messages, newMsg] };
+      });
       setInput('');
       setMedia(null);
       if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -214,48 +217,57 @@ export default function ChatView() {
 
   return (
     <div className="chatview-container">
+      {/* Шапка */}
       <div className="chatview-header">
         <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
-          <ArrowLeft size={18} /> Назад
+          <ArrowLeft size={18} />
         </button>
         {user && (
-          <Link to={`/users/${user.id}`} className="chatview-profile-link">
-            <div className="chatview-profile-link-avatar">{user.fullName.charAt(0)}</div>
-            <span className="chatview-profile-link-name">{user.fullName}</span>
+          <Link to={`/users/${user.id}`} className="chatview-header-user">
+            <div className="chatview-header-avatar">{user.fullName.charAt(0)}</div>
+            <div className="chatview-header-info">
+              <span className="chatview-header-name">{user.fullName}</span>
+              <span className="chatview-header-status">
+                {user.telegram ? `@${user.telegram.replace('@', '')}` : 'Telegram'}
+              </span>
+            </div>
           </Link>
         )}
       </div>
 
       <div className="chatview-body">
         <div className="chatview-main">
+          {/* Сообщения */}
           <div className="chatview-messages">
             {items.map((item, i) =>
               item.type === 'date' ? (
-                <div key={`date-${i}`} className="chatview-date-divider">
+                <div key={`date-${i}`} className="chatview-date-pill">
                   <span>{item.label}</span>
                 </div>
               ) : (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
-                  <div className="chatview-msg-bubble">
+                  <div className={`chatview-bubble ${item.media ? 'chatview-bubble--media' : ''}`}>
                     {item.media && (() => {
                       const mediaUrl = item.media.url || `/uploads/${item.media.filename}`;
-                      return (
-                        <div className="chatview-msg-media">
-                          {item.media.mimeType?.startsWith('image/') ? (
-                            <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
-                              <img src={mediaUrl} alt="" className="chatview-msg-img" />
-                            </a>
-                          ) : (
-                            <a href={mediaUrl} download={item.media.originalName} className="chatview-msg-file">
-                              <FileText size={20} />
-                              <span className="chatview-msg-file-name">{item.media.originalName}</span>
-                            </a>
-                          )}
-                        </div>
+                      return item.media.mimeType?.startsWith('image/') ? (
+                        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="chatview-img-link">
+                          <img src={mediaUrl} alt="" className="chatview-img" />
+                        </a>
+                      ) : (
+                        <a href={mediaUrl} download={item.media.originalName} className="chatview-file">
+                          <div className="chatview-file-icon"><FileText size={22} /></div>
+                          <div className="chatview-file-info">
+                            <span className="chatview-file-name">{item.media.originalName}</span>
+                            <span className="chatview-file-size">Файл</span>
+                          </div>
+                        </a>
                       );
                     })()}
-                    {item.text && <span className="chatview-msg-text">{item.text}</span>}
-                    <span className="chatview-msg-time">{formatTime(item.time)}</span>
+                    {item.text && <span className="chatview-text">{item.text}</span>}
+                    <span className="chatview-meta">
+                      <span className="chatview-time">{formatTime(item.time)}</span>
+                      {item.from === 'admin' && <CheckCheck size={14} className="chatview-read-icon" />}
+                    </span>
                   </div>
                 </div>
               )
@@ -263,37 +275,45 @@ export default function ChatView() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Превью прикрепления */}
           {media && (
-            <div className="chatview-attach-preview">
+            <div className="chatview-attach-bar">
               {media.previewUrl ? (
                 <img src={media.previewUrl} alt="" className="chatview-attach-thumb" />
               ) : (
-                <FileText size={20} className="chatview-attach-icon" />
+                <div className="chatview-attach-file-icon"><FileText size={20} /></div>
               )}
               <span className="chatview-attach-name">{media.originalName}</span>
               <button className="chatview-attach-remove" onClick={() => setMedia(null)}><X size={14} /></button>
             </div>
           )}
-          <div className="chatview-input-row">
+
+          {/* Поле ввода */}
+          <div className="chatview-composer">
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
-            <button className="chatview-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-              <Paperclip size={18} />
+            <button className="chatview-composer-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Paperclip size={20} />
             </button>
             <textarea
               ref={inputRef}
               rows={1}
-              className="chatview-input"
-              placeholder={media ? 'Подпись (необязательно)...' : 'Написать сообщение...'}
+              className="chatview-composer-input"
+              placeholder={media ? 'Подпись (необязательно)...' : 'Сообщение...'}
               value={input}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
-            <button className="chatview-send-btn" onClick={handleSend} disabled={(!input.trim() && !media) || sending}>
-              <Send size={18} />
+            <button
+              className="chatview-composer-send"
+              onClick={handleSend}
+              disabled={(!input.trim() && !media) || sending}
+            >
+              <Send size={20} />
             </button>
           </div>
         </div>
 
+        {/* Сайдбар */}
         <div className="chatview-sidebar">
           {user ? (
             <>
