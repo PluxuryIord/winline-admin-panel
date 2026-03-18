@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus, Paperclip, FileText, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, Paperclip, FileText } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
@@ -285,7 +285,6 @@ export default function ChatView() {
                     {item.text && <span className="chatview-text">{item.text}</span>}
                     <span className="chatview-meta">
                       <span className="chatview-time">{formatTime(item.time)}</span>
-                      {item.from === 'admin' && <CheckCheck size={14} className="chatview-read-icon" />}
                     </span>
                   </div>
                 </div>

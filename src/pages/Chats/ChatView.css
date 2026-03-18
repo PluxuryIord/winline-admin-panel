@@ -59,13 +59,14 @@
   height: 40px;
   min-width: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff7e00, #e56b00);
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.2), rgba(255, 126, 0, 0.08));
+  border: 2px solid rgba(255, 126, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 1.1rem;
-  color: #fff;
+  color: var(--color-orange);
 }
 
 .chatview-header-info {
@@ -248,6 +249,33 @@
   border-top-right-radius: 4px;
 }
 
+/* Фото + подпись = единый блок: убираем нижние скругления у альбома */
+.chatview-bubble--photo .chatview-album {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Подпись под фото — скруглённые нижние углы */
+.chatview-bubble--photo .chatview-text {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.chatview-bubble--photo .chatview-text + .chatview-meta {
+  /* если есть текст, meta внутри текста — убираем свой фон */
+}
+
+/* Если нет текста — meta сама скругляет низ */
+.chatview-bubble--photo .chatview-meta {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Если есть текст — meta не скругляет (текст скругляет) */
+.chatview-bubble--photo .chatview-text ~ .chatview-meta {
+  border-radius: 0;
+}
+
 .chatview-album-item {
   display: block;
   line-height: 0;
@@ -402,13 +430,8 @@
 
 .chatview-time {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.3);
   font-weight: 400;
-}
-
-.chatview-read-icon {
-  color: rgba(255, 126, 0, 0.6);
-  flex-shrink: 0;
 }
 
 /* ===== НЕ НАЙДЕН ===== */
@@ -625,14 +648,15 @@
   width: 100%;
   aspect-ratio: 1;
   max-width: 100px;
-  background: linear-gradient(135deg, #ff7e00, #e56b00);
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.2), rgba(255, 126, 0, 0.08));
+  border: 2px solid rgba(255, 126, 0, 0.35);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   font-size: 2.5rem;
-  color: #fff;
+  color: var(--color-orange);
 }
 
 .chatview-hero-name {
