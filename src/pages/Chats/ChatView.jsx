@@ -145,8 +145,9 @@ export default function ChatView() {
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
-      if (!res.ok) throw new Error('Upload failed');
+      if (!res.ok) throw new Error('Upload failed ' + res.status);
       const data = await res.json();
+      console.log('[ChatView] upload response:', JSON.stringify(data));
       setMedia({
         filename: data.filename,
         url: data.url,
@@ -174,6 +175,7 @@ export default function ChatView() {
       if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
       const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
+      console.log('[ChatView] sent msg response:', JSON.stringify(newMsg));
       setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
       setInput('');
       setMedia(null);

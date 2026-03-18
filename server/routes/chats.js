@@ -193,6 +193,8 @@ router.post('/:id/messages', async (req, res, next) => {
 
     const userId = chats[0].user_id;
     const caption = (text || '').trim();
+    console.log('[chat send] chatId:', chatId, 'hasMedia:', !!media, 'hasText:', !!caption);
+    if (media) console.log('[chat send] media:', JSON.stringify(media));
 
     // Формируем текст для БД
     const dbText = media ? packMedia(media, caption) : caption;

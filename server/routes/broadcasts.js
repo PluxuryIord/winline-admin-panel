@@ -63,8 +63,10 @@ async function sendToChat(chatId, text, media, poll) {
 // POST /api/broadcasts/upload
 router.post('/upload', upload.single('file'), async (req, res, next) => {
   try {
+    console.log('[upload] file:', req.file?.originalname, req.file?.mimetype, req.file?.size, 'bytes');
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
     const { key, url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+    console.log('[upload] S3 ok:', key, url);
     res.json({
       filename: key,
       url,
@@ -72,7 +74,10 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
       mimeType: req.file.mimetype,
       size: req.file.size,
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[upload] ERROR:', err.message);
+    next(err);
+  }
 });
 
 // ===================== КАНАЛЫ =====================
