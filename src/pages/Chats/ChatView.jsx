@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus, Paperclip, FileText, Check, CheckCheck } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, Paperclip, FileText, CheckCheck } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
@@ -14,7 +14,6 @@ function formatDate(iso) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-
   if (d.toDateString() === today.toDateString()) return 'Сегодня';
   if (d.toDateString() === yesterday.toDateString()) return 'Вчера';
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -34,6 +33,20 @@ function groupByDate(messages) {
   return groups;
 }
 
+/** Нормализуем media: всегда возвращаем массив */
+function getMediaList(msg) {
+  if (!msg.media) return [];
+  return Array.isArray(msg.media) ? msg.media : [msg.media];
+}
+
+/** Класс CSS грида для альбома */
+function albumGridClass(count) {
+  if (count <= 1) return '';
+  if (count === 2) return 'chatview-album--2';
+  if (count === 3) return 'chatview-album--3';
+  return 'chatview-album--4plus';
+}
+
 export default function ChatView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -45,7 +58,7 @@ export default function ChatView() {
   const [tags, setTags] = useState([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
-  const [media, setMedia] = useState(null);
+  const [mediaList, setMediaList] = useState([]);   // массив прикреплений
   const [uploading, setUploading] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -63,10 +76,7 @@ export default function ChatView() {
         if (found?.userId) {
           api.get(`/api/users/${found.userId}`)
             .then(r => r.ok ? r.json() : null)
-            .then(u => {
-              setUser(u);
-              if (u) setTags(u.tags || []);
-            })
+            .then(u => { setUser(u); if (u) setTags(u.tags || []); })
             .catch(() => {});
         }
       })
@@ -75,9 +85,7 @@ export default function ChatView() {
 
   useEffect(() => {
     const handler = (e) => {
-      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
-        setShowTagDropdown(false);
-      }
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) setShowTagDropdown(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -92,7 +100,6 @@ export default function ChatView() {
     const token = localStorage.getItem('wl_admin_token');
     const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
     const es = new EventSource(url);
-
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
@@ -105,56 +112,45 @@ export default function ChatView() {
         }
       } catch {}
     };
-
     return () => es.close();
   }, [id]);
 
   const saveTags = async (newTags) => {
     setTags(newTags);
     if (!user) return;
-    try {
-      await api.put(`/api/users/${user.id}/tags`, { tags: newTags });
-    } catch (err) {
-      console.error('Failed to save tags:', err);
-    }
+    try { await api.put(`/api/users/${user.id}/tags`, { tags: newTags }); } catch {}
   };
-
   const handleRemoveTag = (tag) => saveTags(tags.filter(t => t !== tag));
+  const handleAddExistingTag = (tag) => { if (!tags.includes(tag)) saveTags([...tags, tag]); setShowTagDropdown(false); };
+  const handleCreateTag = () => { const t = newTagInput.trim(); if (t && !tags.includes(t)) saveTags([...tags, t]); setNewTagInput(''); };
 
-  const handleAddExistingTag = (tag) => {
-    if (!tags.includes(tag)) saveTags([...tags, tag]);
-    setShowTagDropdown(false);
-  };
-
-  const handleCreateTag = () => {
-    const trimmed = newTagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) saveTags([...tags, trimmed]);
-    setNewTagInput('');
-  };
-
+  // Загрузка файлов (multiple)
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
       const token = localStorage.getItem('wl_admin_token');
-      const res = await fetch('/api/broadcasts/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-      if (!res.ok) throw new Error('Upload failed ' + res.status);
-      const data = await res.json();
-      setMedia({
-        filename: data.filename,
-        url: data.url,
-        originalName: data.originalName,
-        mimeType: data.mimeType,
-        size: data.size,
-        previewUrl: data.mimeType.startsWith('image/') ? data.url : null,
-      });
+      const uploaded = [];
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await fetch('/api/broadcasts/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        if (!res.ok) throw new Error('Upload failed ' + res.status);
+        const data = await res.json();
+        uploaded.push({
+          filename: data.filename,
+          url: data.url,
+          originalName: data.originalName,
+          mimeType: data.mimeType,
+          size: data.size,
+        });
+      }
+      setMediaList(prev => [...prev, ...uploaded]);
     } catch (err) {
       alert('Ошибка загрузки: ' + err.message);
     } finally {
@@ -163,25 +159,30 @@ export default function ChatView() {
     }
   };
 
+  const removeMedia = (idx) => setMediaList(prev => prev.filter((_, i) => i !== idx));
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text && !media) return;
+    if (!text && !mediaList.length) return;
     if (sending) return;
     setSending(true);
     try {
       const body = {};
       if (text) body.text = text;
-      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
+      if (mediaList.length === 1) {
+        body.media = mediaList[0];
+      } else if (mediaList.length > 1) {
+        body.media = mediaList;
+      }
       const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
-      // Добавляем только если SSE ещё не добавил
       setChat(prev => {
         if (!prev) return prev;
         if (prev.messages.some(m => m.id === newMsg.id)) return prev;
         return { ...prev, messages: [...prev.messages, newMsg] };
       });
       setInput('');
-      setMedia(null);
+      setMediaList([]);
       if (inputRef.current) inputRef.current.style.height = 'auto';
       inputRef.current?.focus();
     } catch (e) {
@@ -239,30 +240,48 @@ export default function ChatView() {
         <div className="chatview-main">
           {/* Сообщения */}
           <div className="chatview-messages">
-            {items.map((item, i) =>
-              item.type === 'date' ? (
-                <div key={`date-${i}`} className="chatview-date-pill">
-                  <span>{item.label}</span>
-                </div>
-              ) : (
+            {items.map((item, i) => {
+              if (item.type === 'date') {
+                return (
+                  <div key={`date-${i}`} className="chatview-date-pill">
+                    <span>{item.label}</span>
+                  </div>
+                );
+              }
+
+              const ml = getMediaList(item);
+              const hasImages = ml.some(m => m.mimeType?.startsWith('image/'));
+              const hasMedia = ml.length > 0;
+
+              return (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
-                  <div className={`chatview-bubble ${item.media ? 'chatview-bubble--media' : ''}`}>
-                    {item.media && (() => {
-                      const mediaUrl = item.media.url || `/uploads/${item.media.filename}`;
-                      return item.media.mimeType?.startsWith('image/') ? (
-                        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="chatview-img-link">
-                          <img src={mediaUrl} alt="" className="chatview-img" />
-                        </a>
-                      ) : (
-                        <a href={mediaUrl} download={item.media.originalName} className="chatview-file">
+                  <div className={`chatview-bubble ${hasImages ? 'chatview-bubble--photo' : hasMedia ? 'chatview-bubble--media' : ''}`}>
+                    {/* Альбом / одно фото */}
+                    {hasImages && (
+                      <div className={`chatview-album ${albumGridClass(ml.filter(m => m.mimeType?.startsWith('image/')).length)}`}>
+                        {ml.filter(m => m.mimeType?.startsWith('image/')).map((m, idx) => {
+                          const url = m.url || `/uploads/${m.filename}`;
+                          return (
+                            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="chatview-album-item">
+                              <img src={url} alt="" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Файлы (не картинки) */}
+                    {ml.filter(m => !m.mimeType?.startsWith('image/')).map((m, idx) => {
+                      const url = m.url || `/uploads/${m.filename}`;
+                      return (
+                        <a key={`f-${idx}`} href={url} download={m.originalName} className="chatview-file">
                           <div className="chatview-file-icon"><FileText size={22} /></div>
                           <div className="chatview-file-info">
-                            <span className="chatview-file-name">{item.media.originalName}</span>
+                            <span className="chatview-file-name">{m.originalName}</span>
                             <span className="chatview-file-size">Файл</span>
                           </div>
                         </a>
                       );
-                    })()}
+                    })}
                     {item.text && <span className="chatview-text">{item.text}</span>}
                     <span className="chatview-meta">
                       <span className="chatview-time">{formatTime(item.time)}</span>
@@ -270,27 +289,33 @@ export default function ChatView() {
                     </span>
                   </div>
                 </div>
-              )
-            )}
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Превью прикрепления */}
-          {media && (
+          {/* Превью прикреплений */}
+          {mediaList.length > 0 && (
             <div className="chatview-attach-bar">
-              {media.previewUrl ? (
-                <img src={media.previewUrl} alt="" className="chatview-attach-thumb" />
-              ) : (
-                <div className="chatview-attach-file-icon"><FileText size={20} /></div>
-              )}
-              <span className="chatview-attach-name">{media.originalName}</span>
-              <button className="chatview-attach-remove" onClick={() => setMedia(null)}><X size={14} /></button>
+              <div className="chatview-attach-list">
+                {mediaList.map((m, i) => (
+                  <div key={i} className="chatview-attach-item">
+                    {m.mimeType?.startsWith('image/') ? (
+                      <img src={m.url} alt="" className="chatview-attach-thumb" />
+                    ) : (
+                      <div className="chatview-attach-file-icon"><FileText size={18} /></div>
+                    )}
+                    <button className="chatview-attach-item-remove" onClick={() => removeMedia(i)}><X size={12} /></button>
+                  </div>
+                ))}
+              </div>
+              <span className="chatview-attach-count">{mediaList.length} файл(ов)</span>
             </div>
           )}
 
           {/* Поле ввода */}
           <div className="chatview-composer">
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+            <input type="file" ref={fileInputRef} multiple style={{ display: 'none' }} onChange={handleFileChange} />
             <button className="chatview-composer-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
               <Paperclip size={20} />
             </button>
@@ -298,7 +323,7 @@ export default function ChatView() {
               ref={inputRef}
               rows={1}
               className="chatview-composer-input"
-              placeholder={media ? 'Подпись (необязательно)...' : 'Сообщение...'}
+              placeholder={mediaList.length ? 'Подпись (необязательно)...' : 'Сообщение...'}
               value={input}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
@@ -306,7 +331,7 @@ export default function ChatView() {
             <button
               className="chatview-composer-send"
               onClick={handleSend}
-              disabled={(!input.trim() && !media) || sending}
+              disabled={(!input.trim() && !mediaList.length) || sending}
             >
               <Send size={20} />
             </button>
@@ -331,9 +356,7 @@ export default function ChatView() {
                   {tags.map(tag => (
                     <span key={tag} className="chatview-tag-editable">
                       {tag}
-                      <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}>
-                        <X size={11} />
-                      </button>
+                      <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}><X size={11} /></button>
                     </span>
                   ))}
                   <div className="chatview-tag-add-wrapper" ref={tagDropdownRef}>
@@ -343,9 +366,7 @@ export default function ChatView() {
                     {showTagDropdown && (
                       <div className="chatview-tag-dropdown">
                         {availableTags.map(tag => (
-                          <div key={tag} className="chatview-tag-dropdown-item" onClick={() => handleAddExistingTag(tag)}>
-                            {tag}
-                          </div>
+                          <div key={tag} className="chatview-tag-dropdown-item" onClick={() => handleAddExistingTag(tag)}>{tag}</div>
                         ))}
                         <div className="chatview-tag-dropdown-input-row">
                           <input

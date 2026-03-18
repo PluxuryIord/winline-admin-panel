@@ -216,15 +216,20 @@ router.post('/:id/messages', async (req, res, next) => {
     // Отправляем в Telegram
     let tgError = null;
     try {
-      let tgResult;
-      if (media?.url) {
-        const buffer = await downloadBuffer(media.url);
-        tgResult = await tgSendMedia(userId, { buffer, filename: media.originalName || 'file', mimeType: media.mimeType }, caption);
+      const mediaArr = Array.isArray(media) ? media : (media ? [media] : []);
+      if (mediaArr.length > 0) {
+        // Отправляем каждый файл по отдельности (Telegram sendMediaGroup не через Bot API просто)
+        for (let i = 0; i < mediaArr.length; i++) {
+          const m = mediaArr[i];
+          if (!m.url) continue;
+          const buffer = await downloadBuffer(m.url);
+          const cap = i === 0 ? caption : ''; // подпись только к первому
+          const tgResult = await tgSendMedia(userId, { buffer, filename: m.originalName || 'file', mimeType: m.mimeType }, cap);
+          if (!tgResult.ok) tgError = tgResult.description || 'Telegram error';
+        }
       } else {
-        tgResult = await tgSend(userId, caption);
-      }
-      if (!tgResult.ok) {
-        tgError = tgResult.description || 'Telegram error';
+        const tgResult = await tgSend(userId, caption);
+        if (!tgResult.ok) tgError = tgResult.description || 'Telegram error';
       }
     } catch (err) {
       tgError = err.message;

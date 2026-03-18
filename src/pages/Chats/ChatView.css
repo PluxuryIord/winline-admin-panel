@@ -168,7 +168,7 @@
   justify-content: flex-end;
 }
 
-/* Пузырь */
+/* ===== ПУЗЫРЬ ===== */
 .chatview-bubble {
   max-width: 55%;
   min-width: 80px;
@@ -193,9 +193,34 @@
   border-top-right-radius: 4px;
 }
 
-/* Пузырь с картинкой — без паддингов */
+/* Пузырь с фото — прозрачный фон, без паддингов */
+.chatview-bubble--photo {
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.chatview-bubble--photo .chatview-text {
+  padding: 5px 10px 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chatview-msg--admin .chatview-bubble--photo .chatview-text {
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.22), rgba(255, 100, 0, 0.16));
+}
+
+.chatview-bubble--photo .chatview-meta {
+  padding: 2px 8px 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chatview-msg--admin .chatview-bubble--photo .chatview-meta {
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.22), rgba(255, 100, 0, 0.16));
+}
+
+/* Пузырь с файлом (не фото) */
 .chatview-bubble--media {
-  padding: 3px;
+  padding: 4px;
   overflow: hidden;
 }
 
@@ -207,28 +232,107 @@
   padding: 0 6px 2px;
 }
 
-/* Картинка */
-.chatview-img-link {
+/* ===== АЛЬБОМ (грид фото) ===== */
+.chatview-album {
+  display: block;
+  line-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chatview-msg--user .chatview-album {
+  border-top-left-radius: 4px;
+}
+
+.chatview-msg--admin .chatview-album {
+  border-top-right-radius: 4px;
+}
+
+.chatview-album-item {
   display: block;
   line-height: 0;
 }
 
-.chatview-img {
-  max-width: 320px;
-  max-height: 320px;
-  min-width: 140px;
-  border-radius: 9px;
+.chatview-album-item img {
+  width: 100%;
   display: block;
   object-fit: cover;
   cursor: pointer;
   transition: filter 0.15s;
 }
 
-.chatview-img:hover {
-  filter: brightness(0.92);
+.chatview-album-item img:hover {
+  filter: brightness(0.9);
 }
 
-/* Файл */
+/* Одно фото */
+.chatview-album:not([class*="chatview-album--"]) .chatview-album-item img {
+  max-width: 320px;
+  max-height: 320px;
+  min-width: 180px;
+  width: auto;
+  border-radius: 12px;
+}
+
+.chatview-msg--user .chatview-album:not([class*="chatview-album--"]) .chatview-album-item img {
+  border-top-left-radius: 4px;
+}
+
+.chatview-msg--admin .chatview-album:not([class*="chatview-album--"]) .chatview-album-item img {
+  border-top-right-radius: 4px;
+}
+
+/* 2 фото — горизонтально */
+.chatview-album--2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  width: 320px;
+}
+
+.chatview-album--2 .chatview-album-item img {
+  height: 200px;
+}
+
+/* 3 фото — 1 большое слева + 2 маленьких справа */
+.chatview-album--3 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  width: 320px;
+  height: 260px;
+}
+
+.chatview-album--3 .chatview-album-item:first-child {
+  grid-row: 1 / 3;
+}
+
+.chatview-album--3 .chatview-album-item img {
+  width: 100%;
+  height: 100%;
+}
+
+/* 4+ фото — сетка 2x2 (остальные скрыты) */
+.chatview-album--4plus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  width: 320px;
+  height: 320px;
+}
+
+.chatview-album--4plus .chatview-album-item img {
+  width: 100%;
+  height: 100%;
+}
+
+.chatview-album--4plus .chatview-album-item:nth-child(n+5) {
+  display: none;
+}
+
+/* ===== ФАЙЛ ===== */
 .chatview-file {
   display: flex;
   align-items: center;
@@ -278,14 +382,13 @@
   color: rgba(255, 255, 255, 0.35);
 }
 
-/* Текст сообщения */
+/* ===== ТЕКСТ И МЕТА ===== */
 .chatview-text {
   display: block;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* Мета: время + галочки */
 .chatview-meta {
   display: flex;
   align-items: center;
@@ -328,7 +431,7 @@
   cursor: pointer;
 }
 
-/* ===== ПРЕВЬЮ ПРИКРЕПЛЕНИЯ ===== */
+/* ===== ПРЕВЬЮ ПРИКРЕПЛЕНИЙ (АЛЬБОМ) ===== */
 .chatview-attach-bar {
   display: flex;
   align-items: center;
@@ -338,16 +441,34 @@
   background: rgba(255, 126, 0, 0.04);
 }
 
+.chatview-attach-list {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chatview-attach-list::-webkit-scrollbar {
+  display: none;
+}
+
+.chatview-attach-item {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .chatview-attach-thumb {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   object-fit: cover;
+  display: block;
 }
 
 .chatview-attach-file-icon {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   background: rgba(255, 126, 0, 0.12);
   display: flex;
@@ -356,35 +477,36 @@
   color: var(--color-orange);
 }
 
-.chatview-attach-name {
-  flex: 1;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chatview-attach-remove {
+.chatview-attach-item-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  border-radius: 50%;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.15s;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.chatview-attach-remove:hover {
-  background: rgba(255, 68, 68, 0.15);
-  color: #ff4444;
+.chatview-attach-item:hover .chatview-attach-item-remove {
+  opacity: 1;
 }
 
-/* ===== COMPOSER (поле ввода) ===== */
+.chatview-attach-count {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ===== COMPOSER ===== */
 .chatview-composer {
   display: flex;
   align-items: flex-end;
@@ -737,7 +859,17 @@
     max-width: 80%;
   }
 
-  .chatview-img {
-    max-width: 240px;
+  .chatview-album--2,
+  .chatview-album--3,
+  .chatview-album--4plus {
+    width: 240px;
+  }
+
+  .chatview-album--3 {
+    height: 200px;
+  }
+
+  .chatview-album--4plus {
+    height: 240px;
   }
 }
