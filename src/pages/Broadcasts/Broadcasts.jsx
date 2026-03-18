@@ -400,9 +400,6 @@ function ChannelsTab({ onSendResult }) {
                 <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                 <Hash size={14} className="bc-channel-hash" />
                 <span className="bc-channel-name">{ch.title}</span>
-                <button className="bc-channel-remove" onClick={(e) => { e.preventDefault(); handleDeleteChannel(ch.id); }} title="Удалить канал">
-                  <Trash2 size={13} />
-                </button>
               </label>
             ))}
           </div>
@@ -613,9 +610,6 @@ function GroupsTab({ onSendResult }) {
                 <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                 <MessageCircle size={14} className="bc-channel-hash" />
                 <span className="bc-channel-name">{g.title}</span>
-                <button className="bc-channel-remove" onClick={(e) => { e.preventDefault(); handleDeleteGroup(g.id); }} title="Удалить группу">
-                  <Trash2 size={13} />
-                </button>
               </label>
             ))}
           </div>
