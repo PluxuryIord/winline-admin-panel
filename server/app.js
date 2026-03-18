@@ -11,7 +11,7 @@ import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import chatsRouter, { webhookRouter } from './routes/chats.js';
 import knowledgeRouter from './routes/knowledge.js';
-import broadcastsRouter from './routes/broadcasts.js';
+import broadcastsRouter, { broadcastWebhookRouter } from './routes/broadcasts.js';
 import uploadRouter, { uploadsDir } from './routes/upload.js';
 import statusRouter from './routes/status.js';
 import analyticsRouter from './routes/analytics.js';
@@ -29,6 +29,7 @@ app.use('/uploads', express.static(uploadsDir));
 // Публичные маршруты (без JWT)
 app.use('/api/auth', authRouter);
 app.use('/api/chats/webhook', webhookRouter);
+app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
 
 // Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
 if (JWT_SECRET) {

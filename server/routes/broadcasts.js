@@ -2,11 +2,52 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import dbPool from '../config/db.js';
-import { BOT_TOKEN } from '../config/env.js';
+import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
+
+// ===================== WEBHOOK (без JWT) =====================
+
+export const broadcastWebhookRouter = Router();
+
+broadcastWebhookRouter.post('/', async (req, res, next) => {
+  if (!WEBHOOK_SECRET || req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
+    return res.status(403).json({ error: 'Invalid webhook secret' });
+  }
+
+  try {
+    const { chat_id, title, chat_type, action } = req.body;
+    if (!chat_id || !action) {
+      return res.status(400).json({ error: 'chat_id and action are required' });
+    }
+
+    const isChannel = chat_type === 'channel';
+    const table = isChannel ? 'wl_admin_channels' : 'wl_admin_groups';
+    const chatIdStr = String(chat_id);
+
+    if (action === 'added') {
+      const [existing] = await dbPool.query(`SELECT id FROM ${table} WHERE chat_id = ?`, [chatIdStr]);
+      if (existing.length) {
+        await dbPool.query(`UPDATE ${table} SET title = ? WHERE chat_id = ?`, [title || chatIdStr, chatIdStr]);
+      } else {
+        await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
+      }
+      console.log(`[bot-membership] ${isChannel ? 'Channel' : 'Group'} added: ${chatIdStr} "${title}"`);
+      res.json({ ok: true, action: 'added' });
+    } else if (action === 'removed') {
+      await dbPool.query(`DELETE FROM ${table} WHERE chat_id = ?`, [chatIdStr]);
+      console.log(`[bot-membership] ${isChannel ? 'Channel' : 'Group'} removed: ${chatIdStr}`);
+      res.json({ ok: true, action: 'removed' });
+    } else {
+      res.status(400).json({ error: 'action must be "added" or "removed"' });
+    }
+  } catch (err) {
+    console.error('[bot-membership] ERROR:', err.message);
+    next(err);
+  }
+});
 
 // ===================== MULTER (memory) =====================
 
