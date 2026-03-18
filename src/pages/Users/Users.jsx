@@ -168,7 +168,7 @@ export default function Users() {
       u.banned ? 'Да' : 'Нет',
       (u.tags || []).join('; ')
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -182,7 +182,7 @@ export default function Users() {
   const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
   const handleExportGoogle = () => { exportCSV(filteredAndSortedUsers); setShowExportDropdown(false); };
 
-  if (loading && users.length === 0) {
+  if (loading && users.length === 0 && !search && !debouncedSearch) {
     return (
       <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
         <Loader size={32} className="spinner" />

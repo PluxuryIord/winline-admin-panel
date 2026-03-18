@@ -53,16 +53,26 @@ async function getUserIdsWithTags(userIds) {
 // Но при удалении всех тегов не остаётся строк! Нужен маркер.
 // Решение: при сохранении пустых тегов — вставляем специальную строку с tag = '__edited__'
 const EDITED_MARKER = '__edited__';
+// Все пользователи зарегистрированные до этой даты автоматически получают тег "Старый пользователь"
+const OLD_USER_CUTOFF = new Date('2026-03-18');
 
-function buildTagsForUser(userId, tagsMap, editedIds) {
+function buildTagsForUser(userId, tagsMap, editedIds, dateReg) {
   const uid = String(userId);
+  // Собираем вручную назначенные теги
+  let tags;
   if (tagsMap[uid]) {
-    return tagsMap[uid].filter(t => t !== EDITED_MARKER);
+    tags = tagsMap[uid].filter(t => t !== EDITED_MARKER);
   } else if (editedIds.has(uid)) {
-    return []; // был отредактирован, но все теги удалены
+    tags = [];
   } else {
-    return ['Старый пользователь']; // никогда не редактировался
+    tags = [];
   }
+  // Автотег "Старый пользователь" для всех кто зарегался до cutoff
+  const isOldUser = dateReg && new Date(dateReg) < OLD_USER_CUTOFF;
+  if (isOldUser && !tags.includes('Старый пользователь')) {
+    tags.unshift('Старый пользователь');
+  }
+  return tags;
 }
 
 const USER_COLUMNS = 'user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr';
@@ -93,7 +103,7 @@ router.get('/', async (req, res, next) => {
     const tagsMap = await getTagsForUsers(userIds);
     const editedIds = await getUserIdsWithTags(userIds);
 
-    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds)));
+    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.date_reg)));
     res.json({ users, total, limit, offset });
   } catch (err) { next(err); }
 });
@@ -119,7 +129,7 @@ router.get('/:id', async (req, res, next) => {
     const userId = rows[0].user_id;
     const tagsMap = await getTagsForUsers([userId]);
     const editedIds = await getUserIdsWithTags([userId]);
-    const tags = buildTagsForUser(userId, tagsMap, editedIds);
+    const tags = buildTagsForUser(userId, tagsMap, editedIds, rows[0].date_reg);
 
     res.json(mapUserRow(rows[0], tags));
   } catch (err) { next(err); }
