@@ -143,6 +143,7 @@ router.post('/groups/send', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
   try {
     const { text, groupIds, media, poll } = req.body;
+    console.log('[broadcasts POST /groups/send] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
     if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
 
@@ -202,6 +203,7 @@ router.post('/', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
   try {
     const { text, channelIds, media, poll } = req.body;
+    console.log('[broadcasts POST /] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
     if (!channelIds?.length) return res.status(400).json({ error: 'Выберите хотя бы один канал' });
 
@@ -249,6 +251,7 @@ router.post('/users', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
     const { text, filters, media, poll } = req.body;
+    console.log('[broadcasts POST /users] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
 
     let where = ['u.user_id IS NOT NULL'];
