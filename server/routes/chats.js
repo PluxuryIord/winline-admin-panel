@@ -59,7 +59,8 @@ async function handleWebhook(req, res, next) {
   }
 
   try {
-    const { user_id, text, username, full_name, media } = req.body;
+    const { user_id, text, username, full_name, media, photo, document: doc, video, voice, audio, sticker } = req.body;
+    console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video);
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
     // Находим или создаём чат
@@ -72,23 +73,28 @@ async function handleWebhook(req, res, next) {
       chatId = chats[0].id;
     }
 
-    // Обработка медиа от бота (если есть file_id)
+    // Обработка медиа от бота — поддержка разных форматов
+    // Бот может слать media.file_id, или photo/document/video/voice/audio напрямую
+    const mediaSource = media || photo || doc || video || voice || audio || sticker || null;
     let mediaObj = null;
-    if (media?.file_id) {
+    if (mediaSource?.file_id) {
       try {
-        const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${media.file_id}`);
+        console.log('[webhook] Processing media, file_id:', mediaSource.file_id, 'mime:', mediaSource.mime_type);
+        const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${mediaSource.file_id}`);
         const fileData = await fileRes.json();
+        console.log('[webhook] getFile result:', fileData.ok, fileData.result?.file_path);
         if (fileData.ok) {
           const filePath = fileData.result.file_path;
           const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
-          const originalName = media.file_name || path.basename(filePath);
-          const mimeType = media.mime_type || 'application/octet-stream';
+          const originalName = mediaSource.file_name || path.basename(filePath);
+          const mimeType = mediaSource.mime_type || (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') ? 'image/jpeg' : filePath.endsWith('.png') ? 'image/png' : 'application/octet-stream');
 
           // Скачать и загрузить в S3
           const buffer = await downloadBuffer(fileUrl);
           const { key, url } = await uploadToS3(buffer, originalName, mimeType);
 
           mediaObj = { filename: key, originalName, mimeType, url };
+          console.log('[webhook] Media uploaded to S3:', key, url);
         }
       } catch (e) {
         console.error('[webhook] Failed to download/upload media:', e.message);
@@ -96,7 +102,7 @@ async function handleWebhook(req, res, next) {
     }
 
     // Сохраняем сообщение
-    const caption = text || media?.caption || '';
+    const caption = text || mediaSource?.caption || '';
     const dbText = mediaObj ? packMedia(mediaObj, caption) : caption;
     const [result] = await dbPool.query(
       'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',

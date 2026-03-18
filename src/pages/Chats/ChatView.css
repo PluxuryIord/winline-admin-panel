@@ -4,6 +4,7 @@
   flex-direction: column;
   height: 100%;
   gap: 0;
+  position: relative;
 }
 
 /* ===== ШАПКА ===== */
@@ -14,7 +15,7 @@
   padding: 10px 16px;
   background: var(--color-panel);
   border-radius: 16px 16px 0 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: none;
 }
 
 .chatview-back-btn {
@@ -94,7 +95,7 @@
 .chatview-body {
   display: grid;
   grid-template-columns: 1fr 280px;
-  gap: 0;
+  gap: 12px;
   flex: 1;
   min-height: 0;
 }
@@ -104,7 +105,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0 0 16px 16px;
+  position: relative;
 }
 
 /* ===== СООБЩЕНИЯ ===== */
@@ -202,7 +204,7 @@
 }
 
 .chatview-bubble--photo .chatview-text {
-  padding: 5px 10px 0;
+  padding: 8px 12px 4px;
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -211,12 +213,23 @@
 }
 
 .chatview-bubble--photo .chatview-meta {
-  padding: 2px 8px 4px;
+  padding: 2px 10px 5px;
   background: rgba(255, 255, 255, 0.08);
 }
 
 .chatview-msg--admin .chatview-bubble--photo .chatview-meta {
   background: linear-gradient(135deg, rgba(255, 126, 0, 0.22), rgba(255, 100, 0, 0.16));
+}
+
+/* Фото без подписи — время поверх фото */
+.chatview-bubble--photo:not(:has(.chatview-text)) .chatview-meta {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border-radius: 10px;
+  padding: 2px 6px;
 }
 
 /* Пузырь с файлом (не фото) */
@@ -279,6 +292,7 @@
 .chatview-album-item {
   display: block;
   line-height: 0;
+  cursor: pointer;
 }
 
 .chatview-album-item img {
@@ -593,8 +607,8 @@
   width: 40px;
   height: 40px;
   min-width: 40px;
-  background: var(--color-orange);
-  color: #fff;
+  background: none;
+  color: var(--color-orange);
   border: none;
   border-radius: 50%;
   display: flex;
@@ -605,21 +619,19 @@
 }
 
 .chatview-composer-send:hover:not(:disabled) {
-  background: #e56b00;
-  transform: scale(1.05);
+  background: rgba(255, 126, 0, 0.1);
+  color: #e56b00;
 }
 
 .chatview-composer-send:disabled {
-  background: rgba(255, 126, 0, 0.25);
+  color: rgba(255, 126, 0, 0.25);
   cursor: not-allowed;
-  transform: none;
 }
 
 /* ===== САЙДБАР ===== */
 .chatview-sidebar {
   background-color: var(--color-panel);
-  border-radius: 0 16px 16px 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
   padding: 0 0 20px;
   display: flex;
   flex-direction: column;
@@ -637,7 +649,7 @@
   padding: 24px 20px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   transition: background-color 0.2s;
-  border-radius: 0 16px 0 0;
+  border-radius: 16px 16px 0 0;
 }
 
 .chatview-user-hero:hover {
@@ -854,6 +866,90 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
+/* ===== КНОПКА СКРОЛЛА ВНИЗ ===== */
+.chatview-scroll-bottom {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.chatview-scroll-bottom--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.chatview-scroll-bottom:hover {
+  background: rgba(255, 126, 0, 0.3);
+  border-color: rgba(255, 126, 0, 0.4);
+  color: var(--color-white);
+}
+
+/* ===== LIGHTBOX ===== */
+.chatview-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  animation: lightbox-in 0.2s ease-out;
+}
+
+@keyframes lightbox-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.chatview-lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: default;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.chatview-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.chatview-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
   .chatview-container {
@@ -870,7 +966,7 @@
   }
 
   .chatview-main {
-    border-right: none;
+    border-radius: 0 0 16px 16px;
   }
 
   .chatview-messages {

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus, Paperclip, FileText } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, Paperclip, FileText, ChevronDown } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
@@ -61,7 +61,14 @@ export default function ChatView() {
   const [mediaList, setMediaList] = useState([]);   // массив прикреплений
   const [uploading, setUploading] = useState(false);
 
+  // Lightbox
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+
+  // Scroll-to-bottom
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const tagDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -94,6 +101,22 @@ export default function ChatView() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat?.messages]);
+
+  // Scroll visibility observer
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [chat]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   // SSE
   useEffect(() => {
@@ -203,6 +226,14 @@ export default function ChatView() {
     el.style.height = Math.min(el.scrollHeight, 180) + 'px';
   };
 
+  // Lightbox close on Escape
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handleKey = (e) => { if (e.key === 'Escape') setLightboxUrl(null); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [lightboxUrl]);
+
   if (!chat) {
     return (
       <div className="chatview-not-found">
@@ -239,7 +270,7 @@ export default function ChatView() {
       <div className="chatview-body">
         <div className="chatview-main">
           {/* Сообщения */}
-          <div className="chatview-messages">
+          <div className="chatview-messages" ref={messagesContainerRef}>
             {items.map((item, i) => {
               if (item.type === 'date') {
                 return (
@@ -262,9 +293,15 @@ export default function ChatView() {
                         {ml.filter(m => m.mimeType?.startsWith('image/')).map((m, idx) => {
                           const url = m.url || `/uploads/${m.filename}`;
                           return (
-                            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="chatview-album-item">
+                            <span
+                              key={idx}
+                              className="chatview-album-item"
+                              onClick={() => setLightboxUrl(url)}
+                              role="button"
+                              tabIndex={0}
+                            >
                               <img src={url} alt="" />
-                            </a>
+                            </span>
                           );
                         })}
                       </div>
@@ -292,6 +329,14 @@ export default function ChatView() {
             })}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Кнопка скролла вниз */}
+          <button
+            className={`chatview-scroll-bottom ${showScrollBtn ? 'chatview-scroll-bottom--visible' : ''}`}
+            onClick={scrollToBottom}
+          >
+            <ChevronDown size={22} />
+          </button>
 
           {/* Превью прикреплений */}
           {mediaList.length > 0 && (
@@ -332,7 +377,7 @@ export default function ChatView() {
               onClick={handleSend}
               disabled={(!input.trim() && !mediaList.length) || sending}
             >
-              <Send size={20} />
+              <Send size={18} />
             </button>
           </div>
         </div>
@@ -344,9 +389,6 @@ export default function ChatView() {
               <Link to={`/users/${user.id}`} className="chatview-user-hero">
                 <div className="chatview-hero-avatar">{user.fullName.charAt(0)}</div>
                 <div className="chatview-hero-name">{user.fullName}</div>
-                <span className="chatview-hero-badge badge-guest">
-                  {(tags[0]) || 'Пользователь'}
-                </span>
               </Link>
 
               <div className="chatview-sidebar-section">
@@ -406,6 +448,16 @@ export default function ChatView() {
           )}
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div className="chatview-lightbox" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="" onClick={(e) => e.stopPropagation()} />
+          <button className="chatview-lightbox-close" onClick={() => setLightboxUrl(null)}>
+            <X size={20} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
