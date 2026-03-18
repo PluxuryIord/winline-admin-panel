@@ -129,34 +129,31 @@
 }
 
 .date-input {
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 12px 16px;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   color: var(--color-white);
   font-size: 0.9rem;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
+  color-scheme: dark;
+}
+
+.date-input:hover {
+  border-color: rgba(255, 126, 0, 0.4);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .date-input:focus {
   border-color: var(--color-orange);
-}
-
-.date-input::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
-  cursor: pointer;
+  background: rgba(255, 126, 0, 0.05);
 }
 
 .date-sep {
   color: rgba(255, 255, 255, 0.3);
   font-size: 1.1rem;
-}
-
-.btn-sm {
-  padding: 10px 16px !important;
-  font-size: 0.85rem !important;
 }
 
 .analytics-error {

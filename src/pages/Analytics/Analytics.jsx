@@ -208,9 +208,6 @@ export default function Analytics() {
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="date-input" />
             <span className="date-sep">—</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="date-input" />
-            <button className="btn-control primary btn-sm" onClick={handleApplyRange} disabled={!dateFrom || !dateTo || isGenerating}>
-              OK
-            </button>
           </div>
         )}
 
