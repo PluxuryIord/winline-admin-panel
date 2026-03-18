@@ -406,7 +406,6 @@ export default function UserProfile() {
           )}
         </div>
 
-        {saving && <Loader size={16} className="spinner" style={{ marginLeft: 12 }} />}
       </div>
     </div>
   );
