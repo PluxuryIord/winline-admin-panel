@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, X, Plus } from 'lucide-react';
+import { ArrowLeft, Send, X, Plus, Paperclip, FileText, Image } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
@@ -40,10 +40,13 @@ export default function ChatView() {
   const [tags, setTags] = useState([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
+  const [media, setMedia] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const tagDropdownRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Загрузка чата
   useEffect(() => {
@@ -129,15 +132,50 @@ export default function ChatView() {
     setNewTagInput('');
   };
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const token = localStorage.getItem('wl_admin_token');
+      const res = await fetch('/api/broadcasts/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      setMedia({
+        filename: data.filename,
+        originalName: data.originalName,
+        mimeType: data.mimeType,
+        size: data.size,
+        previewUrl: data.mimeType.startsWith('image/') ? URL.createObjectURL(file) : null,
+      });
+    } catch (err) {
+      alert('Ошибка загрузки: ' + err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text && !media) return;
+    if (sending) return;
     setSending(true);
     try {
-      const res = await api.post(`/api/chats/${id}/messages`, { text });
+      const body = {};
+      if (text) body.text = text;
+      if (media) body.media = { filename: media.filename, originalName: media.originalName, mimeType: media.mimeType };
+      const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
       setChat(prev => ({ ...prev, messages: [...prev.messages, newMsg] }));
       setInput('');
+      setMedia(null);
       if (inputRef.current) inputRef.current.style.height = 'auto';
       inputRef.current?.focus();
     } catch (e) {
@@ -196,7 +234,21 @@ export default function ChatView() {
               ) : (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
                   <div className="chatview-msg-bubble">
-                    {item.text}
+                    {item.media && (
+                      <div className="chatview-msg-media">
+                        {item.media.mimeType?.startsWith('image/') ? (
+                          <a href={`/uploads/${item.media.filename}`} target="_blank" rel="noopener noreferrer">
+                            <img src={`/uploads/${item.media.filename}`} alt="" className="chatview-msg-img" />
+                          </a>
+                        ) : (
+                          <a href={`/uploads/${item.media.filename}`} download={item.media.originalName} className="chatview-msg-file">
+                            <FileText size={20} />
+                            <span className="chatview-msg-file-name">{item.media.originalName}</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {item.text && <span className="chatview-msg-text">{item.text}</span>}
                     <span className="chatview-msg-time">{formatTime(item.time)}</span>
                   </div>
                 </div>
@@ -205,17 +257,32 @@ export default function ChatView() {
             <div ref={messagesEndRef} />
           </div>
 
+          {media && (
+            <div className="chatview-attach-preview">
+              {media.previewUrl ? (
+                <img src={media.previewUrl} alt="" className="chatview-attach-thumb" />
+              ) : (
+                <FileText size={20} className="chatview-attach-icon" />
+              )}
+              <span className="chatview-attach-name">{media.originalName}</span>
+              <button className="chatview-attach-remove" onClick={() => setMedia(null)}><X size={14} /></button>
+            </div>
+          )}
           <div className="chatview-input-row">
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+            <button className="chatview-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Paperclip size={18} />
+            </button>
             <textarea
               ref={inputRef}
               rows={1}
               className="chatview-input"
-              placeholder="Написать сообщение..."
+              placeholder={media ? 'Подпись (необязательно)...' : 'Написать сообщение...'}
               value={input}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
-            <button className="chatview-send-btn" onClick={handleSend} disabled={!input.trim() || sending}>
+            <button className="chatview-send-btn" onClick={handleSend} disabled={(!input.trim() && !media) || sending}>
               <Send size={18} />
             </button>
           </div>

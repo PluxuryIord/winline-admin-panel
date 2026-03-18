@@ -1,9 +1,35 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dbPool from '../config/db.js';
-import { WEBHOOK_SECRET } from '../config/env.js';
-import { tgSend } from '../services/telegram.js';
+import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
+import { tgSend, tgSendMedia } from '../services/telegram.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 const router = Router();
+
+// ===================== MEDIA HELPERS =====================
+const MEDIA_PREFIX = '__media__:';
+
+function packMedia(media, caption = '') {
+  return `${MEDIA_PREFIX}${JSON.stringify(media)}\n${caption}`;
+}
+
+function unpackMessage(row) {
+  const msg = { id: row.id, from: row.from, text: row.text || '', time: row.time };
+  if (msg.text.startsWith(MEDIA_PREFIX)) {
+    const nlIdx = msg.text.indexOf('\n');
+    const jsonStr = nlIdx > 0 ? msg.text.slice(MEDIA_PREFIX.length, nlIdx) : msg.text.slice(MEDIA_PREFIX.length);
+    try {
+      msg.media = JSON.parse(jsonStr);
+      msg.text = nlIdx > 0 ? msg.text.slice(nlIdx + 1) : '';
+    } catch { /* keep as text */ }
+  }
+  return msg;
+}
 
 // ===================== SSE =====================
 
@@ -37,7 +63,7 @@ async function handleWebhook(req, res, next) {
   }
 
   try {
-    const { user_id, text, username, full_name } = req.body;
+    const { user_id, text, username, full_name, media } = req.body;
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
     // Находим или создаём чат
@@ -50,19 +76,53 @@ async function handleWebhook(req, res, next) {
       chatId = chats[0].id;
     }
 
+    // Обработка медиа от бота (если есть file_id)
+    let mediaObj = null;
+    if (media?.file_id) {
+      try {
+        // Скачать файл через Telegram API
+        const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${media.file_id}`);
+        const fileData = await fileRes.json();
+        if (fileData.ok) {
+          const filePath = fileData.result.file_path;
+          const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+          const ext = path.extname(filePath) || (media.mime_type?.startsWith('image/') ? '.jpg' : '.bin');
+          const localName = `tg_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+          const localPath = path.join(UPLOADS_DIR, localName);
+
+          // Создать папку если нет
+          if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+          const imgRes = await fetch(fileUrl);
+          const buffer = Buffer.from(await imgRes.arrayBuffer());
+          fs.writeFileSync(localPath, buffer);
+
+          mediaObj = {
+            filename: localName,
+            originalName: media.file_name || localName,
+            mimeType: media.mime_type || 'application/octet-stream',
+          };
+        }
+      } catch (e) {
+        console.error('[webhook] Failed to download media:', e.message);
+      }
+    }
+
     // Сохраняем сообщение
-    const msgText = text || '';
+    const caption = text || media?.caption || '';
+    const dbText = mediaObj ? packMedia(mediaObj, caption) : caption;
     const [result] = await dbPool.query(
       'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
-      [chatId, 'user', msgText]
+      [chatId, 'user', dbText]
     );
 
     const newMsg = {
       id: result.insertId,
       from: 'user',
-      text: msgText,
+      text: caption,
       time: new Date().toISOString(),
     };
+    if (mediaObj) newMsg.media = mediaObj;
 
     // SSE push
     broadcast({
@@ -98,7 +158,7 @@ router.get('/', async (req, res, next) => {
       );
       for (const m of msgs) {
         if (!messagesMap[m.chat_id]) messagesMap[m.chat_id] = [];
-        messagesMap[m.chat_id].push({ id: m.id, from: m.from, text: m.text, time: m.time });
+        messagesMap[m.chat_id].push(unpackMessage(m));
       }
     }
 
@@ -126,7 +186,7 @@ router.get('/by-user/:userId', async (req, res, next) => {
         'SELECT id, sender AS `from`, text, created_at AS time FROM wl_admin_chat_messages WHERE chat_id = ? ORDER BY created_at ASC',
         [chat.id]
       );
-      chat.messages = msgs.map(m => ({ id: m.id, from: m.from, text: m.text, time: m.time }));
+      chat.messages = msgs.map(m => unpackMessage(m));
     }
 
     res.json(chat);
@@ -137,32 +197,43 @@ router.get('/by-user/:userId', async (req, res, next) => {
 router.post('/:id/messages', async (req, res, next) => {
   try {
     const chatId = Number(req.params.id);
-    const { text } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'Text is required' });
+    const { text, media } = req.body;
+    if (!text?.trim() && !media) return res.status(400).json({ error: 'Введите текст или прикрепите файл' });
 
     // Чат + user_id
     const [chats] = await dbPool.query('SELECT id, user_id FROM wl_admin_chats WHERE id = ?', [chatId]);
     if (!chats.length) return res.status(404).json({ error: 'Чат не найден' });
 
     const userId = chats[0].user_id;
+    const caption = (text || '').trim();
+
+    // Формируем текст для БД
+    const dbText = media ? packMedia(media, caption) : caption;
 
     // Сохраняем в БД
     const [result] = await dbPool.query(
       'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
-      [chatId, 'admin', text.trim()]
+      [chatId, 'admin', dbText]
     );
 
     const newMsg = {
       id: result.insertId,
       from: 'admin',
-      text: text.trim(),
+      text: caption,
       time: new Date().toISOString(),
     };
+    if (media) newMsg.media = media;
 
     // Отправляем в Telegram
     let tgError = null;
     try {
-      const tgResult = await tgSend(userId, text.trim());
+      let tgResult;
+      if (media?.filename) {
+        const filePath = path.join(UPLOADS_DIR, media.filename);
+        tgResult = await tgSendMedia(userId, filePath, media.mimeType, caption);
+      } else {
+        tgResult = await tgSend(userId, caption);
+      }
       if (!tgResult.ok) {
         tgError = tgResult.description || 'Telegram error';
       }
