@@ -19,6 +19,9 @@ const ARTICLE_TITLES = {
 
 // Ключи фото, привязанные к статьям
 const PHOTO_MAP = {
+  lk_overview: 'lk_overview_photo',
+  offer_info: 'offer_info_photo',
+  ref_link: 'ref_link_photo',
   postback: 'postback_photo',
   download_report: 'report_photo',
   download_report_2: 'report_photo_2',
