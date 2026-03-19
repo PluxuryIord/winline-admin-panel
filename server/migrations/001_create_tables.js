@@ -82,12 +82,20 @@ const TABLES = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 
+  `CREATE TABLE IF NOT EXISTS wl_admin_event_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(100) NOT NULL UNIQUE,
+    label VARCHAR(255) DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_code (code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
   `CREATE TABLE IF NOT EXISTS wl_admin_event_scans (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    code VARCHAR(100) NOT NULL,
     scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     prize_given BOOLEAN DEFAULT TRUE,
-    INDEX idx_user_id (user_id),
+    INDEX idx_code (code),
     INDEX idx_scanned_at (scanned_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];

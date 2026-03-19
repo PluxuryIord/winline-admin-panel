@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Users, Gift, ScanLine, Calendar,
-  ChevronLeft, ChevronRight, Plus, Trash2, UserPlus,
+  ChevronLeft, ChevronRight, Plus, Trash2,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -25,12 +25,11 @@ function CodesTab() {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
-  const [qrModal, setQrModal] = useState(null);
+  const [qrModal, setQrModal] = useState(null); // code string for modal
   const [generateModal, setGenerateModal] = useState(false);
-  const [genSearch, setGenSearch] = useState('');
-  const [genResults, setGenResults] = useState([]);
-  const [genLoading, setGenLoading] = useState(false);
-  const [enabling, setEnabling] = useState(null); // userId being enabled
+  const [genCount, setGenCount] = useState(1);
+  const [genLabel, setGenLabel] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
@@ -60,43 +59,37 @@ function CodesTab() {
     setSearch(searchInput.trim());
   };
 
-  // Generate modal: search users
-  const handleGenSearch = async (q) => {
-    setGenSearch(q);
-    if (!q.trim()) { setGenResults([]); return; }
-    setGenLoading(true);
+  // Generate codes
+  const handleGenerate = async () => {
+    setGenerating(true);
     try {
-      const res = await api.get(`/api/events/codes/search-users?search=${encodeURIComponent(q.trim())}`);
+      const res = await api.post('/api/events/codes/generate', {
+        count: Number(genCount) || 1,
+        label: genLabel.trim(),
+      });
       const data = await res.json();
-      setGenResults(data.users || []);
+      if (data.ok) {
+        setGenerateModal(false);
+        setGenCount(1);
+        setGenLabel('');
+        fetchCodes();
+        // If generated 1 code, immediately show its QR
+        if (data.codes?.length === 1) {
+          setQrModal(data.codes[0]);
+        }
+      }
     } catch (e) {
-      console.error('Search failed:', e);
+      alert('Ошибка генерации: ' + e.message);
     } finally {
-      setGenLoading(false);
+      setGenerating(false);
     }
   };
 
-  // Enable QR for a user
-  const handleEnableQr = async (userId) => {
-    setEnabling(userId);
+  // Delete code
+  const handleDelete = async (id) => {
+    if (!confirm('Удалить этот QR-код?')) return;
     try {
-      await api.post(`/api/events/codes/${userId}/enable`);
-      // Update search results
-      setGenResults(prev => prev.map(u => u.userId === userId ? { ...u, hasQr: true } : u));
-      // Refresh main table
-      fetchCodes();
-    } catch (e) {
-      alert('Ошибка: ' + e.message);
-    } finally {
-      setEnabling(null);
-    }
-  };
-
-  // Disable QR for a user
-  const handleDisableQr = async (userId) => {
-    if (!confirm('Отключить QR-код для этого пользователя?')) return;
-    try {
-      await api.delete(`/api/events/codes/${userId}/enable`);
+      await api.delete(`/api/events/codes/${id}`);
       fetchCodes();
     } catch (e) {
       alert('Ошибка: ' + e.message);
@@ -113,7 +106,7 @@ function CodesTab() {
           <Search size={16} className="ew-search-icon" />
           <input
             className="ew-search-input"
-            placeholder="Поиск по имени, ID или username..."
+            placeholder="Поиск по коду или подписи..."
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
           />
@@ -138,8 +131,8 @@ function CodesTab() {
             </button>
           ))}
         </div>
-        <button className="ew-generate-btn" onClick={() => { setGenerateModal(true); setGenSearch(''); setGenResults([]); }}>
-          <Plus size={16} /> Сгенерировать QR
+        <button className="ew-generate-btn" onClick={() => setGenerateModal(true)}>
+          <Plus size={16} /> Сгенерировать
         </button>
       </div>
 
@@ -148,9 +141,9 @@ function CodesTab() {
         <table className="ew-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Имя</th>
-              <th>Username</th>
+              <th>Код</th>
+              <th>Подпись</th>
+              <th>Создан</th>
               <th>Сканирований</th>
               <th>Последнее</th>
               <th>Действия</th>
@@ -160,12 +153,14 @@ function CodesTab() {
             {loading ? (
               <tr><td colSpan={6} className="ew-table-empty">Загрузка...</td></tr>
             ) : codes.length === 0 ? (
-              <tr><td colSpan={6} className="ew-table-empty">Нет данных</td></tr>
+              <tr><td colSpan={6} className="ew-table-empty">Нет QR-кодов. Нажмите «Сгенерировать» чтобы создать.</td></tr>
             ) : codes.map(c => (
-              <tr key={c.userId}>
-                <td className="ew-td-id">{c.userId}</td>
-                <td>{c.fullName}</td>
-                <td className="ew-td-username">{c.username ? `@${c.username}` : '—'}</td>
+              <tr key={c.id}>
+                <td className="ew-td-code">{c.code}</td>
+                <td>{c.label || '—'}</td>
+                <td className="ew-td-date">
+                  {c.createdAt ? new Date(c.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                </td>
                 <td>
                   <span className={`ew-scan-badge ${c.scanCount > 0 ? 'scanned' : ''}`}>
                     {c.scanCount}
@@ -176,10 +171,10 @@ function CodesTab() {
                 </td>
                 <td>
                   <div className="ew-actions-cell">
-                    <button className="ew-qr-btn" onClick={() => setQrModal(c.userId)} title="Показать QR">
+                    <button className="ew-qr-btn" onClick={() => setQrModal(c.code)} title="Показать QR">
                       <Eye size={16} />
                     </button>
-                    <button className="ew-disable-btn" onClick={() => handleDisableQr(c.userId)} title="Отключить QR">
+                    <button className="ew-disable-btn" onClick={() => handleDelete(c.id)} title="Удалить">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -209,10 +204,10 @@ function CodesTab() {
         <div className="ew-modal-overlay" onClick={() => setQrModal(null)}>
           <div className="ew-qr-modal" onClick={e => e.stopPropagation()}>
             <button className="ew-qr-modal-close" onClick={() => setQrModal(null)}><X size={20} /></button>
-            <h3>QR-код пользователя #{qrModal}</h3>
+            <h3>QR-код: {qrModal}</h3>
             <div className="ew-qr-image-wrap">
               <img
-                src={`/api/events/codes/${qrModal}/qr`}
+                src={`/api/events/codes/${encodeURIComponent(qrModal)}/qr`}
                 alt={`QR ${qrModal}`}
                 className="ew-qr-image"
               />
@@ -222,54 +217,43 @@ function CodesTab() {
         </div>
       )}
 
-      {/* Generate QR Modal */}
+      {/* Generate Modal */}
       {generateModal && (
         <div className="ew-modal-overlay" onClick={() => setGenerateModal(false)}>
           <div className="ew-gen-modal" onClick={e => e.stopPropagation()}>
             <button className="ew-qr-modal-close" onClick={() => setGenerateModal(false)}><X size={20} /></button>
-            <h3><UserPlus size={20} /> Сгенерировать QR-код</h3>
-            <p className="ew-gen-desc">Найдите пользователя и включите ему QR-код для мероприятий</p>
+            <h3><QrCode size={20} /> Сгенерировать QR-коды</h3>
+            <p className="ew-gen-desc">Создайте уникальные QR-коды для мероприятия. Каждый код можно отсканировать на странице хостес.</p>
 
-            <div className="ew-gen-search-wrap">
-              <Search size={16} className="ew-search-icon" />
-              <input
-                className="ew-search-input"
-                placeholder="Поиск по имени, ID или username..."
-                value={genSearch}
-                onChange={e => handleGenSearch(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            <div className="ew-gen-results">
-              {genLoading ? (
-                <div className="ew-gen-empty">Поиск...</div>
-              ) : genSearch && genResults.length === 0 ? (
-                <div className="ew-gen-empty">Ничего не найдено</div>
-              ) : genResults.map(u => (
-                <div key={u.userId} className="ew-gen-item">
-                  <div className="ew-gen-item-info">
-                    <span className="ew-gen-item-name">{u.fullName}</span>
-                    <span className="ew-gen-item-meta">
-                      ID {u.userId}{u.username ? ` · @${u.username}` : ''}
-                    </span>
-                  </div>
-                  {u.hasQr ? (
-                    <span className="ew-gen-has-qr">QR активен</span>
-                  ) : (
-                    <button
-                      className="ew-gen-enable-btn"
-                      onClick={() => handleEnableQr(u.userId)}
-                      disabled={enabling === u.userId}
-                    >
-                      {enabling === u.userId ? '...' : <><Plus size={14} /> Включить QR</>}
-                    </button>
-                  )}
-                </div>
-              ))}
-              {!genSearch && (
-                <div className="ew-gen-empty">Введите имя, ID или username для поиска</div>
-              )}
+            <div className="ew-gen-form">
+              <div className="ew-gen-field">
+                <label>Количество кодов</label>
+                <input
+                  type="number"
+                  className="ew-settings-input"
+                  value={genCount}
+                  onChange={e => setGenCount(e.target.value)}
+                  min={1}
+                  max={100}
+                />
+              </div>
+              <div className="ew-gen-field">
+                <label>Подпись (необязательно)</label>
+                <input
+                  type="text"
+                  className="ew-search-input ew-gen-label-input"
+                  placeholder="Например: Ивент 20 марта"
+                  value={genLabel}
+                  onChange={e => setGenLabel(e.target.value)}
+                />
+              </div>
+              <button
+                className="ew-generate-btn ew-gen-submit"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                {generating ? 'Генерация...' : <><Plus size={16} /> Сгенерировать {genCount > 1 ? `${genCount} кодов` : 'код'}</>}
+              </button>
             </div>
           </div>
         </div>
@@ -338,14 +322,13 @@ function StatsTab() {
   const statCards = stats ? [
     { icon: <QrCode size={20} />, label: 'Всего QR-кодов', value: stats.totalCodes },
     { icon: <ScanLine size={20} />, label: 'Сканирований', value: stats.totalScans },
-    { icon: <Users size={20} />, label: 'Уникальных гостей', value: stats.uniqueGuests },
+    { icon: <Users size={20} />, label: 'Уникальных кодов', value: stats.uniqueGuests },
     { icon: <Gift size={20} />, label: 'Призов выдано', value: stats.prizesGiven },
     { icon: <Calendar size={20} />, label: 'Сегодня', value: stats.scansToday },
   ] : [];
 
   return (
     <div className="ew-tab-content">
-      {/* Date presets */}
       <div className="ew-date-presets">
         {DATE_PRESETS.map(p => (
           <button
@@ -358,7 +341,6 @@ function StatsTab() {
         ))}
       </div>
 
-      {/* Stat cards */}
       {loading ? (
         <div className="ew-loading">Загрузка...</div>
       ) : (
@@ -373,7 +355,6 @@ function StatsTab() {
         </div>
       )}
 
-      {/* Recent scans */}
       <div className="ew-recent-header">
         <h3>Последние сканирования</h3>
       </div>
@@ -386,8 +367,8 @@ function StatsTab() {
               <ScanLine size={16} />
             </div>
             <div className="ew-scan-info">
-              <span className="ew-scan-name">{s.fullName}</span>
-              {s.username && <span className="ew-scan-username">@{s.username}</span>}
+              <span className="ew-scan-name">{s.label}</span>
+              <span className="ew-scan-username">{s.code}</span>
             </div>
             <div className="ew-scan-meta">
               <span className={`ew-prize-badge ${s.prizeGiven ? 'given' : ''}`}>
@@ -447,7 +428,7 @@ function SettingsTab() {
       <div className="ew-settings-section">
         <h3>Лимит призов</h3>
         <p className="ew-settings-desc">
-          Максимальное количество призов, которое может получить один пользователь.
+          Максимальное количество сканирований одного QR-кода до блокировки.
           Установите 0 для безлимита.
         </p>
         <div className="ew-settings-row">
@@ -468,7 +449,6 @@ function SettingsTab() {
         </div>
       </div>
 
-      {/* Hostess section */}
       <HostessSection />
     </div>
   );
@@ -496,12 +476,7 @@ function HostessSection() {
           Сканирование QR-кодов гостей, выдача призов и счётчик — всё в одном окне.
         </p>
         <div className="ew-hostess-actions">
-          <a
-            href="/hostess"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ew-hostess-open-btn"
-          >
+          <a href="/hostess" target="_blank" rel="noopener noreferrer" className="ew-hostess-open-btn">
             <ExternalLink size={18} /> Открыть страницу
           </a>
           <button className="ew-hostess-copy-btn" onClick={handleCopy}>
@@ -533,13 +508,11 @@ export default function EventWork() {
 
   return (
     <div className="ew-container">
-      {/* Header */}
       <div className="ew-header">
         <h1>Работа на ивенте</h1>
         <p>QR-коды, сканирования, статистика и настройки мероприятий</p>
       </div>
 
-      {/* Tabs */}
       <div className="ew-tabs">
         {TABS.map(t => (
           <button
@@ -553,7 +526,6 @@ export default function EventWork() {
         ))}
       </div>
 
-      {/* Tab content */}
       {activeTab === 'codes' && <CodesTab />}
       {activeTab === 'stats' && <StatsTab />}
       {activeTab === 'settings' && <SettingsTab />}
