@@ -5,6 +5,64 @@ import dbPool from '../config/db.js';
 
 const router = Router();
 
+// ─── Auto-migrate tables ────────────────────────────────────────────────────
+
+let migrated = false;
+async function ensureTables() {
+  if (migrated) return;
+  migrated = true;
+  try {
+    // Create event_codes table if not exists
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS wl_admin_event_codes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(100) NOT NULL UNIQUE,
+        label VARCHAR(255) DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_code (code)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    // Check if event_scans has 'code' column
+    const [cols] = await dbPool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans' AND COLUMN_NAME = 'code'
+    `);
+
+    if (!cols.length) {
+      // Old schema has user_id — add 'code' column, copy data, drop user_id
+      const [tableExists] = await dbPool.query(`
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans'
+      `);
+
+      if (tableExists.length) {
+        // Table exists but without 'code' column — alter it
+        await dbPool.query(`ALTER TABLE wl_admin_event_scans ADD COLUMN code VARCHAR(100) NOT NULL DEFAULT '' AFTER id`);
+        await dbPool.query(`UPDATE wl_admin_event_scans SET code = CAST(user_id AS CHAR) WHERE code = ''`);
+        await dbPool.query(`ALTER TABLE wl_admin_event_scans ADD INDEX idx_code (code)`);
+        console.log('[events] Migrated wl_admin_event_scans: added code column');
+      } else {
+        // Table doesn't exist at all — create with new schema
+        await dbPool.query(`
+          CREATE TABLE wl_admin_event_scans (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(100) NOT NULL,
+            scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            prize_given BOOLEAN DEFAULT TRUE,
+            INDEX idx_code (code),
+            INDEX idx_scanned_at (scanned_at)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
+        console.log('[events] Created wl_admin_event_scans table');
+      }
+    }
+  } catch (e) {
+    console.error('[events] Migration error:', e.message);
+    migrated = false; // retry next time
+  }
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function generateCode() {
@@ -27,6 +85,12 @@ async function saveSettings(settings) {
     await dbPool.query('INSERT INTO texts (category, data) VALUES (?, ?)', ['event_settings', JSON.stringify(settings)]);
   }
 }
+
+// Ensure tables on first request
+router.use(async (req, res, next) => {
+  await ensureTables();
+  next();
+});
 
 // ─── GET /api/events/codes — список сгенерированных QR-кодов ────────────────
 
@@ -143,6 +207,7 @@ router.get('/codes/:code/qr', async (req, res, next) => {
 
 export async function scanHandler(req, res, next) {
   try {
+    await ensureTables();
     const { user_id } = req.body;
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
