@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2
 } from 'lucide-react';
-import { api } from '../../utils/api.js';
+import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
 
 export default function KnowledgeBase() {
@@ -69,10 +69,11 @@ export default function KnowledgeBase() {
     try {
       const formData = new FormData();
       formData.append('photo', file);
+      const token = getToken();
       const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
         method: 'POST',
         body: formData,
-        credentials: 'include',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
       const data = await res.json();
       if (data.ok) {
@@ -99,12 +100,9 @@ export default function KnowledgeBase() {
     if (!active?.photoKey || !active?.photoFileId) return;
     if (!confirm('Удалить фото из статьи?')) return;
     try {
-      const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.ok) {
+      const res = await api.delete(`/api/knowledge/photo/${active.photoKey}`);
+      const result = await res.json();
+      if (result.ok) {
         setArticles(prev => prev.map(a => {
           if (a.key !== active.key) return a;
           return { ...a, photoFileId: null, photoS3Url: null };
