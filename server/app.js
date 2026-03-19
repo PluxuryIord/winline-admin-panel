@@ -15,6 +15,7 @@ import broadcastsRouter, { broadcastWebhookRouter } from './routes/broadcasts.js
 import uploadRouter, { uploadsDir } from './routes/upload.js';
 import statusRouter from './routes/status.js';
 import analyticsRouter from './routes/analytics.js';
+import eventsRouter, { scanHandler } from './routes/events.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -35,6 +36,9 @@ app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
 import { knowledgePhotoProxy } from './routes/knowledge.js';
 app.get('/api/knowledge/photo/:fileId', knowledgePhotoProxy);
 
+// Публичный endpoint сканирования QR (хостес-страница, без JWT)
+app.post('/api/events/scan', scanHandler);
+
 // Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
 if (JWT_SECRET) {
   app.use('/api', authMiddleware);
@@ -49,6 +53,7 @@ app.use('/api/broadcasts', broadcastsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/bot/status', statusRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/events', eventsRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {

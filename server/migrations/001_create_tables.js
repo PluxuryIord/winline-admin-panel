@@ -81,6 +81,15 @@ const TABLES = [
     uploaded_by INT DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  `CREATE TABLE IF NOT EXISTS wl_admin_event_scans (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    prize_given BOOLEAN DEFAULT TRUE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_scanned_at (scanned_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
 export default async function migrate(pool) {

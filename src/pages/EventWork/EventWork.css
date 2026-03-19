@@ -5,7 +5,7 @@
   padding-bottom: 32px;
 }
 
-/* Заголовок */
+/* Header */
 .ew-header h1 {
   font-size: 1.8rem;
   font-weight: 700;
@@ -18,28 +18,464 @@
   font-size: 0.95rem;
 }
 
-/* Сетка карточек */
-.ew-features-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+/* Tabs */
+.ew-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--color-panel);
+  border-radius: 14px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.ew-feature-card {
+.ew-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-tab:hover {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ew-tab.active {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+  font-weight: 600;
+}
+
+/* Tab content */
+.ew-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ew-loading {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 40px;
+  font-size: 0.95rem;
+}
+
+/* ─── Codes Tab ─── */
+
+.ew-codes-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ew-search-form {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ew-search-icon {
+  position: absolute;
+  left: 14px;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.ew-search-input {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 36px 10px 38px;
+  color: var(--color-white);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ew-search-input:focus {
+  border-color: rgba(255, 126, 0, 0.4);
+}
+
+.ew-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ew-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+
+.ew-search-clear:hover {
+  color: var(--color-white);
+}
+
+.ew-status-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.ew-status-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.ew-status-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ew-status-btn.active {
+  background: rgba(255, 126, 0, 0.12);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: var(--color-orange);
+}
+
+/* Table */
+.ew-table-wrap {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.ew-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ew-table thead {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ew-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ew-table td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ew-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ew-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ew-td-id {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ew-td-username {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.85rem;
+}
+
+.ew-td-date {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.ew-table-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 40px 16px !important;
+}
+
+.ew-scan-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ew-scan-badge.scanned {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.ew-qr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-qr-btn:hover {
+  background: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+  border-color: rgba(255, 126, 0, 0.3);
+}
+
+/* Pagination */
+.ew-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.ew-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-pagination button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-white);
+}
+
+.ew-pagination button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ew-pagination span {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ew-total-label {
+  margin-left: 8px;
+  color: rgba(255, 255, 255, 0.3) !important;
+  font-size: 0.82rem !important;
+}
+
+/* QR Modal */
+.ew-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.ew-qr-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  position: relative;
+  text-align: center;
+}
+
+.ew-qr-modal h3 {
+  color: var(--color-white);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.ew-qr-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+
+.ew-qr-modal-close:hover {
+  color: var(--color-white);
+}
+
+.ew-qr-image-wrap {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  display: inline-flex;
+  margin-bottom: 16px;
+}
+
+.ew-qr-image {
+  width: 280px;
+  height: 280px;
+  image-rendering: pixelated;
+}
+
+.ew-qr-hint {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+}
+
+/* ─── Stats Tab ─── */
+
+.ew-date-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.ew-preset-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ew-preset-btn.active {
+  background: rgba(255, 126, 0, 0.12);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: var(--color-orange);
+}
+
+.ew-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.ew-stat-card {
   background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   padding: 20px;
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.ew-feature-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.ew-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ew-stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-white);
+  line-height: 1;
+}
+
+.ew-stat-label {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ew-recent-header h3 {
+  color: var(--color-white);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ew-scans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.ew-scans-empty {
+  padding: 32px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.9rem;
+}
+
+.ew-scan-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.ew-scan-item:last-child {
+  border-bottom: none;
+}
+
+.ew-scan-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 126, 0, 0.1);
   color: var(--color-orange);
   display: flex;
   align-items: center;
@@ -47,20 +483,131 @@
   flex-shrink: 0;
 }
 
-.ew-feature-title {
-  font-size: 0.95rem;
-  font-weight: 600;
+.ew-scan-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ew-scan-name {
+  font-size: 0.9rem;
+  font-weight: 500;
   color: var(--color-white);
-  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ew-feature-desc {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+.ew-scan-username {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.ew-scan-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ew-prize-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ew-prize-badge.given {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.ew-scan-time {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.3);
+  white-space: nowrap;
+}
+
+/* ─── Settings Tab ─── */
+
+.ew-settings-section {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.ew-settings-section h3 {
+  color: var(--color-white);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ew-settings-desc {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.88rem;
   line-height: 1.5;
+  margin-bottom: 16px;
 }
 
-/* Главный блок — страница хостес */
+.ew-settings-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ew-settings-input {
+  width: 120px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--color-white);
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ew-settings-input:focus {
+  border-color: rgba(255, 126, 0, 0.4);
+}
+
+.ew-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-orange);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ew-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ew-save-btn.saved {
+  background: #22c55e;
+}
+
+/* ─── Hostess Card ─── */
+
 .ew-hostess-card {
   background: var(--color-panel);
   border: 1px solid rgba(255, 126, 0, 0.25);
@@ -156,7 +703,7 @@
   word-break: break-all;
 }
 
-/* Превью телефона/экрана */
+/* Phone preview */
 .ew-hostess-preview {
   flex-shrink: 0;
 }
@@ -223,11 +770,27 @@
   text-align: center;
 }
 
-
-/* Адаптив */
+/* ─── Responsive ─── */
 @media (max-width: 768px) {
-  .ew-features-grid {
-    grid-template-columns: 1fr;
+  .ew-tabs {
+    overflow-x: auto;
+  }
+
+  .ew-codes-filters {
+    flex-direction: column;
+  }
+
+  .ew-status-filters {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .ew-table-wrap {
+    overflow-x: auto;
+  }
+
+  .ew-stat-cards {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .ew-hostess-card {
@@ -237,5 +800,14 @@
 
   .ew-hostess-preview {
     align-self: center;
+  }
+
+  .ew-settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ew-settings-input {
+    width: 100%;
   }
 }
