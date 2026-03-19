@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Users, Gift, ScanLine, Calendar,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus, Trash2, UserPlus,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -25,7 +25,12 @@ function CodesTab() {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
-  const [qrModal, setQrModal] = useState(null); // userId for modal
+  const [qrModal, setQrModal] = useState(null);
+  const [generateModal, setGenerateModal] = useState(false);
+  const [genSearch, setGenSearch] = useState('');
+  const [genResults, setGenResults] = useState([]);
+  const [genLoading, setGenLoading] = useState(false);
+  const [enabling, setEnabling] = useState(null); // userId being enabled
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
@@ -53,6 +58,49 @@ function CodesTab() {
     e.preventDefault();
     setPage(0);
     setSearch(searchInput.trim());
+  };
+
+  // Generate modal: search users
+  const handleGenSearch = async (q) => {
+    setGenSearch(q);
+    if (!q.trim()) { setGenResults([]); return; }
+    setGenLoading(true);
+    try {
+      const res = await api.get(`/api/events/codes/search-users?search=${encodeURIComponent(q.trim())}`);
+      const data = await res.json();
+      setGenResults(data.users || []);
+    } catch (e) {
+      console.error('Search failed:', e);
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  // Enable QR for a user
+  const handleEnableQr = async (userId) => {
+    setEnabling(userId);
+    try {
+      await api.post(`/api/events/codes/${userId}/enable`);
+      // Update search results
+      setGenResults(prev => prev.map(u => u.userId === userId ? { ...u, hasQr: true } : u));
+      // Refresh main table
+      fetchCodes();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      setEnabling(null);
+    }
+  };
+
+  // Disable QR for a user
+  const handleDisableQr = async (userId) => {
+    if (!confirm('Отключить QR-код для этого пользователя?')) return;
+    try {
+      await api.delete(`/api/events/codes/${userId}/enable`);
+      fetchCodes();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    }
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -90,6 +138,9 @@ function CodesTab() {
             </button>
           ))}
         </div>
+        <button className="ew-generate-btn" onClick={() => { setGenerateModal(true); setGenSearch(''); setGenResults([]); }}>
+          <Plus size={16} /> Сгенерировать QR
+        </button>
       </div>
 
       {/* Table */}
@@ -102,7 +153,7 @@ function CodesTab() {
               <th>Username</th>
               <th>Сканирований</th>
               <th>Последнее</th>
-              <th>QR</th>
+              <th>Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -124,9 +175,14 @@ function CodesTab() {
                   {c.lastScanAt ? new Date(c.lastScanAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                 </td>
                 <td>
-                  <button className="ew-qr-btn" onClick={() => setQrModal(c.userId)} title="Показать QR">
-                    <Eye size={16} />
-                  </button>
+                  <div className="ew-actions-cell">
+                    <button className="ew-qr-btn" onClick={() => setQrModal(c.userId)} title="Показать QR">
+                      <Eye size={16} />
+                    </button>
+                    <button className="ew-disable-btn" onClick={() => handleDisableQr(c.userId)} title="Отключить QR">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -148,7 +204,7 @@ function CodesTab() {
         </div>
       )}
 
-      {/* QR Modal */}
+      {/* QR Preview Modal */}
       {qrModal && (
         <div className="ew-modal-overlay" onClick={() => setQrModal(null)}>
           <div className="ew-qr-modal" onClick={e => e.stopPropagation()}>
@@ -162,6 +218,59 @@ function CodesTab() {
               />
             </div>
             <p className="ew-qr-hint">Отсканируйте QR-код камерой или на странице хостес</p>
+          </div>
+        </div>
+      )}
+
+      {/* Generate QR Modal */}
+      {generateModal && (
+        <div className="ew-modal-overlay" onClick={() => setGenerateModal(false)}>
+          <div className="ew-gen-modal" onClick={e => e.stopPropagation()}>
+            <button className="ew-qr-modal-close" onClick={() => setGenerateModal(false)}><X size={20} /></button>
+            <h3><UserPlus size={20} /> Сгенерировать QR-код</h3>
+            <p className="ew-gen-desc">Найдите пользователя и включите ему QR-код для мероприятий</p>
+
+            <div className="ew-gen-search-wrap">
+              <Search size={16} className="ew-search-icon" />
+              <input
+                className="ew-search-input"
+                placeholder="Поиск по имени, ID или username..."
+                value={genSearch}
+                onChange={e => handleGenSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="ew-gen-results">
+              {genLoading ? (
+                <div className="ew-gen-empty">Поиск...</div>
+              ) : genSearch && genResults.length === 0 ? (
+                <div className="ew-gen-empty">Ничего не найдено</div>
+              ) : genResults.map(u => (
+                <div key={u.userId} className="ew-gen-item">
+                  <div className="ew-gen-item-info">
+                    <span className="ew-gen-item-name">{u.fullName}</span>
+                    <span className="ew-gen-item-meta">
+                      ID {u.userId}{u.username ? ` · @${u.username}` : ''}
+                    </span>
+                  </div>
+                  {u.hasQr ? (
+                    <span className="ew-gen-has-qr">QR активен</span>
+                  ) : (
+                    <button
+                      className="ew-gen-enable-btn"
+                      onClick={() => handleEnableQr(u.userId)}
+                      disabled={enabling === u.userId}
+                    >
+                      {enabling === u.userId ? '...' : <><Plus size={14} /> Включить QR</>}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!genSearch && (
+                <div className="ew-gen-empty">Введите имя, ID или username для поиска</div>
+              )}
+            </div>
           </div>
         </div>
       )}

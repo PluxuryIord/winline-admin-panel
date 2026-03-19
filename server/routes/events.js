@@ -75,6 +75,61 @@ router.get('/codes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── GET /api/events/codes/search-users — поиск пользователей без QR ────────
+
+router.get('/codes/search-users', async (req, res, next) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const showAll = req.query.all === '1'; // если all=1, показать и с QR
+    if (!search) return res.json({ users: [] });
+
+    const like = `%${search}%`;
+    let where = showAll
+      ? 'WHERE (u.full_name LIKE ? OR u.username LIKE ? OR u.user_id LIKE ?)'
+      : 'WHERE u.show_qr = 0 AND (u.full_name LIKE ? OR u.username LIKE ? OR u.user_id LIKE ?)';
+
+    const [rows] = await dbPool.query(`
+      SELECT u.user_id, u.full_name, u.rl_full_name, u.username, u.show_qr
+      FROM users u
+      ${where}
+      ORDER BY u.date_reg DESC
+      LIMIT 20
+    `, [like, like, like]);
+
+    const users = rows.map(r => ({
+      userId: r.user_id,
+      fullName: r.rl_full_name || r.full_name || '—',
+      username: r.username || null,
+      hasQr: !!r.show_qr,
+    }));
+
+    res.json({ users });
+  } catch (err) { next(err); }
+});
+
+// ─── POST /api/events/codes/:userId/enable — включить QR для пользователя ───
+
+router.post('/codes/:userId/enable', async (req, res, next) => {
+  try {
+    const uid = Number(req.params.userId);
+    const [users] = await dbPool.query('SELECT user_id, show_qr FROM users WHERE user_id = ?', [uid]);
+    if (!users.length) return res.status(404).json({ error: 'User not found' });
+
+    await dbPool.query('UPDATE users SET show_qr = 1 WHERE user_id = ?', [uid]);
+    res.json({ ok: true, userId: uid, show_qr: 1 });
+  } catch (err) { next(err); }
+});
+
+// ─── DELETE /api/events/codes/:userId/enable — отключить QR для пользователя ─
+
+router.delete('/codes/:userId/enable', async (req, res, next) => {
+  try {
+    const uid = Number(req.params.userId);
+    await dbPool.query('UPDATE users SET show_qr = 0 WHERE user_id = ?', [uid]);
+    res.json({ ok: true, userId: uid, show_qr: 0 });
+  } catch (err) { next(err); }
+});
+
 // ─── GET /api/events/codes/:userId/qr — генерация QR-кода PNG ──────────────
 
 router.get('/codes/:userId/qr', async (req, res, next) => {
