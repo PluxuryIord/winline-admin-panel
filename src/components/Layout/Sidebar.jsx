@@ -10,7 +10,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
   return (
     <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
       <div className="logo-area">
-        <h2>Winline <span>Admin</span></h2>
+        <img src="/logo.svg" alt="Winline Partners" className="sidebar-logo" />
         <button className="mobile-close-btn" onClick={closeMobileMenu}>
           <X size={24} />
         </button>

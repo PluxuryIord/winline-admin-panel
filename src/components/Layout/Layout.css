@@ -27,14 +27,20 @@
 
 .logo-area h2 {
   font-size: 1.4rem;
-  font-weight: 800; /* Жирный шрифт как у спортивных брендов */
+  font-weight: 800;
   color: var(--color-white);
-  text-transform: uppercase; /* Делаем все буквы заглавными */
+  text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .logo-area span {
-  color: var(--color-orange); /* Фирменный оранжевый акцент */
+  color: var(--color-orange);
+}
+
+.sidebar-logo {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
 }
 
 /* --- МЕНЮ --- */
