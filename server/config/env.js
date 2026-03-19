@@ -33,3 +33,6 @@ export const S3_ENDPOINT = process.env.S3_ENDPOINT || projectEnv.S3_ENDPOINT || 
 export const S3_BUCKET = process.env.S3_BUCKET || projectEnv.S3_BUCKET || '';
 export const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || projectEnv.S3_ACCESS_KEY || '';
 export const S3_SECRET_KEY = process.env.S3_SECRET_KEY || projectEnv.S3_SECRET_KEY || '';
+
+// Telegram admin chat ID for getting file_id (bot sends photo here and deletes it)
+export const TG_ADMIN_CHAT_ID = process.env.TG_ADMIN_CHAT_ID || projectEnv.TG_ADMIN_CHAT_ID || '';

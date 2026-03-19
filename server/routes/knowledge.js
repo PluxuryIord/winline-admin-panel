@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import dbPool from '../config/db.js';
-import { BOT_TOKEN } from '../config/env.js';
+import { BOT_TOKEN, TG_ADMIN_CHAT_ID } from '../config/env.js';
 import { uploadToS3 } from '../services/s3.js';
 
 const router = Router();
@@ -99,28 +99,30 @@ router.post('/photo/:photoKey', upload.single('photo'), async (req, res, next) =
     // 1. Upload to S3
     const { url: s3Url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype, 'knowledge');
 
-    // 2. Send to Telegram to get file_id
+    // 2. Send to Telegram to get file_id (send to admin, get file_id, delete message)
     let fileId = null;
-    if (BOT_TOKEN) {
+    if (BOT_TOKEN && TG_ADMIN_CHAT_ID) {
       try {
         const form = new FormData();
-        // Send to "Saved Messages" of the bot (chat_id = bot's own id)
-        const meRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
-        const meData = await meRes.json();
-        const botId = meData.result?.id;
-        if (botId) {
-          form.set('chat_id', String(botId));
-          const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
-          form.set('photo', new File([blob], req.file.originalname, { type: req.file.mimetype }));
-          const sendRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-            method: 'POST', body: form,
-          });
-          const sendData = await sendRes.json();
-          if (sendData.ok && sendData.result?.photo?.length) {
-            // Take the largest photo size
-            const photos = sendData.result.photo;
-            fileId = photos[photos.length - 1].file_id;
-          }
+        form.set('chat_id', TG_ADMIN_CHAT_ID);
+        const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        form.set('photo', new File([blob], req.file.originalname, { type: req.file.mimetype }));
+        form.set('disable_notification', 'true');
+        const sendRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+          method: 'POST', body: form,
+        });
+        const sendData = await sendRes.json();
+        console.log('[knowledge] sendPhoto result:', JSON.stringify(sendData).slice(0, 300));
+        if (sendData.ok && sendData.result?.photo?.length) {
+          const photos = sendData.result.photo;
+          fileId = photos[photos.length - 1].file_id;
+          // Delete the message so admin doesn't see it
+          const msgId = sendData.result.message_id;
+          fetch(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: TG_ADMIN_CHAT_ID, message_id: msgId }),
+          }).catch(() => {});
         }
       } catch (e) {
         console.warn('[knowledge] Failed to get Telegram file_id:', e.message);
