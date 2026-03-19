@@ -205,6 +205,17 @@ router.post('/photo/:photoKey', upload.single('photo'), async (req, res, next) =
 
     if (fileId) data[photoKey] = fileId;
     data[`${photoKey}_s3`] = s3Url;
+
+    // Also write to legacy photo keys so the bot can find them
+    // e.g. download_report_photo → report_photo, download_report_2_photo → report_photo_2
+    for (const [topicKey, legacyKey] of Object.entries(LEGACY_PHOTO_MAP)) {
+      const modernKey = `${topicKey}_photo`;
+      if (photoKey === modernKey && legacyKey !== modernKey) {
+        if (fileId) data[legacyKey] = fileId;
+        data[`${legacyKey}_s3`] = s3Url;
+      }
+    }
+
     await saveKB(data, dbId);
 
     res.json({ ok: true, photoKey, fileId, s3Url });
@@ -220,6 +231,16 @@ router.delete('/photo/:photoKey', async (req, res, next) => {
 
     delete data[photoKey];
     delete data[`${photoKey}_s3`];
+
+    // Also delete legacy photo keys
+    for (const [topicKey, legacyKey] of Object.entries(LEGACY_PHOTO_MAP)) {
+      const modernKey = `${topicKey}_photo`;
+      if (photoKey === modernKey && legacyKey !== modernKey) {
+        delete data[legacyKey];
+        delete data[`${legacyKey}_s3`];
+      }
+    }
+
     await saveKB(data, dbId);
 
     res.json({ ok: true, photoKey, deleted: true });
