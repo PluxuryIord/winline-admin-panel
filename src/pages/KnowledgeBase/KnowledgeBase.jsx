@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X
+  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './KnowledgeBase.css';
@@ -13,6 +13,8 @@ export default function KnowledgeBase() {
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.get('/api/knowledge')
@@ -52,15 +54,74 @@ export default function KnowledgeBase() {
     setEditContent('');
   };
 
+  /** Get photo display URL — prefer S3, fallback to proxy */
+  function getPhotoSrc(article) {
+    if (article.photoS3Url) return article.photoS3Url;
+    if (article.photoFileId) return `/api/knowledge/photo/${article.photoFileId}`;
+    return null;
+  }
+
+  /** Upload new photo for current article */
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !active?.photoKey) return;
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setArticles(prev => prev.map(a => {
+          if (a.key !== active.key) return a;
+          return {
+            ...a,
+            photoFileId: data.fileId || a.photoFileId,
+            photoS3Url: data.s3Url || a.photoS3Url,
+          };
+        }));
+      } else {
+        alert('Ошибка загрузки: ' + (data.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка загрузки: ' + err.message);
+    }
+    setUploadingPhoto(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  /** Delete photo from current article */
+  const handlePhotoDelete = async () => {
+    if (!active?.photoKey || !active?.photoFileId) return;
+    if (!confirm('Удалить фото из статьи?')) return;
+    try {
+      const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setArticles(prev => prev.map(a => {
+          if (a.key !== active.key) return a;
+          return { ...a, photoFileId: null, photoS3Url: null };
+        }));
+      }
+    } catch (err) {
+      alert('Ошибка удаления: ' + err.message);
+    }
+  };
+
   /** Telegram HTML → безопасный HTML для отображения. \n → <br> */
   function tgHtmlToDisplay(text) {
     if (!text) return '';
-    // Заменяем \n на <br>, убираем опасные теги
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      // Восстанавливаем разрешённые теги
       .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
       .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
       .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>')
@@ -81,6 +142,8 @@ export default function KnowledgeBase() {
     );
   }
 
+  const photoSrc = active ? getPhotoSrc(active) : null;
+
   return (
     <div className="kb-container">
 
@@ -99,7 +162,7 @@ export default function KnowledgeBase() {
             >
               <FileText size={16} />
               <span style={{ flex: 1 }}>{article.title}</span>
-              {article.photoFileId && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
+              {(article.photoFileId || article.photoS3Url) && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
             </div>
           ))}
         </div>
@@ -132,14 +195,59 @@ export default function KnowledgeBase() {
             </div>
 
             {/* Фото статьи */}
-            {active.photoFileId && !isEditing && (
+            {active.photoKey && (
               <div className="kb-article-photo">
-                <img
-                  src={`/api/knowledge/photo/${active.photoFileId}`}
-                  alt=""
-                  onClick={(e) => setLightboxSrc(e.target.src)}
-                  style={{ cursor: 'pointer', maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', marginBottom: '16px' }}
-                />
+                {photoSrc ? (
+                  <div className="kb-photo-wrapper">
+                    <img
+                      src={photoSrc}
+                      alt=""
+                      onClick={(e) => !isEditing && setLightboxSrc(e.target.src)}
+                      style={{ cursor: isEditing ? 'default' : 'pointer', maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                    />
+                    {isEditing && (
+                      <div className="kb-photo-actions">
+                        <label className="kb-photo-action-btn">
+                          <Upload size={14} /> Заменить
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handlePhotoUpload}
+                          />
+                        </label>
+                        <button className="kb-photo-action-btn kb-photo-delete-btn" onClick={handlePhotoDelete}>
+                          <Trash2 size={14} /> Удалить
+                        </button>
+                      </div>
+                    )}
+                    {uploadingPhoto && (
+                      <div className="kb-photo-uploading">
+                        <Loader size={20} className="spin" /> Загрузка...
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  isEditing && (
+                    <label className="kb-photo-upload-empty">
+                      <Upload size={24} />
+                      <span>Загрузить фото</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handlePhotoUpload}
+                      />
+                      {uploadingPhoto && (
+                        <div className="kb-photo-uploading">
+                          <Loader size={20} className="spin" /> Загрузка...
+                        </div>
+                      )}
+                    </label>
+                  )
+                )}
               </div>
             )}
 

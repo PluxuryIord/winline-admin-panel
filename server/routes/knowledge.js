@@ -1,8 +1,11 @@
 import { Router } from 'express';
+import multer from 'multer';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN } from '../config/env.js';
+import { uploadToS3 } from '../services/s3.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 // Маппинг ключей статей → человекочитаемые названия
 const ARTICLE_TITLES = {
@@ -53,12 +56,14 @@ router.get('/', async (req, res, next) => {
       if (data[key] === undefined) continue;
       const photoKey = PHOTO_MAP[key] || null;
       const photoFileId = photoKey ? (data[photoKey] || null) : null;
+      const photoS3Url = photoKey ? (data[`${photoKey}_s3`] || null) : null;
       articles.push({
         key,
         title: ARTICLE_TITLES[key] || key,
         content: data[key] || '',
         photoKey,
         photoFileId,
+        photoS3Url,
       });
     }
 
@@ -78,6 +83,72 @@ router.get('/photo/:fileId', async (req, res, next) => {
     res.set('Cache-Control', 'public, max-age=86400');
     const buffer = Buffer.from(await fileRes.arrayBuffer());
     res.send(buffer);
+  } catch (err) { next(err); }
+});
+
+// POST /api/knowledge/photo/:photoKey — загрузить/заменить фото статьи
+router.post('/photo/:photoKey', upload.single('photo'), async (req, res, next) => {
+  try {
+    const { photoKey } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    // 1. Upload to S3
+    const { url: s3Url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype, 'knowledge');
+
+    // 2. Send to Telegram to get file_id
+    let fileId = null;
+    if (BOT_TOKEN) {
+      try {
+        const form = new FormData();
+        // Send to "Saved Messages" of the bot (chat_id = bot's own id)
+        const meRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
+        const meData = await meRes.json();
+        const botId = meData.result?.id;
+        if (botId) {
+          form.set('chat_id', String(botId));
+          const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+          form.set('photo', new File([blob], req.file.originalname, { type: req.file.mimetype }));
+          const sendRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            method: 'POST', body: form,
+          });
+          const sendData = await sendRes.json();
+          if (sendData.ok && sendData.result?.photo?.length) {
+            // Take the largest photo size
+            const photos = sendData.result.photo;
+            fileId = photos[photos.length - 1].file_id;
+          }
+        }
+      } catch (e) {
+        console.warn('[knowledge] Failed to get Telegram file_id:', e.message);
+      }
+    }
+
+    // 3. Update DB — store file_id and s3_url
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+    if (!rows.length) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    if (fileId) data[photoKey] = fileId;
+    data[`${photoKey}_s3`] = s3Url;
+    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
+
+    res.json({ ok: true, photoKey, fileId, s3Url });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/knowledge/photo/:photoKey — удалить фото статьи
+router.delete('/photo/:photoKey', async (req, res, next) => {
+  try {
+    const { photoKey } = req.params;
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+    if (!rows.length) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    delete data[photoKey];
+    delete data[`${photoKey}_s3`];
+    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
+
+    res.json({ ok: true, photoKey, deleted: true });
   } catch (err) { next(err); }
 });
 
