@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2
+  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2,
+  Plus, MoreHorizontal, Pencil
 } from 'lucide-react';
 import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
@@ -16,17 +17,44 @@ export default function KnowledgeBase() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
+  // Modals
+  const [createModal, setCreateModal] = useState(false);
+  const [createTitle, setCreateTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const [deleteModal, setDeleteModal] = useState(null); // { key, title } or null
+  const [deleting, setDeleting] = useState(false);
+
+  const [renameModal, setRenameModal] = useState(null); // { key, title } or null
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
+  // Kebab menu
+  const [openMenu, setOpenMenu] = useState(null); // key of open menu
+
+  const fetchArticles = () => {
     api.get('/api/knowledge')
       .then(res => res.json())
       .then(data => {
         const list = data.articles || [];
         setArticles(list);
-        if (list.length > 0) setActiveKey(list[0].key);
+        if (list.length > 0 && !list.find(a => a.key === activeKey)) {
+          setActiveKey(list[0].key);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchArticles(); }, []);
+
+  // Close kebab menu on click outside
+  useEffect(() => {
+    if (!openMenu) return;
+    const handler = () => setOpenMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [openMenu]);
 
   const active = articles.find(a => a.key === activeKey);
 
@@ -113,7 +141,72 @@ export default function KnowledgeBase() {
     }
   };
 
-  /** Telegram HTML → безопасный HTML для отображения. \n → <br> */
+  /** Create new topic */
+  const handleCreate = async () => {
+    if (!createTitle.trim()) return;
+    setCreating(true);
+    try {
+      const res = await api.post('/api/knowledge', { title: createTitle.trim() });
+      const result = await res.json();
+      if (result.ok) {
+        setCreateModal(false);
+        setCreateTitle('');
+        fetchArticles();
+        setActiveKey(result.key);
+        setIsEditing(false);
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка создания: ' + err.message);
+    }
+    setCreating(false);
+  };
+
+  /** Delete topic */
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/knowledge/${deleteModal.key}`);
+      const result = await res.json();
+      if (result.ok) {
+        setDeleteModal(null);
+        if (activeKey === deleteModal.key) setActiveKey(null);
+        setIsEditing(false);
+        fetchArticles();
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка удаления: ' + err.message);
+    }
+    setDeleting(false);
+  };
+
+  /** Rename topic */
+  const handleRename = async () => {
+    if (!renameModal || !renameTitle.trim()) return;
+    setRenaming(true);
+    try {
+      const res = await api.put(`/api/knowledge/${renameModal.key}/title`, { title: renameTitle.trim() });
+      const result = await res.json();
+      if (result.ok) {
+        setArticles(prev => prev.map(a =>
+          a.key === renameModal.key ? { ...a, title: renameTitle.trim() } : a
+        ));
+        setRenameModal(null);
+        setRenameTitle('');
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка переименования: ' + err.message);
+    }
+    setRenaming(false);
+  };
+
+  /** Telegram HTML → safe display HTML */
   function tgHtmlToDisplay(text) {
     if (!text) return '';
     return text
@@ -145,10 +238,13 @@ export default function KnowledgeBase() {
   return (
     <div className="kb-container">
 
-      {/* ЛЕВАЯ КОЛОНКА — список статей */}
+      {/* LEFT SIDEBAR */}
       <div className="kb-sidebar">
         <div className="kb-sidebar-header">
           <h3><BookOpen size={18} /> База знаний</h3>
+          <button className="add-topic-btn" onClick={() => { setCreateModal(true); setCreateTitle(''); }} title="Добавить тему">
+            <Plus size={18} />
+          </button>
         </div>
 
         <div className="kb-topic-list">
@@ -161,12 +257,50 @@ export default function KnowledgeBase() {
               <FileText size={16} />
               <span style={{ flex: 1 }}>{article.title}</span>
               {(article.photoFileId || article.photoS3Url) && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
+
+              {/* Kebab menu */}
+              <div className="kb-item-menu-wrapper" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className={`kb-item-menu-btn ${openMenu === article.key ? 'open' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenu(openMenu === article.key ? null : article.key);
+                  }}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {openMenu === article.key && (
+                  <div className="kb-item-menu-dropdown">
+                    <button
+                      className="kb-item-menu-item"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        setRenameModal({ key: article.key, title: article.title });
+                        setRenameTitle(article.title);
+                      }}
+                    >
+                      <Pencil size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                      Переименовать
+                    </button>
+                    <button
+                      className="kb-item-menu-item danger"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        setDeleteModal({ key: article.key, title: article.title });
+                      }}
+                    >
+                      <Trash2 size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                      Удалить
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ПРАВАЯ КОЛОНКА — содержимое */}
+      {/* RIGHT CONTENT */}
       <div className="kb-content">
         {active ? (
           <>
@@ -192,7 +326,7 @@ export default function KnowledgeBase() {
               </div>
             </div>
 
-            {/* Фото статьи */}
+            {/* Photo section */}
             {active.photoKey && (
               <div className="kb-article-photo">
                 {photoSrc ? (
@@ -276,9 +410,73 @@ export default function KnowledgeBase() {
         )}
       </div>
 
+      {/* Lightbox */}
       {lightboxSrc && (
         <div className="kb-lightbox" onClick={() => setLightboxSrc(null)}>
           <img src={lightboxSrc} alt="" className="kb-lightbox-img" />
+        </div>
+      )}
+
+      {/* Create topic modal */}
+      {createModal && (
+        <div className="prompt-overlay" onClick={() => setCreateModal(false)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Новая тема</div>
+            <input
+              className="prompt-input"
+              placeholder="Название темы"
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              autoFocus
+            />
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setCreateModal(false)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-ok" onClick={handleCreate} disabled={creating || !createTitle.trim()}>
+                {creating ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete topic modal */}
+      {deleteModal && (
+        <div className="prompt-overlay" onClick={() => setDeleteModal(null)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Удалить тему</div>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', margin: 0 }}>
+              Тема <b>"{deleteModal.title}"</b> будет удалена вместе с фото. Это действие нельзя отменить.
+            </p>
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setDeleteModal(null)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Удаление...' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename topic modal */}
+      {renameModal && (
+        <div className="prompt-overlay" onClick={() => setRenameModal(null)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Переименовать тему</div>
+            <input
+              className="prompt-input"
+              value={renameTitle}
+              onChange={(e) => setRenameTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              autoFocus
+            />
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setRenameModal(null)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-ok" onClick={handleRename} disabled={renaming || !renameTitle.trim()}>
+                {renaming ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
