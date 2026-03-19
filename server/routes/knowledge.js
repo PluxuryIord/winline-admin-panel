@@ -75,11 +75,11 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/knowledge/photo/:fileId — proxy для фото из Telegram (чтобы не палить BOT_TOKEN на фронте)
-router.get('/photo/:fileId', async (req, res, next) => {
+// Экспортируем отдельно для публичного маршрута в app.js
+export async function knowledgePhotoProxy(req, res, next) {
   try {
     const url = await getPhotoUrl(req.params.fileId);
     if (!url) return res.status(404).json({ error: 'Photo not found' });
-    // Проксируем файл
     const fileRes = await fetch(url);
     if (!fileRes.ok) return res.status(404).json({ error: 'Photo not found' });
     res.set('Content-Type', fileRes.headers.get('content-type') || 'image/jpeg');
@@ -87,7 +87,8 @@ router.get('/photo/:fileId', async (req, res, next) => {
     const buffer = Buffer.from(await fileRes.arrayBuffer());
     res.send(buffer);
   } catch (err) { next(err); }
-});
+}
+router.get('/photo/:fileId', knowledgePhotoProxy);
 
 // POST /api/knowledge/photo/:photoKey — загрузить/заменить фото статьи
 router.post('/photo/:photoKey', upload.single('photo'), async (req, res, next) => {

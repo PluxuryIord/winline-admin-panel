@@ -31,6 +31,10 @@ app.use('/api/auth', authRouter);
 app.use('/api/chats/webhook', webhookRouter);
 app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
 
+// Публичный прокси фото KB (img src не может передать Bearer токен)
+import { knowledgePhotoProxy } from './routes/knowledge.js';
+app.get('/api/knowledge/photo/:fileId', knowledgePhotoProxy);
+
 // Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
 if (JWT_SECRET) {
   app.use('/api', authMiddleware);
