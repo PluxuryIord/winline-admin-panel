@@ -10,9 +10,8 @@ const router = Router();
 let migrated = false;
 async function ensureTables() {
   if (migrated) return;
-  migrated = true;
   try {
-    // Create event_codes table if not exists
+    // 1. Create event_codes table if not exists
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS wl_admin_event_codes (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,43 +22,58 @@ async function ensureTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 
-    // Check if event_scans has 'code' column
-    const [cols] = await dbPool.query(`
-      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans' AND COLUMN_NAME = 'code'
+    // 2. event_scans — проверяем существование таблицы
+    const [tableExists] = await dbPool.query(`
+      SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans'
     `);
 
-    if (!cols.length) {
-      // Old schema has user_id — add 'code' column, copy data, drop user_id
-      const [tableExists] = await dbPool.query(`
-        SELECT 1 FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans'
+    if (!tableExists.length) {
+      // Таблицы нет — создаём с новой схемой
+      await dbPool.query(`
+        CREATE TABLE wl_admin_event_scans (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          code VARCHAR(100) NOT NULL,
+          scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          prize_given BOOLEAN DEFAULT TRUE,
+          INDEX idx_code (code),
+          INDEX idx_scanned_at (scanned_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
       `);
-
-      if (tableExists.length) {
-        // Table exists but without 'code' column — alter it
+      console.log('[events] Created wl_admin_event_scans table');
+    } else {
+      // Таблица есть — проверяем колонку code (идемпотентно)
+      const [cols] = await dbPool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans' AND COLUMN_NAME = 'code'
+      `);
+      if (!cols.length) {
         await dbPool.query(`ALTER TABLE wl_admin_event_scans ADD COLUMN code VARCHAR(100) NOT NULL DEFAULT '' AFTER id`);
-        await dbPool.query(`UPDATE wl_admin_event_scans SET code = CAST(user_id AS CHAR) WHERE code = ''`);
-        await dbPool.query(`ALTER TABLE wl_admin_event_scans ADD INDEX idx_code (code)`);
-        console.log('[events] Migrated wl_admin_event_scans: added code column');
-      } else {
-        // Table doesn't exist at all — create with new schema
-        await dbPool.query(`
-          CREATE TABLE wl_admin_event_scans (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            code VARCHAR(100) NOT NULL,
-            scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            prize_given BOOLEAN DEFAULT TRUE,
-            INDEX idx_code (code),
-            INDEX idx_scanned_at (scanned_at)
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        // Скопировать user_id → code если есть колонка user_id
+        const [hasUserId] = await dbPool.query(`
+          SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans' AND COLUMN_NAME = 'user_id'
         `);
-        console.log('[events] Created wl_admin_event_scans table');
+        if (hasUserId.length) {
+          await dbPool.query(`UPDATE wl_admin_event_scans SET code = CAST(user_id AS CHAR) WHERE code = ''`);
+        }
+        console.log('[events] Added code column to wl_admin_event_scans');
+      }
+      // Индекс — проверяем перед добавлением
+      const [idxExists] = await dbPool.query(`
+        SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans' AND INDEX_NAME = 'idx_code'
+      `);
+      if (!idxExists.length) {
+        await dbPool.query(`ALTER TABLE wl_admin_event_scans ADD INDEX idx_code (code)`);
       }
     }
+
+    migrated = true;
+    console.log('[events] Tables ready');
   } catch (e) {
     console.error('[events] Migration error:', e.message);
-    migrated = false; // retry next time
+    // НЕ ставим migrated = true, но и не крашим сервер
   }
 }
 

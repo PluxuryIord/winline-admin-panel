@@ -25,6 +25,11 @@ app.use(express.json({ limit: '5mb' }));
 // Статика для загруженных файлов
 app.use('/uploads', express.static(uploadsDir));
 
+// === Health check (всегда доступен, без JWT) ===
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime(), ts: new Date().toISOString() });
+});
+
 // === API Роуты ===
 
 // Публичные маршруты (без JWT)
