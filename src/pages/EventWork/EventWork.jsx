@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Users, Gift, ScanLine, Calendar,
-  ChevronLeft, ChevronRight, Plus, Trash2,
+  ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
+  ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -25,11 +26,7 @@ function CodesTab() {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
-  const [qrModal, setQrModal] = useState(null); // code string for modal
-  const [generateModal, setGenerateModal] = useState(false);
-  const [genCount, setGenCount] = useState(1);
-  const [genLabel, setGenLabel] = useState('');
-  const [generating, setGenerating] = useState(false);
+  const [qrModal, setQrModal] = useState(null);
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
@@ -59,33 +56,20 @@ function CodesTab() {
     setSearch(searchInput.trim());
   };
 
-  // Generate codes
-  const handleGenerate = async () => {
-    setGenerating(true);
+  const handleToggleStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'used' : 'active';
     try {
-      const res = await api.post('/api/events/codes/generate', {
-        count: Number(genCount) || 1,
-        label: genLabel.trim(),
+      await fetch(`/api/events/codes/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (data.ok) {
-        setGenerateModal(false);
-        setGenCount(1);
-        setGenLabel('');
-        fetchCodes();
-        // If generated 1 code, immediately show its QR
-        if (data.codes?.length === 1) {
-          setQrModal(data.codes[0]);
-        }
-      }
+      fetchCodes();
     } catch (e) {
-      alert('Ошибка генерации: ' + e.message);
-    } finally {
-      setGenerating(false);
+      alert('Ошибка: ' + e.message);
     }
   };
 
-  // Delete code
   const handleDelete = async (id) => {
     if (!confirm('Удалить этот QR-код?')) return;
     try {
@@ -100,13 +84,19 @@ function CodesTab() {
 
   return (
     <div className="ew-tab-content">
+      {/* Info banner */}
+      <div className="ew-info-banner">
+        <Info size={16} />
+        <span>Коды создаются автоматически когда пользователь нажимает «Я на мероприятии» в боте</span>
+      </div>
+
       {/* Filters row */}
       <div className="ew-codes-filters">
         <form className="ew-search-form" onSubmit={handleSearch}>
           <Search size={16} className="ew-search-icon" />
           <input
             className="ew-search-input"
-            placeholder="Поиск по коду или подписи..."
+            placeholder="Поиск по коду, имени или username..."
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
           />
@@ -119,8 +109,8 @@ function CodesTab() {
         <div className="ew-status-filters">
           {[
             { value: '', label: 'Все' },
-            { value: 'scanned', label: 'Отсканированные' },
-            { value: 'not_scanned', label: 'Не отсканированные' },
+            { value: 'active', label: 'Активные' },
+            { value: 'used', label: 'Использованные' },
           ].map(f => (
             <button
               key={f.value}
@@ -131,8 +121,8 @@ function CodesTab() {
             </button>
           ))}
         </div>
-        <button className="ew-generate-btn" onClick={() => setGenerateModal(true)}>
-          <Plus size={16} /> Сгенерировать
+        <button className="ew-refresh-btn" onClick={fetchCodes} title="Обновить">
+          <RefreshCw size={16} />
         </button>
       </div>
 
@@ -142,10 +132,10 @@ function CodesTab() {
           <thead>
             <tr>
               <th>Код</th>
-              <th>Подпись</th>
+              <th>Пользователь</th>
+              <th>Статус</th>
               <th>Создан</th>
-              <th>Сканирований</th>
-              <th>Последнее</th>
+              <th>Использован</th>
               <th>Действия</th>
             </tr>
           </thead>
@@ -153,26 +143,38 @@ function CodesTab() {
             {loading ? (
               <tr><td colSpan={6} className="ew-table-empty">Загрузка...</td></tr>
             ) : codes.length === 0 ? (
-              <tr><td colSpan={6} className="ew-table-empty">Нет QR-кодов. Нажмите «Сгенерировать» чтобы создать.</td></tr>
+              <tr><td colSpan={6} className="ew-table-empty">Нет QR-кодов. Коды появятся когда пользователи нажмут «Я на мероприятии» в боте.</td></tr>
             ) : codes.map(c => (
               <tr key={c.id}>
                 <td className="ew-td-code">{c.code}</td>
-                <td>{c.label || '—'}</td>
-                <td className="ew-td-date">
-                  {c.createdAt ? new Date(c.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                <td>
+                  <div className="ew-user-cell">
+                    <span className="ew-user-name">{c.userName || c.label || '—'}</span>
+                    {c.username && <span className="ew-user-username">@{c.username}</span>}
+                  </div>
                 </td>
                 <td>
-                  <span className={`ew-scan-badge ${c.scanCount > 0 ? 'scanned' : ''}`}>
-                    {c.scanCount}
+                  <span className={`ew-status-badge ${c.status}`}>
+                    {c.status === 'used' ? 'Использован' : 'Активный'}
                   </span>
                 </td>
                 <td className="ew-td-date">
-                  {c.lastScanAt ? new Date(c.lastScanAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  {c.createdAt ? new Date(c.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                </td>
+                <td className="ew-td-date">
+                  {c.usedAt ? new Date(c.usedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                 </td>
                 <td>
                   <div className="ew-actions-cell">
                     <button className="ew-qr-btn" onClick={() => setQrModal(c.code)} title="Показать QR">
                       <Eye size={16} />
+                    </button>
+                    <button
+                      className={`ew-toggle-status-btn ${c.status}`}
+                      onClick={() => handleToggleStatus(c.id, c.status)}
+                      title={c.status === 'active' ? 'Пометить использованным' : 'Активировать'}
+                    >
+                      <RefreshCw size={14} />
                     </button>
                     <button className="ew-disable-btn" onClick={() => handleDelete(c.id)} title="Удалить">
                       <Trash2 size={14} />
@@ -213,48 +215,6 @@ function CodesTab() {
               />
             </div>
             <p className="ew-qr-hint">Отсканируйте QR-код камерой или на странице хостес</p>
-          </div>
-        </div>
-      )}
-
-      {/* Generate Modal */}
-      {generateModal && (
-        <div className="ew-modal-overlay" onClick={() => setGenerateModal(false)}>
-          <div className="ew-gen-modal" onClick={e => e.stopPropagation()}>
-            <button className="ew-qr-modal-close" onClick={() => setGenerateModal(false)}><X size={20} /></button>
-            <h3><QrCode size={20} /> Сгенерировать QR-коды</h3>
-            <p className="ew-gen-desc">Создайте уникальные QR-коды для мероприятия. Каждый код можно отсканировать на странице хостес.</p>
-
-            <div className="ew-gen-form">
-              <div className="ew-gen-field">
-                <label>Количество кодов</label>
-                <input
-                  type="number"
-                  className="ew-settings-input"
-                  value={genCount}
-                  onChange={e => setGenCount(e.target.value)}
-                  min={1}
-                  max={100}
-                />
-              </div>
-              <div className="ew-gen-field">
-                <label>Подпись (необязательно)</label>
-                <input
-                  type="text"
-                  className="ew-search-input ew-gen-label-input"
-                  placeholder="Например: Ивент 20 марта"
-                  value={genLabel}
-                  onChange={e => setGenLabel(e.target.value)}
-                />
-              </div>
-              <button
-                className="ew-generate-btn ew-gen-submit"
-                onClick={handleGenerate}
-                disabled={generating}
-              >
-                {generating ? 'Генерация...' : <><Plus size={16} /> Сгенерировать {genCount > 1 ? `${genCount} кодов` : 'код'}</>}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -320,11 +280,10 @@ function StatsTab() {
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
   const statCards = stats ? [
-    { icon: <QrCode size={20} />, label: 'Всего QR-кодов', value: stats.totalCodes },
-    { icon: <ScanLine size={20} />, label: 'Сканирований', value: stats.totalScans },
-    { icon: <Users size={20} />, label: 'Уникальных кодов', value: stats.uniqueGuests },
-    { icon: <Gift size={20} />, label: 'Призов выдано', value: stats.prizesGiven },
-    { icon: <Calendar size={20} />, label: 'Сегодня', value: stats.scansToday },
+    { icon: <QrCode size={20} />, label: 'Всего кодов', value: stats.totalCodes },
+    { icon: <Gift size={20} />, label: 'Активные', value: stats.activeCodes },
+    { icon: <ScanLine size={20} />, label: 'Использованные', value: stats.usedCodes },
+    { icon: <Calendar size={20} />, label: 'Сканирований сегодня', value: stats.scansToday },
   ] : [];
 
   return (
@@ -344,15 +303,29 @@ function StatsTab() {
       {loading ? (
         <div className="ew-loading">Загрузка...</div>
       ) : (
-        <div className="ew-stat-cards">
-          {statCards.map(s => (
-            <div key={s.label} className="ew-stat-card">
-              <div className="ew-stat-icon">{s.icon}</div>
-              <div className="ew-stat-value">{s.value}</div>
-              <div className="ew-stat-label">{s.label}</div>
+        <>
+          <div className="ew-stat-cards">
+            {statCards.map(s => (
+              <div key={s.label} className="ew-stat-card">
+                <div className="ew-stat-icon">{s.icon}</div>
+                <div className="ew-stat-value">{s.value}</div>
+                <div className="ew-stat-label">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {stats?.codeLimit > 0 && (
+            <div className="ew-limit-bar">
+              <span>Лимит кодов: {stats.totalCodes} / {stats.codeLimit}</span>
+              <div className="ew-limit-progress">
+                <div
+                  className="ew-limit-fill"
+                  style={{ width: `${Math.min(100, (stats.totalCodes / stats.codeLimit) * 100)}%` }}
+                />
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       <div className="ew-recent-header">
@@ -388,9 +361,11 @@ function StatsTab() {
 // ─── Settings Tab ──────────────────────────────────────────────────────────
 
 function SettingsTab() {
-  const [prizeLimit, setPrizeLimit] = useState(1);
+  const [eventStarts, setEventStarts] = useState(false);
+  const [codeLimit, setCodeLimit] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -398,7 +373,8 @@ function SettingsTab() {
       try {
         const res = await api.get('/api/events/settings');
         const data = await res.json();
-        setPrizeLimit(data.prize_limit ?? 1);
+        setEventStarts(!!data.event_starts);
+        setCodeLimit(data.code_limit ?? 0);
       } catch (e) {
         console.error('Failed to load settings:', e);
       } finally {
@@ -407,11 +383,24 @@ function SettingsTab() {
     })();
   }, []);
 
+  const handleToggle = async () => {
+    setToggling(true);
+    try {
+      const res = await api.put('/api/events/toggle', { enabled: !eventStarts });
+      const data = await res.json();
+      if (data.ok) setEventStarts(data.event_starts);
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      setToggling(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
     try {
-      await api.put('/api/events/settings', { prize_limit: Number(prizeLimit) });
+      await api.put('/api/events/settings', { code_limit: Number(codeLimit) });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -425,18 +414,39 @@ function SettingsTab() {
 
   return (
     <div className="ew-tab-content">
+      {/* Event toggle */}
       <div className="ew-settings-section">
-        <h3>Лимит призов</h3>
+        <h3>Мероприятие</h3>
+        <div className="ew-toggle-row">
+          <div className="ew-toggle-info">
+            <span className="ew-toggle-label">Мероприятие активно</span>
+            <span className="ew-toggle-desc">
+              Когда включено, пользователи видят кнопку «Я на мероприятии» в боте и могут получить QR-код
+            </span>
+          </div>
+          <button
+            className={`ew-toggle-switch ${eventStarts ? 'on' : ''}`}
+            onClick={handleToggle}
+            disabled={toggling}
+          >
+            {eventStarts ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Code limit */}
+      <div className="ew-settings-section">
+        <h3>Лимит QR-кодов</h3>
         <p className="ew-settings-desc">
-          Максимальное количество сканирований одного QR-кода до блокировки.
+          Максимальное количество QR-кодов на мероприятие. Когда лимит достигнут, новые коды не генерируются.
           Установите 0 для безлимита.
         </p>
         <div className="ew-settings-row">
           <input
             type="number"
             className="ew-settings-input"
-            value={prizeLimit}
-            onChange={e => setPrizeLimit(e.target.value)}
+            value={codeLimit}
+            onChange={e => setCodeLimit(e.target.value)}
             min={0}
           />
           <button

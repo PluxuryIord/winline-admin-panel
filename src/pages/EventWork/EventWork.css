@@ -885,6 +885,181 @@
   letter-spacing: 0.3px;
 }
 
+/* ─── Info banner ─── */
+.ew-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255, 126, 0, 0.08);
+  border: 1px solid rgba(255, 126, 0, 0.2);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+}
+
+.ew-info-banner svg {
+  color: var(--color-orange);
+  flex-shrink: 0;
+}
+
+/* ─── Refresh button ─── */
+.ew-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-white);
+}
+
+/* ─── User cell ─── */
+.ew-user-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ew-user-name {
+  font-size: 0.9rem;
+  color: var(--color-white);
+}
+
+.ew-user-username {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* ─── Status badge ─── */
+.ew-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ew-status-badge.active {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.ew-status-badge.used {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Toggle status button ─── */
+.ew-toggle-status-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ew-toggle-status-btn.active:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ew-toggle-status-btn.used:hover {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+/* ─── Event toggle ─── */
+.ew-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.ew-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ew-toggle-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-white);
+}
+
+.ew-toggle-desc {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ew-toggle-switch {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.2s;
+  padding: 0;
+  display: flex;
+}
+
+.ew-toggle-switch.on {
+  color: #22c55e;
+}
+
+.ew-toggle-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ─── Limit bar ─── */
+.ew-limit-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+
+.ew-limit-bar span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ew-limit-progress {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.ew-limit-fill {
+  height: 100%;
+  background: var(--color-orange);
+  border-radius: 100px;
+  transition: width 0.3s;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
   .ew-tabs {
