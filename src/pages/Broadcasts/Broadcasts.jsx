@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
-  BarChart2, HelpCircle, Check, Archive, RotateCcw
+  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -14,7 +14,7 @@ const STATUS_LABELS = {
   failed: 'Ошибка',
 };
 
-const TABS = [
+const SECTIONS = [
   { id: 'channels', label: 'Каналы', icon: Hash },
   { id: 'users', label: 'Пользователи', icon: Users },
   { id: 'groups', label: 'Группы', icon: MessageCircle },
@@ -542,33 +542,44 @@ function UsersTab({ onSendResult }) {
     setSending(false);
   };
 
+  const [showTagDD, setShowTagDD] = useState(false);
+  const tagRef = useRef(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (tagRef.current && !tagRef.current.contains(e.target)) setShowTagDD(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   return (
     <>
-      <div className="bc-section">
-        <div className="bc-section-header">
-          <h3 className="bc-section-title">
-            <Filter size={14} style={{ marginRight: 6, display: 'inline', verticalAlign: 'middle' }} />
-            Фильтры аудитории
-          </h3>
-        </div>
-
-        <div className="bc-filters-grid">
-          <div className="bc-filter-group">
-            <label className="bc-filter-label">Тег</label>
-            <select className="bc-filter-select" value={filterTag} onChange={e => setFilterTag(e.target.value)}>
-              <option value="all">Все теги</option>
-              {tags.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
+      <div className="bc-users-filters">
+        <div className="bc-tag-filter" ref={tagRef}>
+          <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
+            <Tag size={14} />
+            <span>{filterTag === 'all' ? 'Все теги' : filterTag}</span>
+            <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
+          </button>
+          {showTagDD && (
+            <div className="bc-tag-dropdown">
+              <div className={`bc-tag-option ${filterTag === 'all' ? 'active' : ''}`} onClick={() => { setFilterTag('all'); setShowTagDD(false); }}>
+                Все теги
+              </div>
+              {tags.map(t => (
+                <div key={t} className={`bc-tag-option ${filterTag === t ? 'active' : ''}`} onClick={() => { setFilterTag(t); setShowTagDD(false); }}>
+                  {t}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bc-user-count">
           <Users size={15} />
-          {countLoading ? (
-            <span>Подсчёт...</span>
-          ) : (
-            <span>Получателей: <b>{userCount ?? '—'}</b></span>
-          )}
+          {countLoading ? <span>Подсчёт...</span> : <span>Получателей: <b>{userCount ?? '—'}</b></span>}
         </div>
       </div>
 
@@ -761,7 +772,7 @@ function GroupsTab({ onSendResult }) {
 
 /* ═══ Главный компонент ═══ */
 export default function Broadcasts() {
-  const [tab, setTab] = useState('channels');
+  const [openSection, setOpenSection] = useState('channels');
   const [broadcasts, setBroadcasts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -796,6 +807,8 @@ export default function Broadcasts() {
 
   const TYPE_ICONS = { users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
+  const toggleSection = (id) => setOpenSection(prev => prev === id ? null : id);
+
   if (loading) {
     return (
       <div className="broadcasts-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -807,27 +820,27 @@ export default function Broadcasts() {
   return (
     <div className="broadcasts-container">
 
-      {/* Табы */}
-      <div className="bc-tabs">
-        {TABS.map(t => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              className={`bc-tab${tab === t.id ? ' bc-tab--active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              <Icon size={16} />
-              {t.label}
+      {/* Аккордеон секций */}
+      {SECTIONS.map(s => {
+        const Icon = s.icon;
+        const isOpen = openSection === s.id;
+        return (
+          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`}>
+            <button className="bc-accordion-header" onClick={() => toggleSection(s.id)}>
+              <Icon size={18} />
+              <span className="bc-accordion-label">{s.label}</span>
+              <ChevronDown size={18} className={`bc-accordion-chevron ${isOpen ? 'open' : ''}`} />
             </button>
-          );
-        })}
-      </div>
-
-      {/* Контент вкладки */}
-      {tab === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
-      {tab === 'users' && <UsersTab onSendResult={handleSendResult} />}
-      {tab === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+            {isOpen && (
+              <div className="bc-accordion-body">
+                {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
+                {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
+                {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* История */}
       <div className="bc-section bc-section--grow">
