@@ -211,7 +211,7 @@ router.post('/scan', scanHandler);
 
 // ─── GET /api/events/stats — статистика ─────────────────────────────────────
 
-router.get('/stats', async (req, res, next) => {
+export async function statsHandler(req, res, next) {
   try {
     const from = req.query.from || null;
     const to = req.query.to || null;
@@ -237,12 +237,12 @@ router.get('/stats', async (req, res, next) => {
       'SELECT COUNT(*) as scansToday FROM wl_admin_event_scans WHERE DATE(scanned_at) = CURDATE()'
     );
 
-    // Settings for limit info
     const settings = await getSettings();
 
     res.json({ totalCodes, activeCodes, usedCodes, scansToday, codeLimit: settings.code_limit || 0 });
   } catch (err) { next(err); }
-});
+}
+router.get('/stats', statsHandler);
 
 // ─── GET /api/events/scans — история сканирований ───────────────────────────
 

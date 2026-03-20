@@ -28,6 +28,17 @@ export default function Hostess() {
   const [cameraError, setCameraError]   = useState(null);
   const [scanning, setScanning]         = useState(false);
   const [processing, setProcessing]     = useState(false);
+  const [stats, setStats]               = useState(null);
+
+  // Fetch stats on mount and after each scan
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/events/public-stats`);
+      if (res.ok) setStats(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   const givenIds  = useRef(new Set()); // fallback for offline mode
   const inputRef  = useRef(null);
@@ -146,6 +157,7 @@ export default function Hostess() {
     }
     setScannedCount(prev => prev + 1);
     setResult(null);
+    fetchStats(); // refresh stats
   };
 
   /* ─── Result card styling ─── */
@@ -175,6 +187,30 @@ export default function Hostess() {
         </div>
         <div className="hostess-logo-subtitle">PARTNERS</div>
       </div>
+
+      {/* Mini stats */}
+      {stats && (
+        <div className="hostess-stats">
+          <div className="hostess-stat">
+            <span className="hostess-stat-value">{stats.totalCodes}</span>
+            <span className="hostess-stat-label">Выдано</span>
+          </div>
+          <div className="hostess-stat-divider" />
+          <div className="hostess-stat">
+            <span className="hostess-stat-value">{stats.usedCodes}</span>
+            <span className="hostess-stat-label">Активировано</span>
+          </div>
+          {stats.codeLimit > 0 && (
+            <>
+              <div className="hostess-stat-divider" />
+              <div className="hostess-stat">
+                <span className="hostess-stat-value">{stats.codeLimit}</span>
+                <span className="hostess-stat-label">Лимит</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Center zone */}
       <div className="hostess-center">

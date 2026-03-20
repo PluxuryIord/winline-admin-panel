@@ -41,8 +41,10 @@ app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
 import { knowledgePhotoProxy } from './routes/knowledge.js';
 app.get('/api/knowledge/photo/:fileId', knowledgePhotoProxy);
 
-// Публичный endpoint сканирования QR (хостес-страница, без JWT)
+// Публичные endpoints для хостес-страницы (без JWT)
 app.post('/api/events/scan', scanHandler);
+import { statsHandler } from './routes/events.js';
+app.get('/api/events/public-stats', statsHandler);
 
 // Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
 if (JWT_SECRET) {
