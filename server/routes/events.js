@@ -17,9 +17,19 @@ function generateCode() {
 
 async function getSettings() {
   const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'event_settings' LIMIT 1");
-  if (!rows.length) return { event_starts: false, code_limit: 0 };
-  const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-  return { event_starts: false, code_limit: 0, ...data };
+  const base = { event_starts: false, code_limit: 0 };
+  if (rows.length) {
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    Object.assign(base, data);
+  }
+  // Always read event_starts from bot's settings table (source of truth)
+  try {
+    const [botSettings] = await dbPool.query('SELECT event_starts FROM settings LIMIT 1');
+    if (botSettings.length) {
+      base.event_starts = !!botSettings[0].event_starts;
+    }
+  } catch (e) { /* settings table may not exist */ }
+  return base;
 }
 
 async function saveSettings(settings) {
