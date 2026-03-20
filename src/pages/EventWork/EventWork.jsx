@@ -30,7 +30,6 @@ function StatsBar() {
     { icon: <QrCode size={18} />, label: 'Всего кодов', value: stats.totalCodes },
     { icon: <Gift size={18} />, label: 'Активные', value: stats.activeCodes },
     { icon: <ScanLine size={18} />, label: 'Использованные', value: stats.usedCodes },
-    { icon: <Calendar size={18} />, label: 'Сегодня', value: stats.scansToday },
   ];
 
   return (
@@ -114,31 +113,6 @@ function CodesSection() {
 
   return (
     <>
-      {/* Info banner */}
-      <div className="ew-info-banner">
-        <Info size={16} />
-        <span>Коды создаются автоматически когда пользователь нажимает «Я на мероприятии» в боте</span>
-      </div>
-
-      {/* Filters */}
-      <div className="ew-codes-filters">
-        <form className="ew-search-form" onSubmit={handleSearch}>
-          <Search size={16} className="ew-search-icon" />
-          <input className="ew-search-input" placeholder="Поиск по коду, имени или username..." value={searchInput} onChange={e => setSearchInput(e.target.value)} />
-          {searchInput && (
-            <button type="button" className="ew-search-clear" onClick={() => { setSearchInput(''); setSearch(''); setPage(0); }}>
-              <X size={14} />
-            </button>
-          )}
-        </form>
-        <div className="ew-status-filters">
-          {[{ value: '', label: 'Все' }, { value: 'active', label: 'Активные' }, { value: 'used', label: 'Использованные' }].map(f => (
-            <button key={f.value} className={`ew-status-btn ${statusFilter === f.value ? 'active' : ''}`} onClick={() => { setStatusFilter(f.value); setPage(0); }}>{f.label}</button>
-          ))}
-        </div>
-        <button className="ew-refresh-btn" onClick={fetchCodes} title="Обновить"><RefreshCw size={16} /></button>
-      </div>
-
       {/* Table */}
       <div className="ew-table-wrap">
         <table className="ew-table">
