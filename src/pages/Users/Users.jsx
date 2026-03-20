@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader } from 'lucide-react';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './Users.css';
 
@@ -104,9 +104,41 @@ export default function Users() {
 
   // Все уникальные теги — загружаем с сервера
   const [allTags, setAllTags] = useState([]);
-  useEffect(() => {
+  const loadTags = useCallback(() => {
     api.get('/api/users/all-tags').then(r => r.json()).then(setAllTags).catch(() => {});
   }, []);
+  useEffect(() => { loadTags(); }, [loadTags]);
+
+  // Массовое переименование тега
+  const handleRenameTag = async (tag, e) => {
+    e.stopPropagation();
+    const newName = prompt(`Переименовать тег «${tag}» на:`, tag);
+    if (!newName || newName.trim() === tag) return;
+    try {
+      const res = await api.put('/api/users/tags/rename', { oldTag: tag, newTag: newName.trim() });
+      const data = await res.json();
+      if (data.ok) {
+        loadTags();
+        fetchUsers(0, debouncedSearch);
+        if (filterTag === tag) setFilterTag(newName.trim());
+      }
+    } catch (err) { alert('Ошибка: ' + err.message); }
+  };
+
+  // Массовое удаление тега
+  const handleDeleteTag = async (tag, e) => {
+    e.stopPropagation();
+    if (!confirm(`Удалить тег «${tag}» у всех пользователей?`)) return;
+    try {
+      const res = await api.delete(`/api/users/tags/bulk-delete?tag=${encodeURIComponent(tag)}`);
+      const data = await res.json();
+      if (data.ok) {
+        loadTags();
+        fetchUsers(0, debouncedSearch);
+        if (filterTag === tag) setFilterTag('all');
+      }
+    } catch (err) { alert('Ошибка: ' + err.message); }
+  };
 
   // Фильтрация и сортировка (клиентская, по загруженным)
   const filteredAndSortedUsers = useMemo(() => {
@@ -273,7 +305,15 @@ export default function Users() {
                     className={`tag-filter-item${filterTag === tag ? ' tag-filter-item--active' : ''}`}
                     onClick={() => { setFilterTag(tag); setShowTagDropdown(false); }}
                   >
-                    {tag}
+                    <span className="tag-filter-item-text">{tag}</span>
+                    <div className="tag-filter-actions">
+                      <button className="tag-action-btn" onClick={(e) => handleRenameTag(tag, e)} title="Переименовать">
+                        <Pencil size={12} />
+                      </button>
+                      <button className="tag-action-btn tag-action-delete" onClick={(e) => handleDeleteTag(tag, e)} title="Удалить у всех">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

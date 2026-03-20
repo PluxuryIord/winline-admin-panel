@@ -124,6 +124,38 @@ router.get('/all-tags', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PUT /api/users/tags/rename — переименовать тег у всех носителей
+router.put('/tags/rename', async (req, res, next) => {
+  try {
+    const { oldTag, newTag } = req.body;
+    if (!oldTag || !newTag) return res.status(400).json({ error: 'oldTag and newTag required' });
+    if (oldTag === newTag) return res.json({ ok: true, affected: 0 });
+
+    // Delete newTag where user already has it to avoid unique constraint violation
+    await dbPool.query(
+      `DELETE t1 FROM wl_admin_user_tags t1
+       INNER JOIN wl_admin_user_tags t2 ON t1.user_id = t2.user_id
+       WHERE t1.tag = ? AND t2.tag = ?`,
+      [newTag, oldTag]
+    );
+    const [result] = await dbPool.query(
+      'UPDATE wl_admin_user_tags SET tag = ? WHERE tag = ?',
+      [newTag, oldTag]
+    );
+    res.json({ ok: true, affected: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/users/tags/bulk-delete — удалить тег у всех носителей
+router.delete('/tags/bulk-delete', async (req, res, next) => {
+  try {
+    const tag = req.query.tag;
+    if (!tag) return res.status(400).json({ error: 'tag query param required' });
+    const [result] = await dbPool.query('DELETE FROM wl_admin_user_tags WHERE tag = ?', [tag]);
+    res.json({ ok: true, deleted: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
 // GET /api/users/:id
 router.get('/:id', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });

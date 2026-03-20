@@ -139,6 +139,10 @@
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .tag-filter-item:hover {
@@ -150,6 +154,47 @@
   background-color: rgba(255, 126, 0, 0.15);
   color: var(--color-orange);
   font-weight: 600;
+}
+
+.tag-filter-item-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-filter-actions {
+  display: none;
+  gap: 2px;
+  align-items: center;
+}
+
+.tag-filter-item:hover .tag-filter-actions {
+  display: flex;
+}
+
+.tag-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.tag-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-white);
+}
+
+.tag-action-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 /* --- КНОПКИ СОРТИРОВКИ --- */
