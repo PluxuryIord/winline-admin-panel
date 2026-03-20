@@ -84,6 +84,24 @@
   position: relative;
 }
 
+/* Unread indicator */
+.chat-item--unread {
+  border-color: rgba(255, 126, 0, 0.25);
+}
+
+.chat-item--unread::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-orange);
+  box-shadow: 0 0 8px rgba(255, 126, 0, 0.5);
+}
+
 .chat-item:hover {
   border-color: rgba(255, 126, 0, 0.3);
   background-color: rgba(255, 126, 0, 0.04);

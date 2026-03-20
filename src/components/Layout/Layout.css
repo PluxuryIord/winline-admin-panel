@@ -108,6 +108,22 @@
 }
 
 
+/* --- ИНДИКАТОР НЕПРОЧИТАННЫХ --- */
+.menu-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-orange);
+  margin-left: auto;
+  flex-shrink: 0;
+  animation: unread-pulse 2s ease-in-out infinite;
+}
+
+@keyframes unread-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* --- ПРОФИЛЬ АДМИНА --- */
 .admin-profile {
   /* margin-top: auto — это магия Flexbox. Она заставляет этот блок 

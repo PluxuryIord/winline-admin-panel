@@ -4,9 +4,11 @@ import {
   Database, BarChart, Calendar, LogOut, X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useUnread } from '../../contexts/UnreadContext.jsx';
 
 export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
   const { user, logout } = useAuth();
+  const { hasUnread } = useUnread();
   return (
     <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
       <div className="logo-area">
@@ -36,6 +38,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
               {item.icon}
             </div>
             {item.name}
+            {item.path === '/chats' && hasUnread && <span className="menu-unread-dot" />}
           </NavLink>
         ))}
       </nav>

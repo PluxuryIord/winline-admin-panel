@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext.jsx';
 import { Loader } from 'lucide-react';
 
 import Layout from './components/Layout/Layout.jsx';
+import { UnreadProvider } from './contexts/UnreadContext.jsx';
 import Login from './pages/Auth/Login.jsx';
 import KnowledgeBase from './pages/KnowledgeBase/KnowledgeBase.jsx';
 import Analytics from './pages/Analytics/Analytics.jsx';
@@ -44,7 +45,7 @@ function App() {
         <Route path="/hostess" element={<Hostess />} />
 
         {/* Защищённые страницы */}
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/" element={<ProtectedRoute><UnreadProvider><Layout /></UnreadProvider></ProtectedRoute>}>
           <Route index element={<Navigate to="/users" replace />} />
 
           <Route path="users" element={<Users />} />

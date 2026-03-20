@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, List, LayoutGrid } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
 
@@ -19,6 +20,7 @@ export default function Chats() {
   const [users, setUsers] = useState([]);
   const [viewMode, setViewMode] = useState('list');
   const [deleteModal, setDeleteModal] = useState(null);
+  const { unreadChats } = useUnread();
 
   useEffect(() => {
     api.get('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
@@ -107,7 +109,7 @@ export default function Chats() {
           return (
             <div
               key={chat.id}
-              className="chat-item"
+              className={`chat-item${unreadChats.has(chat.id) ? ' chat-item--unread' : ''}`}
               onClick={() => navigate(`/chats/${chat.id}`)}
             >
               <div className="chat-item-avatar">
