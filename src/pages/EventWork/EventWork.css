@@ -54,6 +54,74 @@
   font-weight: 600;
 }
 
+/* ─── Accordion ─── */
+.ew-accordion {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.ew-accordion.open {
+  border-color: rgba(255, 126, 0, 0.2);
+}
+
+.ew-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, background 0.15s;
+}
+
+.ew-accordion.open .ew-accordion-header {
+  color: var(--color-orange);
+  background: rgba(255, 126, 0, 0.04);
+}
+
+.ew-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ew-accordion-label {
+  flex: 1;
+  text-align: left;
+}
+
+.ew-accordion-chevron {
+  transition: transform 0.3s ease;
+}
+
+.ew-accordion-chevron.open {
+  transform: rotate(180deg);
+}
+
+.ew-accordion-body-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.ew-accordion.open .ew-accordion-body-wrap {
+  grid-template-rows: 1fr;
+}
+
+.ew-accordion-body {
+  overflow: hidden;
+}
+
+.ew-accordion-body-inner {
+  padding: 0 20px 20px;
+}
+
 /* Tab content */
 .ew-tab-content {
   display: flex;

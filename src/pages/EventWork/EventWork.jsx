@@ -3,15 +3,15 @@ import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Users, Gift, ScanLine, Calendar,
   ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, ChevronDown,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
 
-const TABS = [
-  { key: 'codes', label: 'QR-коды', icon: <QrCode size={18} /> },
-  { key: 'stats', label: 'Статистика', icon: <BarChart2 size={18} /> },
-  { key: 'settings', label: 'Настройки', icon: <Settings size={18} /> },
+const SECTIONS = [
+  { id: 'codes', label: 'QR-коды', icon: QrCode },
+  { id: 'stats', label: 'Статистика', icon: BarChart2 },
+  { id: 'settings', label: 'Настройки', icon: Settings },
 ];
 
 const PAGE_SIZE = 30;
@@ -538,7 +538,13 @@ function HostessSection() {
 // ─── Main Component ────────────────────────────────────────────────────────
 
 export default function EventWork() {
-  const [activeTab, setActiveTab] = useState('codes');
+  const [openSection, setOpenSection] = useState('codes');
+  const [mounted, setMounted] = useState({ codes: true });
+
+  const toggleSection = (id) => {
+    setOpenSection(prev => prev === id ? null : id);
+    setMounted(prev => ({ ...prev, [id]: true }));
+  };
 
   return (
     <div className="ew-container">
@@ -547,22 +553,32 @@ export default function EventWork() {
         <p>QR-коды, сканирования, статистика и настройки мероприятий</p>
       </div>
 
-      <div className="ew-tabs">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            className={`ew-tab ${activeTab === t.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(t.key)}
-          >
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'codes' && <CodesTab />}
-      {activeTab === 'stats' && <StatsTab />}
-      {activeTab === 'settings' && <SettingsTab />}
+      {SECTIONS.map(s => {
+        const Icon = s.icon;
+        const isOpen = openSection === s.id;
+        return (
+          <div key={s.id} className={`ew-accordion ${isOpen ? 'open' : ''}`}>
+            <button className="ew-accordion-header" onClick={() => toggleSection(s.id)}>
+              <Icon size={18} />
+              <span className="ew-accordion-label">{s.label}</span>
+              <ChevronDown size={18} className={`ew-accordion-chevron ${isOpen ? 'open' : ''}`} />
+            </button>
+            <div className="ew-accordion-body-wrap">
+              <div className="ew-accordion-body">
+                <div className="ew-accordion-body-inner">
+                  {mounted[s.id] && (
+                    <>
+                      {s.id === 'codes' && <CodesTab />}
+                      {s.id === 'stats' && <StatsTab />}
+                      {s.id === 'settings' && <SettingsTab />}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
