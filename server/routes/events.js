@@ -138,7 +138,7 @@ router.delete('/codes/:id', async (req, res, next) => {
 
 // ─── GET /api/events/codes/:code/qr — генерация QR PNG ──────────────────────
 
-router.get('/codes/:code/qr', async (req, res, next) => {
+export async function qrHandler(req, res, next) {
   try {
     const code = req.params.code;
     const buffer = await QRCode.toBuffer(String(code), {
@@ -152,7 +152,8 @@ router.get('/codes/:code/qr', async (req, res, next) => {
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(buffer);
   } catch (err) { next(err); }
-});
+}
+router.get('/codes/:code/qr', qrHandler);
 
 // ─── POST /api/events/scan — сканирование (публичный) ────────────────────────
 
