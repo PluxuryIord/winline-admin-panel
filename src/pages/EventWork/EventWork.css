@@ -6,16 +6,45 @@
 }
 
 /* Header */
-.ew-header h1 {
+.ew-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ew-header-left h1 {
   font-size: 1.8rem;
   font-weight: 700;
   color: var(--color-white);
   margin-bottom: 8px;
 }
 
-.ew-header p {
+.ew-header-left p {
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.95rem;
+}
+
+.ew-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-panel);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.ew-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-white);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Tabs */
@@ -52,6 +81,125 @@
   background: rgba(255, 126, 0, 0.15);
   color: var(--color-orange);
   font-weight: 600;
+}
+
+/* ─── Stats Bar ─── */
+.ew-stats-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ew-mini-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px 18px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.ew-mini-stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ew-mini-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ew-mini-stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-white);
+  line-height: 1;
+}
+
+.ew-mini-stat-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ew-mini-stat--limit {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.ew-mini-limit-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.ew-mini-limit-fill {
+  height: 100%;
+  background: var(--color-orange);
+  border-radius: 100px;
+  transition: width 0.3s;
+}
+
+/* ─── Settings Modal ─── */
+.ew-settings-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.ew-settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ew-settings-modal-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-white);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.ew-settings-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ew-hostess-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ew-hostess-url-small {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: monospace;
 }
 
 /* ─── Accordion ─── */
