@@ -459,6 +459,30 @@ function SettingsTab() {
         </div>
       </div>
 
+      {/* Reset all codes */}
+      <div className="ew-settings-section ew-danger-section">
+        <h3>Сброс кодов</h3>
+        <p className="ew-settings-desc">
+          Удалить все QR-коды и историю сканирований. Используйте при начале нового мероприятия.
+          Это действие необратимо.
+        </p>
+        <button
+          className="ew-reset-btn"
+          onClick={async () => {
+            if (!confirm('Вы уверены? Все QR-коды и сканирования будут удалены. Это необратимо!')) return;
+            try {
+              const res = await api.delete('/api/events/codes/all');
+              const data = await res.json();
+              if (data.ok) alert(`Удалено ${data.deleted} кодов. Можно начинать новое мероприятие.`);
+            } catch (e) {
+              alert('Ошибка: ' + e.message);
+            }
+          }}
+        >
+          <Trash2 size={16} /> Сбросить все коды
+        </button>
+      </div>
+
       <HostessSection />
     </div>
   );

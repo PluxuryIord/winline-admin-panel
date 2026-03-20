@@ -105,6 +105,17 @@ router.patch('/codes/:id/status', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── DELETE /api/events/codes/all — сбросить все коды (новое мероприятие) ────
+
+router.delete('/codes/all', async (req, res, next) => {
+  try {
+    const [[{ count }]] = await dbPool.query('SELECT COUNT(*) as count FROM wl_event_codes');
+    await dbPool.query('DELETE FROM wl_event_codes');
+    await dbPool.query('DELETE FROM wl_admin_event_scans');
+    res.json({ ok: true, deleted: count });
+  } catch (err) { next(err); }
+});
+
 // ─── DELETE /api/events/codes/:id — удалить код ─────────────────────────────
 
 router.delete('/codes/:id', async (req, res, next) => {
