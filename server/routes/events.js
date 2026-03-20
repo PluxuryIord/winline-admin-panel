@@ -7,69 +7,7 @@ const router = Router();
 
 // ─── Auto-migrate tables ────────────────────────────────────────────────────
 
-let migrated = false;
-async function ensureTables() {
-  if (migrated) return;
-  try {
-    // 1. event_codes — основная таблица кодов
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS wl_admin_event_codes (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        code VARCHAR(100) NOT NULL UNIQUE,
-        label VARCHAR(255) DEFAULT '',
-        user_id BIGINT DEFAULT NULL,
-        status ENUM('active','used') DEFAULT 'active',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        used_at DATETIME DEFAULT NULL,
-        INDEX idx_code (code),
-        INDEX idx_user_id (user_id),
-        INDEX idx_status (status)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // Миграция: добавить новые колонки если таблица уже существует без них
-    const addColIfMissing = async (table, col, definition) => {
-      const [cols] = await dbPool.query(`
-        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
-      `, [table, col]);
-      if (!cols.length) {
-        await dbPool.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${definition}`);
-        console.log(`[events] Added ${col} to ${table}`);
-      }
-    };
-
-    await addColIfMissing('wl_admin_event_codes', 'user_id', "BIGINT DEFAULT NULL AFTER label");
-    await addColIfMissing('wl_admin_event_codes', 'status', "ENUM('active','used') DEFAULT 'active' AFTER user_id");
-    await addColIfMissing('wl_admin_event_codes', 'used_at', "DATETIME DEFAULT NULL AFTER created_at");
-
-    // 2. event_scans — лог сканирований
-    const [scanTableExists] = await dbPool.query(`
-      SELECT 1 FROM INFORMATION_SCHEMA.TABLES
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'wl_admin_event_scans'
-    `);
-
-    if (!scanTableExists.length) {
-      await dbPool.query(`
-        CREATE TABLE wl_admin_event_scans (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          code VARCHAR(100) NOT NULL,
-          scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          prize_given BOOLEAN DEFAULT TRUE,
-          INDEX idx_code (code),
-          INDEX idx_scanned_at (scanned_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-      `);
-    } else {
-      await addColIfMissing('wl_admin_event_scans', 'code', "VARCHAR(100) NOT NULL DEFAULT '' AFTER id");
-    }
-
-    migrated = true;
-    console.log('[events] Tables ready');
-  } catch (e) {
-    console.error('[events] Migration error:', e.message);
-  }
-}
+// Tables wl_event_codes and wl_admin_event_scans are pre-created
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -93,11 +31,6 @@ async function saveSettings(settings) {
   }
 }
 
-// Ensure tables on first request
-router.use(async (req, res, next) => {
-  await ensureTables();
-  next();
-});
 
 // ─── GET /api/events/codes — список кодов с юзерами ─────────────────────────
 
@@ -123,14 +56,14 @@ router.get('/codes', async (req, res, next) => {
 
     // Count total
     const [[{ total }]] = await dbPool.query(
-      `SELECT COUNT(*) as total FROM wl_admin_event_codes c LEFT JOIN users u ON u.user_id = c.user_id ${where}`, params
+      `SELECT COUNT(*) as total FROM wl_event_codes c LEFT JOIN users u ON u.user_id = c.user_id ${where}`, params
     );
 
     // Get codes with user info
     const [rows] = await dbPool.query(`
       SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
         u.full_name, u.rl_full_name, u.username
-      FROM wl_admin_event_codes c
+      FROM wl_event_codes c
       LEFT JOIN users u ON u.user_id = c.user_id
       ${where}
       ORDER BY c.created_at DESC
@@ -165,7 +98,7 @@ router.patch('/codes/:id/status', async (req, res, next) => {
 
     const usedAt = status === 'used' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
     await dbPool.query(
-      'UPDATE wl_admin_event_codes SET status = ?, used_at = ? WHERE id = ?',
+      'UPDATE wl_event_codes SET status = ?, used_at = ? WHERE id = ?',
       [status, usedAt, id]
     );
     res.json({ ok: true });
@@ -177,7 +110,7 @@ router.patch('/codes/:id/status', async (req, res, next) => {
 router.delete('/codes/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    await dbPool.query('DELETE FROM wl_admin_event_codes WHERE id = ?', [id]);
+    await dbPool.query('DELETE FROM wl_event_codes WHERE id = ?', [id]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -204,7 +137,6 @@ router.get('/codes/:code/qr', async (req, res, next) => {
 
 export async function scanHandler(req, res, next) {
   try {
-    await ensureTables();
     const { code: rawCode } = req.body;
     // Support both {code} and legacy {user_id} field
     const scannedValue = String(rawCode || req.body.user_id || '').trim();
@@ -214,7 +146,7 @@ export async function scanHandler(req, res, next) {
     const [codes] = await dbPool.query(
       `SELECT c.id, c.code, c.status, c.user_id, c.label,
         u.full_name, u.rl_full_name, u.username
-       FROM wl_admin_event_codes c
+       FROM wl_event_codes c
        LEFT JOIN users u ON u.user_id = c.user_id
        WHERE c.code = ?`,
       [scannedValue]
@@ -237,7 +169,7 @@ export async function scanHandler(req, res, next) {
 
     // Mark as used
     await dbPool.query(
-      'UPDATE wl_admin_event_codes SET status = ?, used_at = NOW() WHERE id = ?',
+      'UPDATE wl_event_codes SET status = ?, used_at = NOW() WHERE id = ?',
       ['used', eventCode.id]
     );
 
@@ -269,15 +201,15 @@ router.get('/stats', async (req, res, next) => {
     if (to) { dateFilter += ' AND c.created_at <= ?'; params.push(to + ' 23:59:59'); }
 
     const [[{ totalCodes }]] = await dbPool.query(
-      `SELECT COUNT(*) as totalCodes FROM wl_admin_event_codes c WHERE 1=1 ${dateFilter}`, params
+      `SELECT COUNT(*) as totalCodes FROM wl_event_codes c WHERE 1=1 ${dateFilter}`, params
     );
 
     const [[{ activeCodes }]] = await dbPool.query(
-      `SELECT COUNT(*) as activeCodes FROM wl_admin_event_codes c WHERE status = 'active' ${dateFilter}`, params
+      `SELECT COUNT(*) as activeCodes FROM wl_event_codes c WHERE status = 'active' ${dateFilter}`, params
     );
 
     const [[{ usedCodes }]] = await dbPool.query(
-      `SELECT COUNT(*) as usedCodes FROM wl_admin_event_codes c WHERE status = 'used' ${dateFilter}`, params
+      `SELECT COUNT(*) as usedCodes FROM wl_event_codes c WHERE status = 'used' ${dateFilter}`, params
     );
 
     const [[{ scansToday }]] = await dbPool.query(
@@ -305,7 +237,7 @@ router.get('/scans', async (req, res, next) => {
         c.label AS code_label, c.user_id,
         u.full_name, u.rl_full_name, u.username
       FROM wl_admin_event_scans s
-      LEFT JOIN wl_admin_event_codes c ON c.code = s.code
+      LEFT JOIN wl_event_codes c ON c.code = s.code
       LEFT JOIN users u ON u.user_id = c.user_id
       ORDER BY s.scanned_at DESC
       LIMIT ? OFFSET ?
@@ -360,7 +292,7 @@ router.put('/toggle', async (req, res, next) => {
 
     // 2. Update bot's settings table
     try {
-      await dbPool.query('UPDATE settings SET event_starts = ? WHERE id = 1', [eventStarts ? 1 : 0]);
+      await dbPool.query('UPDATE settings SET event_starts = ? LIMIT 1', [eventStarts ? 1 : 0]);
     } catch (e) {
       console.warn('[events] Could not update settings.event_starts:', e.message);
     }
