@@ -107,7 +107,7 @@ export default function Analytics() {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
 
-  const conversionRatio = stats.partners > 0 ? (stats.totalUsers / stats.partners).toFixed(1) : '—';
+  const conversionRatio = stats.totalUsers > 0 ? ((stats.partners / stats.totalUsers) * 100).toFixed(1) : '0.0';
 
   const periodLabel = isCustomRange && dateFrom && dateTo
     ? `${new Date(dateFrom).toLocaleDateString('ru-RU')} — ${new Date(dateTo).toLocaleDateString('ru-RU')}`
@@ -123,7 +123,7 @@ export default function Analytics() {
       ['Всего пользователей', stats.totalUsers],
       ['Партнёры', stats.partners],
       ['Гости', stats.guests],
-      ['Конверсия в партнёра', `1 к ${conversionRatio}`],
+      ['Конверсия в партнёра', `${conversionRatio}%`],
       [],
       ['Активность и вовлечённость'],
       ['Обращений к боту', stats.requests],
@@ -151,7 +151,7 @@ export default function Analytics() {
       `Всего пользователей:   ${stats.totalUsers.toLocaleString('ru-RU')}`,
       `Партнёры:              ${stats.partners.toLocaleString('ru-RU')}`,
       `Гости:                 ${stats.guests.toLocaleString('ru-RU')}`,
-      `Конверсия в партнёра:  1 к ${conversionRatio}`,
+      `Конверсия в партнёра:  ${conversionRatio}%`,
       sep,
       'АКТИВНОСТЬ И ВОВЛЕЧЁННОСТЬ',
       `Обращений к боту:      ${stats.requests.toLocaleString('ru-RU')}`,
@@ -271,7 +271,7 @@ export default function Analytics() {
             <div className="metric-icon"><BarChart2 size={20} /></div>
             Конверсия в партнёра
           </div>
-          <div className="metric-value">1 к {conversionRatio}</div>
+          <div className="metric-value">{conversionRatio}%</div>
         </div>
       </div>
 
