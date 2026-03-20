@@ -807,7 +807,11 @@ export default function Broadcasts() {
 
   const TYPE_ICONS = { users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
-  const toggleSection = (id) => setOpenSection(prev => prev === id ? null : id);
+  const [mounted, setMounted] = useState({ channels: true }); // track which sections have been opened
+  const toggleSection = (id) => {
+    setOpenSection(prev => prev === id ? null : id);
+    setMounted(prev => ({ ...prev, [id]: true }));
+  };
 
   if (loading) {
     return (
@@ -833,13 +837,15 @@ export default function Broadcasts() {
             </button>
             <div className="bc-accordion-body-wrap">
               <div className="bc-accordion-body">
-                {isOpen && (
-                  <div className="bc-accordion-body-inner">
-                    {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
-                    {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
-                    {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
-                  </div>
-                )}
+                <div className="bc-accordion-body-inner">
+                  {mounted[s.id] && (
+                    <>
+                      {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
+                      {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
+                      {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
