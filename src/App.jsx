@@ -13,6 +13,7 @@ import UserProfile from './pages/Users/UserProfile.jsx';
 import Chats from './pages/Chats/Chats.jsx';
 import ChatView from './pages/Chats/ChatView.jsx';
 import EventWork from './pages/EventWork/EventWork.jsx';
+import BotScenarios from './pages/Scenarios/BotScenarios.jsx';
 import Hostess from './pages/Hostess/Hostess.jsx';
 import Broadcasts from './pages/Broadcasts/Broadcasts.jsx';
 import BroadcastNew from './pages/Broadcasts/BroadcastNew.jsx';
@@ -55,7 +56,7 @@ function App() {
           <Route path="mailings" element={<Broadcasts />} />
           <Route path="mailings/new" element={<BroadcastNew />} />
           <Route path="mailings/editor/:type" element={<BroadcastEditor />} />
-          <Route path="scenarios" element={<Placeholder title="Сценарии" />} />
+          <Route path="scenarios" element={<BotScenarios />} />
 
           <Route path="knowledge" element={<KnowledgeBase />} />
           <Route path="analytics" element={<Analytics />} />

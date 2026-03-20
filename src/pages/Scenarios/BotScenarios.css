@@ -1,0 +1,329 @@
+.sc-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  min-height: calc(100vh - 120px);
+}
+
+.sc-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 60px;
+  font-size: 0.95rem;
+}
+
+.sc-spinner { animation: sc-spin 1s linear infinite; }
+@keyframes sc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ─── Sidebar ─── */
+.sc-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sc-sidebar-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-white);
+  padding: 0 4px;
+}
+
+.sc-screen-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sc-screen-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  position: relative;
+}
+
+.sc-screen-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sc-screen-item.active {
+  background: rgba(255, 126, 0, 0.08);
+  border-color: rgba(255, 126, 0, 0.2);
+}
+
+.sc-screen-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.sc-screen-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sc-screen-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-screen-desc {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-unsaved-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-orange);
+}
+
+/* ─── Editor ─── */
+.sc-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sc-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sc-editor-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-white);
+  margin-bottom: 4px;
+}
+
+.sc-editor-header p {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sc-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-orange);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sc-save-btn:hover:not(:disabled) { opacity: 0.9; }
+.sc-save-btn:disabled { opacity: 0.4; cursor: default; }
+.sc-save-btn.saved { background: #22c55e; }
+
+/* ─── Sections ─── */
+.sc-section {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Messages ─── */
+.sc-message-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-message-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sc-message-textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--color-white);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  min-height: 80px;
+}
+
+.sc-message-textarea:focus {
+  border-color: rgba(255, 126, 0, 0.4);
+}
+
+.sc-message-hint {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+/* ─── Buttons ─── */
+.sc-buttons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-button-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.15);
+  transition: background 0.15s;
+}
+
+.sc-button-row:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.sc-button-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sc-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sc-arrow-btn:hover:not(:disabled) {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+}
+
+.sc-arrow-btn:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.sc-button-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--color-white);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sc-button-input:focus {
+  border-color: rgba(255, 126, 0, 0.4);
+}
+
+.sc-action-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.sc-action-badge.url {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+.sc-action-badge.callback {
+  background: rgba(255, 126, 0, 0.1);
+  color: rgba(255, 126, 0, 0.6);
+}
+
+.sc-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.95rem;
+  padding: 60px;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .sc-container {
+    grid-template-columns: 1fr;
+  }
+  .sc-sidebar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 16px;
+  }
+  .sc-screen-list {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+  }
+  .sc-screen-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .sc-screen-desc { display: none; }
+}

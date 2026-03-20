@@ -63,6 +63,8 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/bot/status', statusRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/events', eventsRouter);
+import scenariosRouter from './routes/scenarios.js';
+app.use('/api/scenarios', scenariosRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {
