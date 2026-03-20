@@ -80,6 +80,13 @@ export default function Chats() {
 
   const lastMsg = (chat) => chat.messages.at(-1);
 
+  // Sort by last message time (newest first)
+  const sortedChats = [...chats].sort((a, b) => {
+    const timeA = lastMsg(a)?.time ? new Date(lastMsg(a).time).getTime() : 0;
+    const timeB = lastMsg(b)?.time ? new Date(lastMsg(b).time).getTime() : 0;
+    return timeB - timeA;
+  });
+
   return (
     <div className="chats-container">
       <div className="chats-header">
@@ -103,7 +110,7 @@ export default function Chats() {
         {chats.length === 0 && (
           <p className="chats-empty">Чатов пока нет</p>
         )}
-        {chats.map(chat => {
+        {sortedChats.map(chat => {
           const user = getUser(chat.userId);
           const msg = lastMsg(chat);
           return (
