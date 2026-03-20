@@ -831,13 +831,17 @@ export default function Broadcasts() {
               <span className="bc-accordion-label">{s.label}</span>
               <ChevronDown size={18} className={`bc-accordion-chevron ${isOpen ? 'open' : ''}`} />
             </button>
-            {isOpen && (
+            <div className="bc-accordion-body-wrap">
               <div className="bc-accordion-body">
-                {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
-                {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
-                {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+                {isOpen && (
+                  <div className="bc-accordion-body-inner">
+                    {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
+                    {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
+                    {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
       })}

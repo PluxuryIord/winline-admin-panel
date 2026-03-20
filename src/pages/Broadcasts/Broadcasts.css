@@ -636,7 +636,21 @@
   transform: rotate(180deg);
 }
 
+.bc-accordion-body-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.bc-accordion.open .bc-accordion-body-wrap {
+  grid-template-rows: 1fr;
+}
+
 .bc-accordion-body {
+  overflow: hidden;
+}
+
+.bc-accordion-body-inner {
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
