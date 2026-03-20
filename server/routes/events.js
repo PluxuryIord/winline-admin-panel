@@ -27,7 +27,7 @@ async function saveSettings(settings) {
   if (rows.length) {
     await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(settings), rows[0].id]);
   } else {
-    await dbPool.query('INSERT INTO texts (category, data) VALUES (?, ?)', ['event_settings', JSON.stringify(settings)]);
+    await dbPool.query('INSERT INTO texts (category, description, data) VALUES (?, ?, ?)', ['event_settings', 'Event settings', JSON.stringify(settings)]);
   }
 }
 
