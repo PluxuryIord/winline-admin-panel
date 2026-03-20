@@ -356,6 +356,166 @@
 }
 .bc-channel-remove:hover { color: #ff3b30; }
 
+/* ─── List View (channels/groups) ─── */
+.bc-list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.bc-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 0;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.bc-list-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bc-list-item-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.bc-list-item--all {
+  padding: 10px 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.bc-list-item--all input { cursor: pointer; }
+
+.bc-list-icon {
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.bc-list-title {
+  flex: 1;
+  color: var(--color-white);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bc-list-id {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.bc-list-archive-btn,
+.bc-list-restore-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.bc-list-item:hover .bc-list-archive-btn,
+.bc-list-item:hover .bc-list-restore-btn {
+  opacity: 1;
+}
+
+.bc-list-archive-btn:hover {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+}
+
+.bc-list-restore-btn:hover {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.bc-list-item--archived {
+  opacity: 0.6;
+}
+
+.bc-list-item--archived:hover {
+  opacity: 1;
+}
+
+.bc-list-view--archive {
+  background: rgba(255, 126, 0, 0.04);
+  border: 1px dashed rgba(255, 126, 0, 0.15);
+}
+
+/* ─── Header actions ─── */
+.bc-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bc-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bc-archive-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.bc-archive-count {
+  background: rgba(255, 126, 0, 0.2);
+  color: var(--color-orange);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 100px;
+  margin-left: 2px;
+}
+
+/* ─── Archive section ─── */
+.bc-archive-section {
+  margin-top: 16px;
+}
+
+.bc-archive-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 /* Форма отправки */
 .bc-compose-textarea {
   width: 100%;

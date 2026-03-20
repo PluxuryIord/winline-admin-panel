@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
-  BarChart2, HelpCircle, Check
+  BarChart2, HelpCircle, Check, Archive, RotateCcw
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -319,10 +319,33 @@ function ChannelsTab({ onSendResult }) {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archived, setArchived] = useState([]);
 
-  useEffect(() => {
+  const loadChannels = useCallback(() => {
     api.get('/api/broadcasts/channels').then(r => r.json()).then(setChannels).catch(() => {});
   }, []);
+  const loadArchive = useCallback(() => {
+    api.get('/api/broadcasts/channels/archive').then(r => r.json()).then(setArchived).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadChannels(); }, [loadChannels]);
+
+  const handleArchive = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/channels/${id}/archive`);
+      loadChannels();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/channels/restore/${id}`);
+      loadChannels();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
 
   const handleAddChannel = async (input) => {
     setAddModal(false);
@@ -381,27 +404,66 @@ function ChannelsTab({ onSendResult }) {
       <div className="bc-section">
         <div className="bc-section-header">
           <h3 className="bc-section-title">Каналы</h3>
-          <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-            <Plus size={16} /> Добавить
-          </button>
+          <div className="bc-header-actions">
+            <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
+              <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
+              {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
+            </button>
+            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+              <Plus size={16} /> Добавить
+            </button>
+          </div>
         </div>
+
+        {/* Active channels list */}
         {channels.length === 0 ? (
           <div className="bc-channels-empty">
             Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
           </div>
         ) : (
-          <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all">
+          <div className="bc-list-view">
+            <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === channels.length && channels.length > 0} onChange={selectAll} />
               <span>Все каналы ({channels.length})</span>
             </label>
             {channels.map(ch => (
-              <label key={ch.id} className="bc-channel-item">
-                <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
-                <Hash size={14} className="bc-channel-hash" />
-                <span className="bc-channel-name">{ch.title}</span>
-              </label>
+              <div key={ch.id} className="bc-list-item">
+                <label className="bc-list-item-main">
+                  <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
+                  <Hash size={14} className="bc-list-icon" />
+                  <span className="bc-list-title">{ch.title}</span>
+                  <span className="bc-list-id">{ch.chatId}</span>
+                </label>
+                <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
+                  <Archive size={14} />
+                </button>
+              </div>
             ))}
+          </div>
+        )}
+
+        {/* Archived channels */}
+        {showArchive && (
+          <div className="bc-archive-section">
+            <h4 className="bc-archive-title"><Archive size={14} /> Архив каналов</h4>
+            {archived.length === 0 ? (
+              <div className="bc-channels-empty">Архив пуст</div>
+            ) : (
+              <div className="bc-list-view bc-list-view--archive">
+                {archived.map(ch => (
+                  <div key={ch.id} className="bc-list-item bc-list-item--archived">
+                    <div className="bc-list-item-main">
+                      <Hash size={14} className="bc-list-icon" />
+                      <span className="bc-list-title">{ch.title}</span>
+                      <span className="bc-list-id">{ch.chatId}</span>
+                    </div>
+                    <button className="bc-list-restore-btn" onClick={() => handleRestore(ch.id)} title="Восстановить">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -529,10 +591,33 @@ function GroupsTab({ onSendResult }) {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [addModal, setAddModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archived, setArchived] = useState([]);
 
-  useEffect(() => {
+  const loadGroups = useCallback(() => {
     api.get('/api/broadcasts/groups').then(r => r.json()).then(setGroups).catch(() => {});
   }, []);
+  const loadArchive = useCallback(() => {
+    api.get('/api/broadcasts/groups/archive').then(r => r.json()).then(setArchived).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  const handleArchive = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/groups/${id}/archive`);
+      loadGroups();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/groups/restore/${id}`);
+      loadGroups();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
 
   const handleAddGroup = async (input) => {
     setAddModal(false);
@@ -591,27 +676,64 @@ function GroupsTab({ onSendResult }) {
       <div className="bc-section">
         <div className="bc-section-header">
           <h3 className="bc-section-title">Группы / чаты</h3>
-          <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-            <Plus size={16} /> Добавить
-          </button>
+          <div className="bc-header-actions">
+            <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
+              <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
+              {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
+            </button>
+            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+              <Plus size={16} /> Добавить
+            </button>
+          </div>
         </div>
+
         {groups.length === 0 ? (
           <div className="bc-channels-empty">
             Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
           </div>
         ) : (
-          <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all">
+          <div className="bc-list-view">
+            <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === groups.length && groups.length > 0} onChange={selectAll} />
               <span>Все группы ({groups.length})</span>
             </label>
             {groups.map(g => (
-              <label key={g.id} className="bc-channel-item">
-                <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
-                <MessageCircle size={14} className="bc-channel-hash" />
-                <span className="bc-channel-name">{g.title}</span>
-              </label>
+              <div key={g.id} className="bc-list-item">
+                <label className="bc-list-item-main">
+                  <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
+                  <MessageCircle size={14} className="bc-list-icon" />
+                  <span className="bc-list-title">{g.title}</span>
+                  <span className="bc-list-id">{g.chatId}</span>
+                </label>
+                <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
+                  <Archive size={14} />
+                </button>
+              </div>
             ))}
+          </div>
+        )}
+
+        {showArchive && (
+          <div className="bc-archive-section">
+            <h4 className="bc-archive-title"><Archive size={14} /> Архив групп</h4>
+            {archived.length === 0 ? (
+              <div className="bc-channels-empty">Архив пуст</div>
+            ) : (
+              <div className="bc-list-view bc-list-view--archive">
+                {archived.map(g => (
+                  <div key={g.id} className="bc-list-item bc-list-item--archived">
+                    <div className="bc-list-item-main">
+                      <MessageCircle size={14} className="bc-list-icon" />
+                      <span className="bc-list-title">{g.title}</span>
+                      <span className="bc-list-id">{g.chatId}</span>
+                    </div>
+                    <button className="bc-list-restore-btn" onClick={() => handleRestore(g.id)} title="Восстановить">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

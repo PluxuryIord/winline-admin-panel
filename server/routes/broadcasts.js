@@ -141,6 +141,52 @@ router.post('/channels', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Archive channel (move to archive table instead of delete)
+router.post('/channels/:id/archive', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await dbPool.query('SELECT chat_id, title, added_at FROM wl_admin_channels WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    // Ensure archive table
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_channels_archive (
+      id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
+      added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    await dbPool.query('INSERT INTO wl_admin_channels_archive (chat_id, title, added_at) VALUES (?, ?, ?)',
+      [rows[0].chat_id, rows[0].title, rows[0].added_at]);
+    await dbPool.query('DELETE FROM wl_admin_channels WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Restore channel from archive
+router.post('/channels/restore/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels_archive WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const [existing] = await dbPool.query('SELECT id FROM wl_admin_channels WHERE chat_id = ?', [rows[0].chat_id]);
+    if (!existing.length) {
+      await dbPool.query('INSERT INTO wl_admin_channels (chat_id, title) VALUES (?, ?)', [rows[0].chat_id, rows[0].title]);
+    }
+    await dbPool.query('DELETE FROM wl_admin_channels_archive WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Get archived channels
+router.get('/channels/archive', async (req, res, next) => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_channels_archive (
+      id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
+      added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    const [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, archived_at AS archivedAt FROM wl_admin_channels_archive ORDER BY archived_at DESC');
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// Legacy delete (keep for backward compat but shouldn't be used)
 router.delete('/channels/:id', async (req, res, next) => {
   try {
     const [result] = await dbPool.query('DELETE FROM wl_admin_channels WHERE id = ?', [Number(req.params.id)]);
@@ -169,6 +215,51 @@ router.post('/groups', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Archive group
+router.post('/groups/:id/archive', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await dbPool.query('SELECT chat_id, title, added_at FROM wl_admin_groups WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_groups_archive (
+      id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
+      added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    await dbPool.query('INSERT INTO wl_admin_groups_archive (chat_id, title, added_at) VALUES (?, ?, ?)',
+      [rows[0].chat_id, rows[0].title, rows[0].added_at]);
+    await dbPool.query('DELETE FROM wl_admin_groups WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Restore group from archive
+router.post('/groups/restore/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups_archive WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const [existing] = await dbPool.query('SELECT id FROM wl_admin_groups WHERE chat_id = ?', [rows[0].chat_id]);
+    if (!existing.length) {
+      await dbPool.query('INSERT INTO wl_admin_groups (chat_id, title) VALUES (?, ?)', [rows[0].chat_id, rows[0].title]);
+    }
+    await dbPool.query('DELETE FROM wl_admin_groups_archive WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Get archived groups
+router.get('/groups/archive', async (req, res, next) => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_groups_archive (
+      id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
+      added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    const [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, archived_at AS archivedAt FROM wl_admin_groups_archive ORDER BY archived_at DESC');
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// Legacy delete
 router.delete('/groups/:id', async (req, res, next) => {
   try {
     const [result] = await dbPool.query('DELETE FROM wl_admin_groups WHERE id = ?', [Number(req.params.id)]);
