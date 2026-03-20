@@ -109,35 +109,59 @@ export default function Users() {
   }, []);
   useEffect(() => { loadTags(); }, [loadTags]);
 
-  // Массовое переименование тега
-  const handleRenameTag = async (tag, e) => {
+  // Модал редактирования тега
+  const [tagModal, setTagModal] = useState(null); // { tag, newName }
+  const [tagModalSaving, setTagModalSaving] = useState(false);
+
+  const openRenameModal = (tag, e) => {
     e.stopPropagation();
-    const newName = prompt(`Переименовать тег «${tag}» на:`, tag);
-    if (!newName || newName.trim() === tag) return;
-    try {
-      const res = await api.put('/api/users/tags/rename', { oldTag: tag, newTag: newName.trim() });
-      const data = await res.json();
-      if (data.ok) {
-        loadTags();
-        fetchUsers(0, debouncedSearch);
-        if (filterTag === tag) setFilterTag(newName.trim());
-      }
-    } catch (err) { alert('Ошибка: ' + err.message); }
+    setTagModal({ tag, newName: tag });
+    setShowTagDropdown(false);
   };
 
-  // Массовое удаление тега
-  const handleDeleteTag = async (tag, e) => {
-    e.stopPropagation();
-    if (!confirm(`Удалить тег «${tag}» у всех пользователей?`)) return;
+  const handleRenameSubmit = async () => {
+    if (!tagModal || !tagModal.newName.trim() || tagModal.newName.trim() === tagModal.tag) {
+      setTagModal(null);
+      return;
+    }
+    setTagModalSaving(true);
     try {
-      const res = await api.delete(`/api/users/tags/bulk-delete?tag=${encodeURIComponent(tag)}`);
+      const res = await api.put('/api/users/tags/rename', { oldTag: tagModal.tag, newTag: tagModal.newName.trim() });
       const data = await res.json();
       if (data.ok) {
         loadTags();
         fetchUsers(0, debouncedSearch);
-        if (filterTag === tag) setFilterTag('all');
+        if (filterTag === tagModal.tag) setFilterTag(tagModal.newName.trim());
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
+    setTagModalSaving(false);
+    setTagModal(null);
+  };
+
+  // Модал удаления тега
+  const [deleteTagModal, setDeleteTagModal] = useState(null); // tag string
+  const [deleteTagSaving, setDeleteTagSaving] = useState(false);
+
+  const openDeleteModal = (tag, e) => {
+    e.stopPropagation();
+    setDeleteTagModal(tag);
+    setShowTagDropdown(false);
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTagModal) return;
+    setDeleteTagSaving(true);
+    try {
+      const res = await api.delete(`/api/users/tags/bulk-delete?tag=${encodeURIComponent(deleteTagModal)}`);
+      const data = await res.json();
+      if (data.ok) {
+        loadTags();
+        fetchUsers(0, debouncedSearch);
+        if (filterTag === deleteTagModal) setFilterTag('all');
+      }
+    } catch (err) { alert('Ошибка: ' + err.message); }
+    setDeleteTagSaving(false);
+    setDeleteTagModal(null);
   };
 
   // Фильтрация и сортировка (клиентская, по загруженным)
@@ -307,10 +331,10 @@ export default function Users() {
                   >
                     <span className="tag-filter-item-text">{tag}</span>
                     <div className="tag-filter-actions">
-                      <button className="tag-action-btn" onClick={(e) => handleRenameTag(tag, e)} title="Переименовать">
+                      <button className="tag-action-btn" onClick={(e) => openRenameModal(tag, e)} title="Переименовать">
                         <Pencil size={12} />
                       </button>
-                      <button className="tag-action-btn tag-action-delete" onClick={(e) => handleDeleteTag(tag, e)} title="Удалить у всех">
+                      <button className="tag-action-btn tag-action-delete" onClick={(e) => openDeleteModal(tag, e)} title="Удалить у всех">
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -407,6 +431,62 @@ export default function Users() {
           </div>
         )}
       </div>
+
+      {/* Модал переименования тега */}
+      {tagModal && (
+        <div className="tag-modal-overlay" onClick={() => setTagModal(null)}>
+          <div className="tag-modal" onClick={e => e.stopPropagation()}>
+            <button className="tag-modal-close" onClick={() => setTagModal(null)}><X size={18} /></button>
+            <h3>Переименовать тег</h3>
+            <p className="tag-modal-desc">
+              Тег <strong>«{tagModal.tag}»</strong> будет переименован у всех пользователей
+            </p>
+            <div className="tag-modal-field">
+              <label>Новое название</label>
+              <input
+                type="text"
+                value={tagModal.newName}
+                onChange={e => setTagModal({ ...tagModal, newName: e.target.value })}
+                onKeyDown={e => e.key === 'Enter' && handleRenameSubmit()}
+                autoFocus
+              />
+            </div>
+            <div className="tag-modal-actions">
+              <button className="tag-modal-cancel" onClick={() => setTagModal(null)}>Отмена</button>
+              <button
+                className="tag-modal-submit"
+                onClick={handleRenameSubmit}
+                disabled={tagModalSaving || !tagModal.newName.trim() || tagModal.newName.trim() === tagModal.tag}
+              >
+                {tagModalSaving ? 'Сохранение...' : 'Переименовать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал удаления тега */}
+      {deleteTagModal && (
+        <div className="tag-modal-overlay" onClick={() => setDeleteTagModal(null)}>
+          <div className="tag-modal" onClick={e => e.stopPropagation()}>
+            <button className="tag-modal-close" onClick={() => setDeleteTagModal(null)}><X size={18} /></button>
+            <h3>Удалить тег</h3>
+            <p className="tag-modal-desc">
+              Тег <strong>«{deleteTagModal}»</strong> будет удалён у всех пользователей. Это действие необратимо.
+            </p>
+            <div className="tag-modal-actions">
+              <button className="tag-modal-cancel" onClick={() => setDeleteTagModal(null)}>Отмена</button>
+              <button
+                className="tag-modal-submit tag-modal-danger"
+                onClick={handleDeleteSubmit}
+                disabled={deleteTagSaving}
+              >
+                {deleteTagSaving ? 'Удаление...' : 'Удалить у всех'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
