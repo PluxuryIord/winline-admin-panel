@@ -87,18 +87,13 @@ export default function BotScenarios() {
         data = await res.json();
       }
 
-      const migrated = migrateData(data);
+      // Deep copy before migration to detect changes
+      const origJson = JSON.stringify(data);
+      const migrated = migrateData(JSON.parse(JSON.stringify(data)));
       setScenarios(migrated);
 
-      // Auto-save if migration added targetScreen or positions
-      const hasTargets = Object.values(migrated.screens || {}).some(s =>
-        (s.buttons?._order || []).some(k => s.buttons[k]?.targetScreen)
-      );
-      const origHasTargets = Object.values(data.screens || {}).some(s =>
-        (s.buttons?._order || []).some(k => s.buttons[k]?.targetScreen)
-      );
-      if (hasTargets && !origHasTargets) {
-        // Migration happened, auto-save
+      // Auto-save if migration changed anything (added targetScreen/positions)
+      if (JSON.stringify(migrated) !== origJson) {
         try { await api.put('/api/scenarios', migrated); } catch (_) {}
       }
     } catch (e) {
