@@ -23,7 +23,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
           { name: 'Пользователи', path: '/users', icon: <Users size={18} /> },
           { name: 'Чаты', path: '/chats', icon: <MessageSquare size={18} /> },
           { name: 'Рассылки и контент', path: '/mailings', icon: <Send size={18} /> },
-          { name: 'Сценарии', path: '/scenarios', icon: <BookOpen size={18} /> },
+          // { name: 'Сценарии', path: '/scenarios', icon: <BookOpen size={18} /> },
           { name: 'База знаний', path: '/knowledge', icon: <Database size={18} /> },
           { name: 'Аналитика', path: '/analytics', icon: <BarChart size={18} /> },
           { name: 'Работа на ивенте', path: '/events', icon: <Calendar size={18} /> },
