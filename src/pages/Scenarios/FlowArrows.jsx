@@ -16,6 +16,7 @@ function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
+// Returns SVG elements (no wrapping <svg>), parent provides <svg>
 export default function FlowArrows({ screens, activeScreen }) {
   const arrows = [];
 
@@ -23,10 +24,7 @@ export default function FlowArrows({ screens, activeScreen }) {
     const order = screen.buttons?._order || [];
     const srcX = screen.x ?? 0;
     const srcY = screen.y ?? 0;
-
-    // Calculate source node total height
     const srcBtnCount = order.length;
-    const srcNodeH = NODE_HEADER_H + srcBtnCount * BTN_ROW_H + NODE_PAD_BOTTOM;
 
     order.forEach((btnKey, btnIdx) => {
       const btn = screen.buttons[btnKey];
@@ -36,33 +34,27 @@ export default function FlowArrows({ screens, activeScreen }) {
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
 
-      // Source: bottom of button row, center X
-      // Each button anchors at its right edge bottom
+      // Source: bottom of node, spread horizontally per button
       const sx = srcX + NODE_W / 2 + (btnIdx - (srcBtnCount - 1) / 2) * 20;
-      const sy = srcY + NODE_HEADER_H + (btnIdx + 1) * BTN_ROW_H + NODE_PAD_BOTTOM;
+      const sy = srcY + NODE_HEADER_H + srcBtnCount * BTN_ROW_H + NODE_PAD_BOTTOM;
 
       // Target: top center of target node
       const tx = tgtX + NODE_W / 2;
       const ty = tgtY;
 
-      // Bezier: vertical flow (top→bottom)
       const dy = Math.abs(ty - sy);
       const cpOffset = Math.max(60, dy * 0.4);
 
       let cp1x, cp1y, cp2x, cp2y;
       if (ty > sy) {
-        // Normal: downward
         cp1x = sx; cp1y = sy + cpOffset;
         cp2x = tx; cp2y = ty - cpOffset;
       } else {
-        // Reverse: upward (loopback)
         cp1x = sx + 120; cp1y = sy + 80;
         cp2x = tx - 120; cp2y = ty - 80;
       }
 
       const isHighlighted = srcId === activeScreen || btn.targetScreen === activeScreen;
-
-      // Midpoint arrow
       const mid = bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
       const angle = bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
 
@@ -70,15 +62,13 @@ export default function FlowArrows({ screens, activeScreen }) {
         key: `${srcId}-${btnKey}`,
         d: `M ${sx},${sy} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${tx},${ty}`,
         highlighted: isHighlighted,
-        mid,
-        angle,
-        sx, sy, tx, ty,
+        mid, angle, sx, sy, tx, ty,
       });
     });
   }
 
   return (
-    <svg className="flow-arrows-svg">
+    <g>
       {arrows.map(({ key, d, highlighted, mid, angle, sx, sy, tx, ty }) => (
         <g key={key}>
           <path
@@ -87,20 +77,17 @@ export default function FlowArrows({ screens, activeScreen }) {
             stroke={highlighted ? 'rgba(255,126,0,0.8)' : 'rgba(255,126,0,0.3)'}
             strokeWidth={highlighted ? 3 : 2.5}
           />
-          {/* Arrow triangle at midpoint */}
           <polygon
             points="-8,-6 8,0 -8,6"
             fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(255,126,0,0.5)'}
             transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
           />
-          {/* Source dot */}
           <circle cx={sx} cy={sy} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
-          {/* Target dot */}
           <circle cx={tx} cy={ty} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
         </g>
       ))}
-    </svg>
+    </g>
   );
 }

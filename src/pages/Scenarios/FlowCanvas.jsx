@@ -32,11 +32,15 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
 
   return (
     <div className="flow-canvas" ref={containerRef} onMouseDown={handleBgMouseDown}>
+      {/* SVG arrows layer — uses offset for transform */}
+      <svg className="flow-arrows-svg" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}>
+        <FlowArrows screens={screens} activeScreen={activeScreen} />
+      </svg>
+
       <div
         className="flow-canvas-inner"
         style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
       >
-        <FlowArrows screens={screens} activeScreen={activeScreen} />
         {Object.entries(screens).map(([id, screen]) => (
           <FlowNode
             key={id}
