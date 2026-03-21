@@ -1,7 +1,20 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
+import { BOT_API_URL } from '../config/env.js';
 
 const router = Router();
+
+// ─── Notify bot to reload texts after save ──────────────────────────────────
+async function notifyBotReload() {
+  if (!BOT_API_URL) return;
+  try {
+    const resp = await fetch(`${BOT_API_URL}/reload-texts`);
+    const data = await resp.json();
+    console.log('[scenarios] Bot reload:', data);
+  } catch (err) {
+    console.warn('[scenarios] Bot reload failed (non-blocking):', err.message);
+  }
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -191,6 +204,7 @@ router.put('/', async (req, res, next) => {
     const { dbId } = await loadScenarios();
     if (!dbId) return res.status(404).json({ error: 'Scenarios not seeded yet' });
     await saveScenarios(req.body, dbId);
+    notifyBotReload();  // non-blocking
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -206,6 +220,7 @@ router.put('/screens/:screenId/messages/:messageKey', async (req, res, next) => 
     if (!screen.messages[req.params.messageKey]) return res.status(404).json({ error: 'Message not found' });
     screen.messages[req.params.messageKey].text = req.body.text;
     await saveScenarios(data, dbId);
+    notifyBotReload();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -221,6 +236,7 @@ router.put('/screens/:screenId/buttons/:buttonKey', async (req, res, next) => {
     if (!screen.buttons[req.params.buttonKey]) return res.status(404).json({ error: 'Button not found' });
     screen.buttons[req.params.buttonKey].label = req.body.label;
     await saveScenarios(data, dbId);
+    notifyBotReload();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -235,6 +251,7 @@ router.put('/screens/:screenId/buttons-order', async (req, res, next) => {
     if (!screen) return res.status(404).json({ error: 'Screen not found' });
     screen.buttons._order = req.body.order;
     await saveScenarios(data, dbId);
+    notifyBotReload();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

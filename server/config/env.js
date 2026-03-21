@@ -36,3 +36,6 @@ export const S3_SECRET_KEY = process.env.S3_SECRET_KEY || projectEnv.S3_SECRET_K
 
 // Telegram admin chat ID for getting file_id (bot sends photo here and deletes it)
 export const TG_ADMIN_CHAT_ID = process.env.TG_ADMIN_CHAT_ID || projectEnv.TG_ADMIN_CHAT_ID || '';
+
+// Bot admin API (Python aiohttp on bot server, port 5050)
+export const BOT_API_URL = process.env.BOT_API_URL || projectEnv.BOT_API_URL || '';
