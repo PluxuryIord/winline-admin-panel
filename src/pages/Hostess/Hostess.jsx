@@ -266,7 +266,6 @@ export default function Hostess() {
 
       {/* Footer */}
       <div className="hostess-footer">
-        <span>Отсканировано кодов: {scannedCount}</span>
         <a
           href="https://t.me/avoynich"
           target="_blank"

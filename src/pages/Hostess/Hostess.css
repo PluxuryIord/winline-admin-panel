@@ -23,7 +23,7 @@
 }
 
 .hostess-logo-img {
-  height: 48px;
+  height: 72px;
   width: auto;
   object-fit: contain;
 }
@@ -257,7 +257,7 @@
   }
 
   .hostess-logo-img {
-    height: 40px;
+    height: 56px;
   }
 
   /* Центральный блок — меньше отступы */

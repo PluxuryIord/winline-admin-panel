@@ -321,6 +321,47 @@ function SettingsModal({ onClose }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────
 
+function EventToggle() {
+  const [eventStarts, setEventStarts] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/api/events/settings');
+        const data = await res.json();
+        setEventStarts(!!data.event_starts);
+      } catch {}
+      finally { setLoaded(true); }
+    })();
+  }, []);
+
+  const handleToggle = async () => {
+    setToggling(true);
+    try {
+      const res = await api.put('/api/events/toggle', { enabled: !eventStarts });
+      const data = await res.json();
+      if (data.ok) setEventStarts(data.event_starts);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setToggling(false); }
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <button
+      className={`ew-header-toggle ${eventStarts ? 'on' : ''}`}
+      onClick={handleToggle}
+      disabled={toggling}
+      title={eventStarts ? 'Мероприятие активно' : 'Мероприятие выключено'}
+    >
+      {eventStarts ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+      <span className="ew-header-toggle-label">{eventStarts ? 'Активно' : 'Выключено'}</span>
+    </button>
+  );
+}
+
 export default function EventWork() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -328,7 +369,10 @@ export default function EventWork() {
     <div className="ew-container">
       <div className="ew-header">
         <div className="ew-header-left">
-          <h1>Работа на ивенте</h1>
+          <div className="ew-header-title-row">
+            <h1>Работа на ивенте</h1>
+            <EventToggle />
+          </div>
           <p>QR-коды, сканирования и управление мероприятием</p>
         </div>
         <button className="ew-settings-btn" onClick={() => setSettingsOpen(true)}>
