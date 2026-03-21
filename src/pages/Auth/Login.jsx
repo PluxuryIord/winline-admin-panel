@@ -32,7 +32,7 @@ export default function Login() {
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-logo">
-          <span className="login-logo-text">WL</span>
+          <img src="/logo.svg" alt="Winline Partners" className="login-logo-img" />
         </div>
         <h1 className="login-title">Winline Admin</h1>
         <p className="login-subtitle">Войдите в панель управления</p>

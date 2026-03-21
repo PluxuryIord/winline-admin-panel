@@ -21,20 +21,14 @@
 }
 
 .login-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #FF7E00, #ff5500);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.login-logo-text {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: white;
-  letter-spacing: 0.05em;
+.login-logo-img {
+  height: 48px;
+  width: auto;
 }
 
 .login-title {
