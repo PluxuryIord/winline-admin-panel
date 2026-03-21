@@ -185,73 +185,21 @@ function CodesSection() {
 
 // ─── Settings Modal ───────────────────────────────────────────────────────
 
-// ─── QR Card Preview (canvas) ─────────────────────────────────────────────
+// ─── QR Card Preview (server-rendered) ───────────────────────────────────
 
-function QrCardPreview({ bgUrl, captionText }) {
-  const canvasRef = useRef(null);
-  const bgImgRef = useRef(null);
+function QrCardPreview({ saved }) {
+  const [previewUrl, setPreviewUrl] = useState('');
 
   useEffect(() => {
-    if (bgUrl) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => { bgImgRef.current = img; draw(); };
-      img.onerror = () => { bgImgRef.current = null; draw(); };
-      img.src = bgUrl;
-    } else {
-      bgImgRef.current = null;
-      draw();
-    }
-  }, [bgUrl]); // eslint-disable-line
+    // Use server endpoint to render actual card preview
+    setPreviewUrl(`/api/events/codes/PREVIEW/qr-card?t=${Date.now()}`);
+  }, [saved]);
 
-  useEffect(() => { draw(); }, [captionText]); // eslint-disable-line
-
-  function draw() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const W = 300, H = 400;
-    canvas.width = W; canvas.height = H;
-
-    // Background
-    if (bgImgRef.current) {
-      const img = bgImgRef.current;
-      const scale = Math.max(W / img.width, H / img.height);
-      const sw = W / scale, sh = H / scale;
-      const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
-    } else {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, W, H);
-    }
-
-    // QR placeholder
-    const qrSize = 140, qrTop = 70;
-    const qrX = (W - qrSize) / 2;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(qrX - 4, qrTop - 4, qrSize + 8, qrSize + 8);
-    ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(qrX, qrTop, qrSize, qrSize);
-    ctx.fillStyle = '#999';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('QR-CODE', W / 2, qrTop + qrSize / 2 + 5);
-
-    // Caption text
-    if (captionText) {
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'center';
-      const lines = captionText.split('\n');
-      const lineH = 16;
-      const textY = qrTop + qrSize + 24;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, W / 2, textY + i * lineH);
-      });
-    }
-  }
-
-  return <canvas ref={canvasRef} className="ew-qr-preview-canvas" />;
+  return previewUrl ? (
+    <img src={previewUrl} alt="QR Card Preview" className="ew-qr-preview-img" />
+  ) : (
+    <div className="ew-qr-preview-empty">Сохраните шаблон для превью</div>
+  );
 }
 
 function SettingsModal({ onClose }) {
@@ -392,7 +340,7 @@ function SettingsModal({ onClose }) {
                 {/* Preview */}
                 <div className="ew-qr-editor-preview">
                   <span className="ew-qr-preview-label">Превью</span>
-                  <QrCardPreview bgUrl={qrBgUrl} captionText={qrCaptionText} />
+                  <QrCardPreview saved={saved} />
                 </div>
               </div>
             </div>

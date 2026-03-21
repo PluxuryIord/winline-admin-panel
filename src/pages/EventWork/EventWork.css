@@ -1499,10 +1499,25 @@
   letter-spacing: 1px;
 }
 
-.ew-qr-preview-canvas {
+.ew-qr-preview-img {
   width: 210px;
-  height: 280px;
+  height: auto;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: #1a1a1a;
+}
+
+.ew-qr-preview-empty {
+  width: 210px;
+  height: 280px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 16px;
 }
