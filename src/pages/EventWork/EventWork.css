@@ -624,7 +624,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   padding: 32px;
-  max-width: 420px;
+  max-width: 500px;
   width: 100%;
   position: relative;
   text-align: center;
@@ -654,17 +654,15 @@
 }
 
 .ew-qr-image-wrap {
-  background: #fff;
   border-radius: 16px;
-  padding: 20px;
+  overflow: hidden;
   display: inline-flex;
   margin-bottom: 16px;
 }
 
 .ew-qr-image {
-  width: 280px;
-  height: 280px;
-  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
 }
 
 .ew-qr-hint {
