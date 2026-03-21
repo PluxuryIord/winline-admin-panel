@@ -173,7 +173,7 @@ function CodesSection() {
             <button className="ew-qr-modal-close" onClick={() => setQrModal(null)}><X size={20} /></button>
             <h3>QR-код: {qrModal}</h3>
             <div className="ew-qr-image-wrap">
-              <img src={`/api/events/codes/${encodeURIComponent(qrModal)}/qr`} alt={`QR ${qrModal}`} className="ew-qr-image" />
+              <img src={`/api/events/codes/${encodeURIComponent(qrModal)}/qr-card?t=${Date.now()}`} alt={`QR ${qrModal}`} className="ew-qr-image" />
             </div>
             <p className="ew-qr-hint">Отсканируйте QR-код камерой или на странице хостес</p>
           </div>
