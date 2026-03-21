@@ -1,4 +1,4 @@
-import { Settings, Bell, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 export default function Header({ setIsMobileMenuOpen }) {
   return (
@@ -7,11 +7,6 @@ export default function Header({ setIsMobileMenuOpen }) {
       <button className="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(true)}>
         <Menu size={24} />
       </button>
-
-      <div className="header-actions">
-        <Bell size={20} className="icon-orange" />
-        <Settings size={20} className="icon-orange" />
-      </div>
     </header>
   );
 }
