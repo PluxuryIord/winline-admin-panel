@@ -16,45 +16,16 @@
 /* ===== ЛОГОТИП ===== */
 .hostess-logo-wrap {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   margin-top: 56px;
   flex-shrink: 0;
 }
 
-.hostess-logo-badge {
-  display: flex;
-  align-items: center;
-  background: #111;
-  border-radius: 100px;
-  padding: 8px 12px 8px 20px;
-  gap: 10px;
-}
-
-.hostess-logo-text {
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.hostess-logo-circle {
-  width: 32px;
-  height: 32px;
-  background: #FF7E00;
-  border-radius: 50%;
-  display: block;
-  border: 3px solid #fff;
-  box-sizing: border-box;
-}
-
-.hostess-logo-subtitle {
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 5px;
-  text-transform: uppercase;
+.hostess-logo-img {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
 }
 
 /* ===== МИНИ СТАТИСТИКА ===== */
@@ -283,26 +254,10 @@
   /* Логотип */
   .hostess-logo-wrap {
     margin-top: 32px;
-    gap: 4px;
   }
 
-  .hostess-logo-badge {
-    padding: 7px 10px 7px 16px;
-    gap: 8px;
-  }
-
-  .hostess-logo-text {
-    font-size: 1.2rem;
-  }
-
-  .hostess-logo-circle {
-    width: 26px;
-    height: 26px;
-  }
-
-  .hostess-logo-subtitle {
-    font-size: 0.8rem;
-    letter-spacing: 4px;
+  .hostess-logo-img {
+    height: 40px;
   }
 
   /* Центральный блок — меньше отступы */
