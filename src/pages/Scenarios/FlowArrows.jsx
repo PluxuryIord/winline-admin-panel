@@ -34,25 +34,25 @@ export default function FlowArrows({ screens, activeScreen }) {
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
 
-      // Source: bottom of node, spread horizontally per button
-      const sx = srcX + NODE_W / 2 + (btnIdx - (srcBtnCount - 1) / 2) * 20;
-      const sy = srcY + NODE_HEADER_H + srcBtnCount * BTN_ROW_H + NODE_PAD_BOTTOM;
+      // Source: right edge of the specific button row
+      const sx = srcX + NODE_W;
+      const sy = srcY + NODE_HEADER_H + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
       // Target: top center of target node
       const tx = tgtX + NODE_W / 2;
       const ty = tgtY;
 
-      const dy = Math.abs(ty - sy);
-      const cpOffset = Math.max(60, dy * 0.4);
+      // Bezier: exits right from button, enters top of target
+      const dist = Math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2);
+      const cpOffset = Math.max(80, dist * 0.35);
 
       let cp1x, cp1y, cp2x, cp2y;
-      if (ty > sy) {
-        cp1x = sx; cp1y = sy + cpOffset;
-        cp2x = tx; cp2y = ty - cpOffset;
-      } else {
-        cp1x = sx + 120; cp1y = sy + 80;
-        cp2x = tx - 120; cp2y = ty - 80;
-      }
+      // Control point 1: go right from button
+      cp1x = sx + cpOffset;
+      cp1y = sy;
+      // Control point 2: come from above into target top
+      cp2x = tx;
+      cp2y = ty - cpOffset;
 
       const isHighlighted = srcId === activeScreen || btn.targetScreen === activeScreen;
       const mid = bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
