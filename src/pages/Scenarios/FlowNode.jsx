@@ -7,6 +7,12 @@ const SCREEN_ICONS = {
   socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
 };
 
+// Exported constants for FlowArrows to use
+export const NODE_W = 280;
+export const NODE_HEADER_H = 52;
+export const BTN_ROW_H = 36;
+export const NODE_PAD_BOTTOM = 10;
+
 export default function FlowNode({ screenId, screen, position, isActive, onSelect, onMove }) {
   const dragRef = useRef(null);
 
@@ -47,6 +53,9 @@ export default function FlowNode({ screenId, screen, position, isActive, onSelec
       style={{ left: position.x, top: position.y }}
       onMouseDown={handleMouseDown}
     >
+      {/* Top anchor dot (incoming arrows land here) */}
+      <div className="flow-node-anchor flow-node-anchor-top" />
+
       <div className="flow-node-header">
         <span className="flow-node-icon">{icon}</span>
         <span className="flow-node-title">{screen.title}</span>
@@ -57,11 +66,13 @@ export default function FlowNode({ screenId, screen, position, isActive, onSelec
             const btn = screen.buttons[key];
             if (!btn) return null;
             const isUrl = btn.action?.startsWith('url:');
+            const hasTarget = !!btn.targetScreen;
             return (
-              <div key={key} className="flow-node-btn" data-btn-key={key}>
-                <span className={`flow-node-btn-dot ${isUrl ? 'url' : 'callback'}`} />
+              <div key={key} className={`flow-node-btn ${isUrl ? 'url' : 'callback'}`} data-btn-key={key}>
                 <span className="flow-node-btn-label">{btn.label}</span>
-                {isUrl && <ExternalLink size={10} />}
+                {isUrl && <ExternalLink size={12} />}
+                {/* Bottom anchor dot for outgoing arrows */}
+                {hasTarget && <div className="flow-node-anchor flow-node-anchor-btn" />}
               </div>
             );
           })}

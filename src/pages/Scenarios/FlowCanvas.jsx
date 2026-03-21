@@ -7,7 +7,6 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   const handleBgMouseDown = useCallback((e) => {
-    // Only pan if clicking on background (not on a node)
     if (e.target !== e.currentTarget && !e.target.classList.contains('flow-canvas-inner')) return;
     if (e.button !== 0) return;
 

@@ -21,12 +21,12 @@
 .sc-spinner { animation: sc-spin 1s linear infinite; }
 @keyframes sc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* ─── Canvas ─── */
+/* ─── Canvas (no size limits) ─── */
 .flow-canvas {
   width: 100%;
   height: 100%;
   cursor: grab;
-  overflow: hidden;
+  overflow: visible;
   background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
   background-size: 24px 24px;
 }
@@ -35,28 +35,27 @@
 
 .flow-canvas-inner {
   position: relative;
-  width: 5000px;
-  height: 5000px;
 }
 
 /* ─── Arrows SVG ─── */
 .flow-arrows-svg {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: -5000px;
+  left: -5000px;
+  width: 10000px;
+  height: 10000px;
   pointer-events: none;
   z-index: 1;
+  overflow: visible;
 }
 
-/* ─── Flow Node ─── */
+/* ─── Flow Node (bigger) ─── */
 .flow-node {
   position: absolute;
-  width: 220px;
+  width: 280px;
   background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: 16px;
   cursor: pointer;
   user-select: none;
   z-index: 2;
@@ -73,21 +72,47 @@
   box-shadow: 0 0 0 2px rgba(255, 126, 0, 0.15), 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 
+/* ─── Anchor dots ─── */
+.flow-node-anchor {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 126, 0, 0.4);
+  border: 2px solid var(--color-panel);
+  z-index: 3;
+}
+
+.flow-node-anchor-top {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.flow-node-anchor-btn {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+}
+
 .flow-node-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 14px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .flow-node-icon {
-  font-size: 1rem;
+  font-size: 1.2rem;
   flex-shrink: 0;
 }
 
 .flow-node-title {
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-white);
   white-space: nowrap;
@@ -95,44 +120,42 @@
   text-overflow: ellipsis;
 }
 
+/* ─── Buttons inside node (button-like) ─── */
 .flow-node-buttons {
-  padding: 6px 10px 8px;
+  padding: 8px 10px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .flow-node-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: background 0.1s;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  transition: all 0.12s;
+  position: relative;
+}
+
+.flow-node-btn.callback {
+  background: rgba(255, 126, 0, 0.08);
+  border: 1px solid rgba(255, 126, 0, 0.15);
+}
+
+.flow-node-btn.url {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .flow-node-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.flow-node-btn-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.flow-node-btn-dot.callback {
-  background: var(--color-orange);
-}
-
-.flow-node-btn-dot.url {
-  background: #60a5fa;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .flow-node-btn-label {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -140,7 +163,7 @@
 }
 
 .flow-node-btn svg {
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
 }
 
