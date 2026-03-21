@@ -12,7 +12,7 @@ export function removeToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request(url, options = {}) {
+async function request(url, options = {}, retries = 2) {
   const token = getToken();
   const headers = { ...options.headers };
 
@@ -20,23 +20,41 @@ async function request(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Автоматически добавляем Content-Type для JSON, если есть body и не FormData
   if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(url, { ...options, headers });
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, { ...options, headers });
 
-  if (res.status === 401) {
-    removeToken();
-    // Не редиректим если уже на /login
-    if (!window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+      if (res.status === 401) {
+        removeToken();
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
+        throw new Error('Unauthorized');
+      }
+
+      // Retry on 502/503/504
+      if (res.status >= 502 && res.status <= 504 && attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      lastError = err;
+      if (err.message === 'Unauthorized') throw err;
+      // Network error — retry
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
     }
-    throw new Error('Unauthorized');
   }
-
-  return res;
+  throw lastError;
 }
 
 export const api = {
