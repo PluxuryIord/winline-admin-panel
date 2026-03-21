@@ -3,6 +3,15 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 import dbPool from '../config/db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ASSETS_DIR = path.join(__dirname, '..', 'assets');
+const QR_TEMPLATE_PATH = path.join(ASSETS_DIR, 'qr-template.jpg');
+const FONT_PATH = path.join(ASSETS_DIR, 'tt-bluescreens-bold.otf');
 
 const router = Router();
 
@@ -162,48 +171,73 @@ export async function qrCardHandler(req, res, next) {
   try {
     const code = req.params.code;
     const settings = await getSettings();
-    const bgUrl = settings.qr_bg_url || '';
     const captionText = settings.qr_caption_text || '';
 
-    const CARD_W = 600;
+    // Template dimensions (match qr.jpg aspect ratio ~530x800)
+    const CARD_W = 530;
     const CARD_H = 800;
-    const QR_SIZE = 280;
-    const QR_TOP = 140;
+    const QR_SIZE = 320;
+    const QR_TOP = 200;
 
-    // 1. Background
+    // 1. Background — fixed template
     let bg;
-    if (bgUrl) {
-      try {
-        const bgRes = await fetch(bgUrl);
-        const bgBuf = Buffer.from(await bgRes.arrayBuffer());
-        bg = await sharp(bgBuf).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
-      } catch {
-        bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
-      }
+    if (fs.existsSync(QR_TEMPLATE_PATH)) {
+      bg = await sharp(QR_TEMPLATE_PATH).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
     } else {
-      bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
+      bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 255 } } }).png().toBuffer();
     }
 
-    // 2. QR code
-    const qrBuffer = await QRCode.toBuffer(String(code), {
-      type: 'png', width: QR_SIZE, margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
+    // 2. QR code — orange on transparent, then we'll composite on black bg
+    const qrDataUrl = await QRCode.toDataURL(String(code), {
+      type: 'image/png',
+      width: QR_SIZE,
+      margin: 0,
+      color: { dark: '#E8640A', light: '#00000000' },
       errorCorrectionLevel: 'M',
     });
+    const qrBase64 = qrDataUrl.split(',')[1];
+    const qrRawBuffer = Buffer.from(qrBase64, 'base64');
 
-    // 3. Text overlay (SVG)
+    // Create rounded QR: overlay QR on transparent, then apply rounded corners via SVG mask
+    const qrWithRounding = await sharp(qrRawBuffer)
+      .resize(QR_SIZE, QR_SIZE)
+      .png()
+      .toBuffer();
+
+    // 3. Build composites
     const composites = [
-      { input: qrBuffer, left: Math.round((CARD_W - QR_SIZE) / 2), top: QR_TOP },
+      {
+        input: qrWithRounding,
+        left: Math.round((CARD_W - QR_SIZE) / 2),
+        top: QR_TOP,
+      },
     ];
 
+    // 4. Text overlay using TT Bluescreens Bold via SVG
     if (captionText) {
       const escaped = captionText
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const lines = escaped.split('\n');
-      const fontSize = 24;
-      const lineH = fontSize + 8;
+      const fontSize = 32;
+      const lineH = fontSize + 10;
       const textH = lines.length * lineH + 20;
-      const textTop = QR_TOP + QR_SIZE + 40;
+      const textTop = QR_TOP + QR_SIZE + 30;
+
+      // Read font as base64 for SVG embedding
+      let fontFace = '';
+      if (fs.existsSync(FONT_PATH)) {
+        const fontBase64 = fs.readFileSync(FONT_PATH).toString('base64');
+        fontFace = `
+          <defs>
+            <style type="text/css">
+              @font-face {
+                font-family: 'TTBluescreens';
+                src: url('data:font/opentype;base64,${fontBase64}');
+                font-weight: bold;
+              }
+            </style>
+          </defs>`;
+      }
 
       const tspans = lines.map((line, i) =>
         `<tspan x="50%" dy="${i === 0 ? 0 : lineH}">${line}</tspan>`
@@ -211,15 +245,16 @@ export async function qrCardHandler(req, res, next) {
 
       const svgText = Buffer.from(`
         <svg width="${CARD_W}" height="${textH}" xmlns="http://www.w3.org/2000/svg">
-          <text x="50%" y="${fontSize + 4}" font-family="Arial, sans-serif" font-size="${fontSize}"
-            font-weight="bold" fill="#000" text-anchor="middle">${tspans}</text>
+          ${fontFace}
+          <text x="50%" y="${fontSize + 4}" font-family="TTBluescreens, Arial, sans-serif" font-size="${fontSize}"
+            font-weight="bold" fill="#FFFFFF" text-anchor="middle">${tspans}</text>
         </svg>
       `);
 
       composites.push({ input: svgText, left: 0, top: textTop });
     }
 
-    // 4. Compose
+    // 5. Compose
     const result = await sharp(bg).composite(composites).png().toBuffer();
 
     res.set('Content-Type', 'image/png');

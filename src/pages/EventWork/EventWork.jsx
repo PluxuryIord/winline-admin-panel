@@ -206,14 +206,13 @@ function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
   const [qrCaptionText, setQrCaptionText] = useState('');
-  const [qrBgUrl, setQrBgUrl] = useState('');
+  // qrBgUrl removed — fixed template is used
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  // uploading/fileInputRef removed — no bg upload
   const hostessUrl = `${window.location.origin}/hostess`;
 
   useEffect(() => {
@@ -224,7 +223,7 @@ function SettingsModal({ onClose }) {
         setEventStarts(!!data.event_starts);
         setCodeLimit(data.code_limit ?? 0);
         setQrCaptionText(data.qr_caption_text ?? '');
-        setQrBgUrl(data.qr_bg_url ?? '');
+        // qr_bg_url no longer needed
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -246,30 +245,14 @@ function SettingsModal({ onClose }) {
       await api.put('/api/events/settings', {
         code_limit: Number(codeLimit),
         qr_caption_text: qrCaptionText,
-        qr_bg_url: qrBgUrl,
+        // qr_bg_url: fixed template
       });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setSaving(false); }
   };
 
-  const handleBgUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const res = await api.post('/api/upload', { data: reader.result });
-        const data = await res.json();
-        if (data.url) setQrBgUrl(data.url);
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (e) { alert('Ошибка загрузки: ' + e.message); setUploading(false); }
-  };
-
-  const handleRemoveBg = () => setQrBgUrl('');
+  // Background upload removed — fixed template
 
   const handleReset = async () => {
     if (!confirm('Вы уверены? Все QR-коды и сканирования будут удалены. Это необратимо!')) return;
@@ -299,27 +282,10 @@ function SettingsModal({ onClose }) {
             {/* QR Card Editor */}
             <div className="ew-settings-section">
               <h3><ImageIcon size={18} /> Шаблон QR-карточки</h3>
-              <p className="ew-settings-desc">Настройте фон и текст карточки, которую получат пользователи в боте</p>
+              <p className="ew-settings-desc">Настройте текст карточки, которую получат пользователи в боте</p>
 
               <div className="ew-qr-editor">
                 <div className="ew-qr-editor-controls">
-                  {/* Background */}
-                  <div className="ew-qr-editor-field">
-                    <label>Фоновое изображение</label>
-                    <div className="ew-qr-bg-actions">
-                      <button className="ew-qr-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                        <Upload size={14} /> {uploading ? 'Загрузка...' : 'Загрузить фон'}
-                      </button>
-                      {qrBgUrl && (
-                        <button className="ew-qr-remove-bg-btn" onClick={handleRemoveBg}>
-                          <X size={14} /> Убрать
-                        </button>
-                      )}
-                    </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
-                    {qrBgUrl && <span className="ew-qr-bg-hint">Фон загружен</span>}
-                  </div>
-
                   {/* Caption */}
                   <div className="ew-qr-editor-field">
                     <label>Текст под QR-кодом</label>
