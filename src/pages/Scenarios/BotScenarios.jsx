@@ -10,8 +10,7 @@ const CALLBACK_TO_SCREEN = {
   client_existing_partner: 'auth_flow',
   client_new_partner: 'registration_flow',
   client_already_registered: 'auth_flow',
-  client_back_to_start: 'start_menu',
-  client_back_menu: 'main_menu',
+  // client_back_to_start и client_back_menu — не рисуем стрелки "назад"
   client_offers: 'offer_page',
   client_promo: 'promo_page',
   client_socials: 'socials_page',
@@ -46,17 +45,26 @@ function migrateData(data) {
       changed = true;
     }
 
-    // Add targetScreen to callback buttons
+    // Add/remove targetScreen on callback buttons
+    const BACK_CALLBACKS = ['client_back_to_start', 'client_back_menu'];
     const order = screen.buttons?._order || [];
     for (const btnKey of order) {
       const btn = screen.buttons[btnKey];
       if (!btn) continue;
-      if (btn.action?.startsWith('callback:') && !btn.targetScreen) {
+      if (btn.action?.startsWith('callback:')) {
         const callbackId = btn.action.split(':').slice(1).join(':');
-        const target = CALLBACK_TO_SCREEN[callbackId];
-        if (target) {
-          btn.targetScreen = target;
+        // Remove targetScreen from "back" buttons
+        if (BACK_CALLBACKS.includes(callbackId) && btn.targetScreen) {
+          delete btn.targetScreen;
           changed = true;
+        }
+        // Add targetScreen for non-back buttons
+        if (!btn.targetScreen && !BACK_CALLBACKS.includes(callbackId)) {
+          const target = CALLBACK_TO_SCREEN[callbackId];
+          if (target) {
+            btn.targetScreen = target;
+            changed = true;
+          }
         }
       }
     }
