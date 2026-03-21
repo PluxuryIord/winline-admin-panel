@@ -295,6 +295,7 @@ router.put('/settings', async (req, res, next) => {
     const updated = { ...current };
     if (req.body.code_limit !== undefined) updated.code_limit = Math.max(0, Number(req.body.code_limit) || 0);
     if (req.body.event_starts !== undefined) updated.event_starts = !!req.body.event_starts;
+    if (req.body.qr_caption_text !== undefined) updated.qr_caption_text = String(req.body.qr_caption_text || '');
     await saveSettings(updated);
     res.json({ ok: true, settings: updated });
   } catch (err) { next(err); }

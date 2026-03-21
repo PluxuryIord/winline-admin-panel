@@ -188,6 +188,7 @@ function CodesSection() {
 function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
+  const [qrCaptionText, setQrCaptionText] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -202,6 +203,7 @@ function SettingsModal({ onClose }) {
         const data = await res.json();
         setEventStarts(!!data.event_starts);
         setCodeLimit(data.code_limit ?? 0);
+        setQrCaptionText(data.qr_caption_text ?? '');
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -220,7 +222,7 @@ function SettingsModal({ onClose }) {
   const handleSave = async () => {
     setSaving(true); setSaved(false);
     try {
-      await api.put('/api/events/settings', { code_limit: Number(codeLimit) });
+      await api.put('/api/events/settings', { code_limit: Number(codeLimit), qr_caption_text: qrCaptionText });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setSaving(false); }
@@ -273,6 +275,19 @@ function SettingsModal({ onClose }) {
                   {saved ? <><Check size={16} /> Сохранено</> : saving ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>
+            </div>
+
+            {/* QR Caption */}
+            <div className="ew-settings-section">
+              <h3>Текст под QR-кодом</h3>
+              <p className="ew-settings-desc">Этот текст будет нарисован на картинке под QR-кодом, который получает пользователь в боте.</p>
+              <textarea
+                className="ew-settings-textarea"
+                rows={4}
+                value={qrCaptionText}
+                onChange={e => setQrCaptionText(e.target.value)}
+                placeholder="Например: Покажите этот QR-код на стенде для получения подарка!"
+              />
             </div>
 
             {/* Hostess link */}

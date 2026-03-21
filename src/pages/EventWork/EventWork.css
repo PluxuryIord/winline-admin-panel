@@ -842,6 +842,29 @@
   border-color: rgba(255, 126, 0, 0.4);
 }
 
+.ew-settings-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--color-white);
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.ew-settings-textarea:focus {
+  border-color: rgba(255, 126, 0, 0.4);
+}
+
+.ew-settings-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .ew-save-btn {
   display: inline-flex;
   align-items: center;
