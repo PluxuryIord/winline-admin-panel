@@ -34,7 +34,6 @@ export default function Login() {
         <div className="login-logo">
           <img src="/logo.svg" alt="Winline Partners" className="login-logo-img" />
         </div>
-        <h1 className="login-title">Winline Admin</h1>
         <p className="login-subtitle">Войдите в панель управления</p>
 
         {error && <div className="login-error">{error}</div>}
