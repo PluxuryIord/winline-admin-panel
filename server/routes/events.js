@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
+import sharp from 'sharp';
 import dbPool from '../config/db.js';
 
 const router = Router();
@@ -17,7 +18,7 @@ function generateCode() {
 
 async function getSettings() {
   const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'event_settings' LIMIT 1");
-  const base = { event_starts: false, code_limit: 0 };
+  const base = { event_starts: false, code_limit: 0, qr_bg_url: '', qr_caption_text: '' };
   if (rows.length) {
     const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     Object.assign(base, data);
@@ -154,6 +155,79 @@ export async function qrHandler(req, res, next) {
   } catch (err) { next(err); }
 }
 router.get('/codes/:code/qr', qrHandler);
+
+// ─── GET /api/events/codes/:code/qr-card — карточка: фон + QR + текст ────────
+
+export async function qrCardHandler(req, res, next) {
+  try {
+    const code = req.params.code;
+    const settings = await getSettings();
+    const bgUrl = settings.qr_bg_url || '';
+    const captionText = settings.qr_caption_text || '';
+
+    const CARD_W = 600;
+    const CARD_H = 800;
+    const QR_SIZE = 280;
+    const QR_TOP = 140;
+
+    // 1. Background
+    let bg;
+    if (bgUrl) {
+      try {
+        const bgRes = await fetch(bgUrl);
+        const bgBuf = Buffer.from(await bgRes.arrayBuffer());
+        bg = await sharp(bgBuf).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
+      } catch {
+        bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
+      }
+    } else {
+      bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
+    }
+
+    // 2. QR code
+    const qrBuffer = await QRCode.toBuffer(String(code), {
+      type: 'png', width: QR_SIZE, margin: 2,
+      color: { dark: '#000000', light: '#FFFFFF' },
+      errorCorrectionLevel: 'M',
+    });
+
+    // 3. Text overlay (SVG)
+    const composites = [
+      { input: qrBuffer, left: Math.round((CARD_W - QR_SIZE) / 2), top: QR_TOP },
+    ];
+
+    if (captionText) {
+      const escaped = captionText
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const lines = escaped.split('\n');
+      const fontSize = 24;
+      const lineH = fontSize + 8;
+      const textH = lines.length * lineH + 20;
+      const textTop = QR_TOP + QR_SIZE + 40;
+
+      const tspans = lines.map((line, i) =>
+        `<tspan x="50%" dy="${i === 0 ? 0 : lineH}">${line}</tspan>`
+      ).join('');
+
+      const svgText = Buffer.from(`
+        <svg width="${CARD_W}" height="${textH}" xmlns="http://www.w3.org/2000/svg">
+          <text x="50%" y="${fontSize + 4}" font-family="Arial, sans-serif" font-size="${fontSize}"
+            font-weight="bold" fill="#000" text-anchor="middle">${tspans}</text>
+        </svg>
+      `);
+
+      composites.push({ input: svgText, left: 0, top: textTop });
+    }
+
+    // 4. Compose
+    const result = await sharp(bg).composite(composites).png().toBuffer();
+
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(result);
+  } catch (err) { next(err); }
+}
+router.get('/codes/:code/qr-card', qrCardHandler);
 
 // ─── POST /api/events/scan — сканирование (публичный) ────────────────────────
 
@@ -296,6 +370,7 @@ router.put('/settings', async (req, res, next) => {
     if (req.body.code_limit !== undefined) updated.code_limit = Math.max(0, Number(req.body.code_limit) || 0);
     if (req.body.event_starts !== undefined) updated.event_starts = !!req.body.event_starts;
     if (req.body.qr_caption_text !== undefined) updated.qr_caption_text = String(req.body.qr_caption_text || '');
+    if (req.body.qr_bg_url !== undefined) updated.qr_bg_url = String(req.body.qr_bg_url || '');
     await saveSettings(updated);
     res.json({ ok: true, settings: updated });
   } catch (err) { next(err); }

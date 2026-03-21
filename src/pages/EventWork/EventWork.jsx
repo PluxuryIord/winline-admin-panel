@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Gift, ScanLine, Calendar,
   ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, Upload, ImageIcon,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -185,15 +185,87 @@ function CodesSection() {
 
 // ─── Settings Modal ───────────────────────────────────────────────────────
 
+// ─── QR Card Preview (canvas) ─────────────────────────────────────────────
+
+function QrCardPreview({ bgUrl, captionText }) {
+  const canvasRef = useRef(null);
+  const bgImgRef = useRef(null);
+
+  useEffect(() => {
+    if (bgUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { bgImgRef.current = img; draw(); };
+      img.onerror = () => { bgImgRef.current = null; draw(); };
+      img.src = bgUrl;
+    } else {
+      bgImgRef.current = null;
+      draw();
+    }
+  }, [bgUrl]); // eslint-disable-line
+
+  useEffect(() => { draw(); }, [captionText]); // eslint-disable-line
+
+  function draw() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = 300, H = 400;
+    canvas.width = W; canvas.height = H;
+
+    // Background
+    if (bgImgRef.current) {
+      const img = bgImgRef.current;
+      const scale = Math.max(W / img.width, H / img.height);
+      const sw = W / scale, sh = H / scale;
+      const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // QR placeholder
+    const qrSize = 140, qrTop = 70;
+    const qrX = (W - qrSize) / 2;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qrX - 4, qrTop - 4, qrSize + 8, qrSize + 8);
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(qrX, qrTop, qrSize, qrSize);
+    ctx.fillStyle = '#999';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR-CODE', W / 2, qrTop + qrSize / 2 + 5);
+
+    // Caption text
+    if (captionText) {
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      const lines = captionText.split('\n');
+      const lineH = 16;
+      const textY = qrTop + qrSize + 24;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, W / 2, textY + i * lineH);
+      });
+    }
+  }
+
+  return <canvas ref={canvasRef} className="ew-qr-preview-canvas" />;
+}
+
 function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
   const [qrCaptionText, setQrCaptionText] = useState('');
+  const [qrBgUrl, setQrBgUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const hostessUrl = `${window.location.origin}/hostess`;
 
   useEffect(() => {
@@ -204,6 +276,7 @@ function SettingsModal({ onClose }) {
         setEventStarts(!!data.event_starts);
         setCodeLimit(data.code_limit ?? 0);
         setQrCaptionText(data.qr_caption_text ?? '');
+        setQrBgUrl(data.qr_bg_url ?? '');
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -222,11 +295,33 @@ function SettingsModal({ onClose }) {
   const handleSave = async () => {
     setSaving(true); setSaved(false);
     try {
-      await api.put('/api/events/settings', { code_limit: Number(codeLimit), qr_caption_text: qrCaptionText });
+      await api.put('/api/events/settings', {
+        code_limit: Number(codeLimit),
+        qr_caption_text: qrCaptionText,
+        qr_bg_url: qrBgUrl,
+      });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setSaving(false); }
   };
+
+  const handleBgUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const res = await api.post('/api/upload', { data: reader.result });
+        const data = await res.json();
+        if (data.url) setQrBgUrl(data.url);
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (e) { alert('Ошибка загрузки: ' + e.message); setUploading(false); }
+  };
+
+  const handleRemoveBg = () => setQrBgUrl('');
 
   const handleReset = async () => {
     if (!confirm('Вы уверены? Все QR-коды и сканирования будут удалены. Это необратимо!')) return;
@@ -244,7 +339,7 @@ function SettingsModal({ onClose }) {
 
   return (
     <div className="ew-modal-overlay" onClick={onClose}>
-      <div className="ew-settings-modal" onClick={e => e.stopPropagation()}>
+      <div className="ew-settings-modal ew-settings-modal--wide" onClick={e => e.stopPropagation()}>
         <div className="ew-settings-modal-header">
           <h2><Settings size={20} /> Настройки мероприятия</h2>
           <button className="ew-qr-modal-close" onClick={onClose}><X size={20} /></button>
@@ -252,6 +347,56 @@ function SettingsModal({ onClose }) {
 
         {loading ? <div className="ew-loading">Загрузка...</div> : (
           <div className="ew-settings-modal-body">
+
+            {/* QR Card Editor */}
+            <div className="ew-settings-section">
+              <h3><ImageIcon size={18} /> Шаблон QR-карточки</h3>
+              <p className="ew-settings-desc">Настройте фон и текст карточки, которую получат пользователи в боте</p>
+
+              <div className="ew-qr-editor">
+                <div className="ew-qr-editor-controls">
+                  {/* Background */}
+                  <div className="ew-qr-editor-field">
+                    <label>Фоновое изображение</label>
+                    <div className="ew-qr-bg-actions">
+                      <button className="ew-qr-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                        <Upload size={14} /> {uploading ? 'Загрузка...' : 'Загрузить фон'}
+                      </button>
+                      {qrBgUrl && (
+                        <button className="ew-qr-remove-bg-btn" onClick={handleRemoveBg}>
+                          <X size={14} /> Убрать
+                        </button>
+                      )}
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
+                    {qrBgUrl && <span className="ew-qr-bg-hint">Фон загружен</span>}
+                  </div>
+
+                  {/* Caption */}
+                  <div className="ew-qr-editor-field">
+                    <label>Текст под QR-кодом</label>
+                    <textarea
+                      className="ew-settings-textarea"
+                      rows={3}
+                      value={qrCaptionText}
+                      onChange={e => setQrCaptionText(e.target.value)}
+                      placeholder="Покажите этот QR-код на стенде для получения подарка!"
+                    />
+                  </div>
+
+                  <button className={`ew-save-btn ${saved ? 'saved' : ''}`} onClick={handleSave} disabled={saving}>
+                    {saved ? <><Check size={16} /> Сохранено</> : saving ? 'Сохранение...' : 'Сохранить шаблон'}
+                  </button>
+                </div>
+
+                {/* Preview */}
+                <div className="ew-qr-editor-preview">
+                  <span className="ew-qr-preview-label">Превью</span>
+                  <QrCardPreview bgUrl={qrBgUrl} captionText={qrCaptionText} />
+                </div>
+              </div>
+            </div>
+
             {/* Toggle */}
             <div className="ew-settings-section">
               <div className="ew-toggle-row">
@@ -271,23 +416,7 @@ function SettingsModal({ onClose }) {
               <p className="ew-settings-desc">Максимальное количество кодов. 0 = безлимит.</p>
               <div className="ew-settings-row">
                 <input type="number" className="ew-settings-input" value={codeLimit} onChange={e => setCodeLimit(e.target.value)} min={0} />
-                <button className={`ew-save-btn ${saved ? 'saved' : ''}`} onClick={handleSave} disabled={saving}>
-                  {saved ? <><Check size={16} /> Сохранено</> : saving ? 'Сохранение...' : 'Сохранить'}
-                </button>
               </div>
-            </div>
-
-            {/* QR Caption */}
-            <div className="ew-settings-section">
-              <h3>Текст под QR-кодом</h3>
-              <p className="ew-settings-desc">Этот текст будет нарисован на картинке под QR-кодом, который получает пользователь в боте.</p>
-              <textarea
-                className="ew-settings-textarea"
-                rows={4}
-                value={qrCaptionText}
-                onChange={e => setQrCaptionText(e.target.value)}
-                placeholder="Например: Покажите этот QR-код на стенде для получения подарка!"
-              />
             </div>
 
             {/* Hostess link */}
