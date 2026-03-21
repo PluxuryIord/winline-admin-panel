@@ -43,10 +43,12 @@ app.get('/api/knowledge/photo/:fileId', knowledgePhotoProxy);
 
 // Публичные endpoints для хостес-страницы (без JWT)
 app.post('/api/events/scan', scanHandler);
-import { statsHandler, qrHandler } from './routes/events.js';
+import { statsHandler, qrHandler, qrCardHandler } from './routes/events.js';
 app.get('/api/events/public-stats', statsHandler);
 // QR-код как картинка (img src не может передать Bearer токен)
 app.get('/api/events/codes/:code/qr', qrHandler);
+// QR-карточка с фоном и текстом (публичный, бот скачивает без токена)
+app.get('/api/events/codes/:code/qr-card', qrCardHandler);
 
 // Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
 if (JWT_SECRET) {
