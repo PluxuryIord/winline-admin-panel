@@ -18,6 +18,19 @@ const CALLBACK_TO_SCREEN = {
   client_logout: 'logout_screen',
 };
 
+// ─── Screen → Callback mapping (for changing connections) ───────────────────
+const SCREEN_TO_CALLBACK = {
+  start_menu: 'client_back_to_start',
+  registration_flow: 'client_new_partner',
+  auth_flow: 'client_existing_partner',
+  main_menu: 'client_back_menu',
+  offer_page: 'client_offers',
+  promo_page: 'client_promo',
+  socials_page: 'client_socials',
+  event_flow: 'client_at_event',
+  logout_screen: 'client_logout',
+};
+
 // ─── Default positions for first load ───────────────────────────────────────
 const DEFAULT_POSITIONS = {
   start_menu:        { x: 400, y: 50 },
@@ -174,11 +187,16 @@ export default function BotScenarios() {
     setSaved(false);
   };
 
-  // Edit button target screen
+  // Edit button target screen + update callback action
   const updateButtonTarget = (key, targetScreen) => {
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
-      next.buttons[key] = { ...next.buttons[key], targetScreen: targetScreen || undefined };
+      const updates = { targetScreen: targetScreen || undefined };
+      // Also update the callback action to match the new target screen
+      if (targetScreen && SCREEN_TO_CALLBACK[targetScreen]) {
+        updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
+      }
+      next.buttons[key] = { ...next.buttons[key], ...updates };
       return next;
     });
     setDirty(true);
