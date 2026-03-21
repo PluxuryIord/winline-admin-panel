@@ -1,22 +1,69 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Save, ChevronUp, ChevronDown, MessageSquare, MousePointer,
-  Loader, Check, ExternalLink,
-} from 'lucide-react';
+import { Loader } from 'lucide-react';
 import { api } from '../../utils/api';
+import FlowCanvas from './FlowCanvas';
+import NodeEditorPanel from './NodeEditorPanel';
 import './BotScenarios.css';
 
-const SCREEN_ICONS = {
-  start_menu: '👋',
-  registration_flow: '📝',
-  auth_flow: '🔐',
-  main_menu: '🏠',
-  offer_page: '📋',
-  promo_page: '🎨',
-  socials_page: '📱',
-  event_flow: '🎪',
-  logout_screen: '🚪',
+// ─── Callback → Screen mapping (for auto-migration) ────────────────────────
+const CALLBACK_TO_SCREEN = {
+  client_existing_partner: 'auth_flow',
+  client_new_partner: 'registration_flow',
+  client_already_registered: 'auth_flow',
+  client_back_to_start: 'start_menu',
+  client_back_menu: 'main_menu',
+  client_offers: 'offer_page',
+  client_promo: 'promo_page',
+  client_socials: 'socials_page',
+  client_at_event: 'event_flow',
+  client_logout: 'logout_screen',
 };
+
+// ─── Default positions for first load ───────────────────────────────────────
+const DEFAULT_POSITIONS = {
+  start_menu:        { x: 400, y: 50 },
+  registration_flow: { x: 100, y: 300 },
+  auth_flow:         { x: 650, y: 300 },
+  main_menu:         { x: 400, y: 550 },
+  offer_page:        { x: 20,  y: 820 },
+  promo_page:        { x: 240, y: 820 },
+  socials_page:      { x: 460, y: 820 },
+  event_flow:        { x: 680, y: 820 },
+  logout_screen:     { x: 900, y: 820 },
+};
+
+// ─── Migrate data: add x, y, targetScreen if missing ────────────────────────
+function migrateData(data) {
+  if (!data?.screens) return data;
+  let changed = false;
+
+  for (const [screenId, screen] of Object.entries(data.screens)) {
+    // Add positions
+    if (screen.x == null || screen.y == null) {
+      const pos = DEFAULT_POSITIONS[screenId] || { x: 100, y: 100 };
+      screen.x = pos.x;
+      screen.y = pos.y;
+      changed = true;
+    }
+
+    // Add targetScreen to callback buttons
+    const order = screen.buttons?._order || [];
+    for (const btnKey of order) {
+      const btn = screen.buttons[btnKey];
+      if (!btn) continue;
+      if (btn.action?.startsWith('callback:') && !btn.targetScreen) {
+        const callbackId = btn.action.split(':').slice(1).join(':');
+        const target = CALLBACK_TO_SCREEN[callbackId];
+        if (target) {
+          btn.targetScreen = target;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return data;
+}
 
 export default function BotScenarios() {
   const [scenarios, setScenarios] = useState(null);
@@ -34,25 +81,20 @@ export default function BotScenarios() {
       let res = await api.get('/api/scenarios');
       let data = await res.json();
 
-      // Auto-seed if empty
       if (!data.screens || Object.keys(data.screens).length === 0) {
         await api.post('/api/scenarios/seed');
         res = await api.get('/api/scenarios');
         data = await res.json();
       }
 
-      setScenarios(data);
-      const screenIds = Object.keys(data.screens || {});
-      if (screenIds.length > 0 && !activeScreen) {
-        setActiveScreen(screenIds[0]);
-        setEditData(JSON.parse(JSON.stringify(data.screens[screenIds[0]])));
-      }
+      const migrated = migrateData(data);
+      setScenarios(migrated);
     } catch (e) {
       console.error('Failed to load scenarios:', e);
     } finally {
       setLoading(false);
     }
-  }, []); // eslint-disable-line
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -64,6 +106,25 @@ export default function BotScenarios() {
     setDirty(false);
     setSaved(false);
   };
+
+  // Close editor
+  const closeEditor = () => {
+    if (dirty && !confirm('Есть несохранённые изменения. Закрыть?')) return;
+    setActiveScreen(null);
+    setEditData(null);
+    setDirty(false);
+  };
+
+  // Move node
+  const moveNode = useCallback((screenId, pos) => {
+    setScenarios(prev => {
+      const next = { ...prev, screens: { ...prev.screens } };
+      next.screens[screenId] = { ...next.screens[screenId], x: pos.x, y: pos.y };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  }, []);
 
   // Edit message text
   const updateMessage = (key, text) => {
@@ -87,6 +148,28 @@ export default function BotScenarios() {
     setSaved(false);
   };
 
+  // Edit button action (url)
+  const updateButtonAction = (key, action) => {
+    setEditData(prev => {
+      const next = { ...prev, buttons: { ...prev.buttons } };
+      next.buttons[key] = { ...next.buttons[key], action };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Edit button target screen
+  const updateButtonTarget = (key, targetScreen) => {
+    setEditData(prev => {
+      const next = { ...prev, buttons: { ...prev.buttons } };
+      next.buttons[key] = { ...next.buttons[key], targetScreen: targetScreen || undefined };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
   // Move button up/down
   const moveButton = (key, direction) => {
     setEditData(prev => {
@@ -104,11 +187,16 @@ export default function BotScenarios() {
 
   // Save
   const handleSave = async () => {
-    if (!activeScreen || !editData) return;
     setSaving(true);
     try {
-      const updated = { ...scenarios };
-      updated.screens[activeScreen] = editData;
+      const updated = JSON.parse(JSON.stringify(scenarios));
+      if (activeScreen && editData) {
+        updated.screens[activeScreen] = {
+          ...editData,
+          x: updated.screens[activeScreen].x,
+          y: updated.screens[activeScreen].y,
+        };
+      }
       await api.put('/api/scenarios', updated);
       setScenarios(updated);
       setDirty(false);
@@ -124,128 +212,31 @@ export default function BotScenarios() {
   if (loading) return <div className="sc-loading"><Loader size={24} className="sc-spinner" /> Загрузка сценариев...</div>;
   if (!scenarios) return <div className="sc-loading">Не удалось загрузить</div>;
 
-  const screenIds = Object.keys(scenarios.screens);
-  const messageKeys = editData ? Object.keys(editData.messages || {}) : [];
-  const buttonOrder = editData?.buttons?._order || [];
-
   return (
-    <div className="sc-container">
-      {/* Sidebar */}
-      <div className="sc-sidebar">
-        <h2 className="sc-sidebar-title">Экраны бота</h2>
-        <div className="sc-screen-list">
-          {screenIds.map(id => {
-            const screen = scenarios.screens[id];
-            const isActive = id === activeScreen;
-            return (
-              <button
-                key={id}
-                className={`sc-screen-item ${isActive ? 'active' : ''}`}
-                onClick={() => selectScreen(id)}
-              >
-                <span className="sc-screen-icon">{SCREEN_ICONS[id] || '📄'}</span>
-                <div className="sc-screen-info">
-                  <span className="sc-screen-name">{screen.title}</span>
-                  <span className="sc-screen-desc">{screen.description}</span>
-                </div>
-                {isActive && dirty && <span className="sc-unsaved-dot" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Editor */}
-      <div className="sc-editor">
-        {editData ? (
-          <>
-            <div className="sc-editor-header">
-              <div>
-                <h2>{SCREEN_ICONS[activeScreen] || '📄'} {editData.title}</h2>
-                <p>{editData.description}</p>
-              </div>
-              <button
-                className={`sc-save-btn ${saved ? 'saved' : ''}`}
-                onClick={handleSave}
-                disabled={saving || !dirty}
-              >
-                {saved ? <><Check size={16} /> Сохранено</> : saving ? <><Loader size={16} className="sc-spinner" /> Сохранение...</> : <><Save size={16} /> Сохранить</>}
-              </button>
-            </div>
-
-            {/* Messages */}
-            {messageKeys.length > 0 && (
-              <div className="sc-section">
-                <h3 className="sc-section-title"><MessageSquare size={16} /> Сообщения</h3>
-                {messageKeys.map(key => {
-                  const msg = editData.messages[key];
-                  return (
-                    <div key={key} className="sc-message-block">
-                      <label className="sc-message-label">{msg.label}</label>
-                      <textarea
-                        className="sc-message-textarea"
-                        value={msg.text}
-                        onChange={e => updateMessage(key, e.target.value)}
-                        rows={Math.max(3, (msg.text.match(/\n/g) || []).length + 2)}
-                      />
-                      <span className="sc-message-hint">HTML-формат Telegram: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Buttons */}
-            {buttonOrder.length > 0 && (
-              <div className="sc-section">
-                <h3 className="sc-section-title"><MousePointer size={16} /> Кнопки</h3>
-                <div className="sc-buttons-list">
-                  {buttonOrder.map((key, idx) => {
-                    const btn = editData.buttons[key];
-                    if (!btn) return null;
-                    const actionType = btn.action.split(':')[0];
-                    const actionTarget = btn.action.split(':').slice(1).join(':');
-                    return (
-                      <div key={key} className="sc-button-row">
-                        <div className="sc-button-arrows">
-                          <button
-                            className="sc-arrow-btn"
-                            onClick={() => moveButton(key, -1)}
-                            disabled={idx === 0}
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            className="sc-arrow-btn"
-                            onClick={() => moveButton(key, 1)}
-                            disabled={idx === buttonOrder.length - 1}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                        </div>
-                        <input
-                          className="sc-button-input"
-                          value={btn.label}
-                          onChange={e => updateButtonLabel(key, e.target.value)}
-                        />
-                        <span className={`sc-action-badge ${actionType}`}>
-                          {actionType === 'url' ? <><ExternalLink size={12} /> ссылка</> : actionType}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {messageKeys.length === 0 && buttonOrder.length === 0 && (
-              <div className="sc-empty">Этот экран пуст</div>
-            )}
-          </>
-        ) : (
-          <div className="sc-empty">Выберите экран слева</div>
-        )}
-      </div>
+    <div className="sc-flow-layout">
+      <FlowCanvas
+        screens={scenarios.screens}
+        activeScreen={activeScreen}
+        onSelectNode={selectScreen}
+        onMoveNode={moveNode}
+      />
+      {activeScreen && editData && (
+        <NodeEditorPanel
+          screenId={activeScreen}
+          editData={editData}
+          allScreens={scenarios.screens}
+          onUpdateMessage={updateMessage}
+          onUpdateButtonLabel={updateButtonLabel}
+          onUpdateButtonAction={updateButtonAction}
+          onUpdateButtonTarget={updateButtonTarget}
+          onMoveButton={moveButton}
+          onClose={closeEditor}
+          onSave={handleSave}
+          dirty={dirty}
+          saving={saving}
+          saved={saved}
+        />
+      )}
     </div>
   );
 }
