@@ -84,7 +84,7 @@ export default function ChatView() {
     return {
       position: 'fixed',
       top: rect.bottom + 6,
-      right: window.innerWidth - rect.right,
+      left: Math.max(10, rect.right - 250),
     };
   })();
 
