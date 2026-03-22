@@ -105,7 +105,7 @@ const SEED_DATA = {
         btn_chat: { label: 'Чат с менеджером', action: 'url:https://t.me/winline_affiliate' },
         btn_socials: { label: 'Наши соц. сети', action: 'callback:client_socials' },
         btn_event: { label: 'Я на мероприятии!', action: 'callback:client_at_event' },
-        btn_logout: { label: '🚪 Выйти из аккаунта', action: 'callback:client_logout' },
+        btn_logout: { label: '🚪 Выйти из аккаунта', action: 'callback:client_logout', locked: true },
       },
     },
     offer_page: {
@@ -174,17 +174,7 @@ const SEED_DATA = {
         btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner' },
       },
     },
-    logout_screen: {
-      title: 'Выход из аккаунта',
-      description: 'Сообщение при выходе',
-      messages: {
-        logout_text: {
-          label: 'Текст выхода',
-          text: '<b>Вы вышли из аккаунта.\n\nПривет! Этот бот поможет тебе зарегистрироваться в качестве партнёра, предоставит быстрый доступ к порталу WINLINE PARTNERS, даст возможность получать актуальные новости и предложения, а также участвовать в мероприятиях!</b>',
-        },
-      },
-      buttons: {},
-    },
+    /* logout_screen removed — button stays in main_menu but is locked */
     // ── Сценарий 4: Работа бота в чатах ──
     group_menu: {
       title: 'Меню группы',

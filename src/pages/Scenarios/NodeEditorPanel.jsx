@@ -96,6 +96,21 @@ export default function NodeEditorPanel({
               const isUrl = btn.action?.startsWith('url:');
               const urlValue = isUrl ? btn.action.slice(4) : '';
 
+              if (btn.locked) {
+                return (
+                  <div key={key} className="node-editor-btn-block node-editor-btn-locked">
+                    <div className="sc-button-row">
+                      <input
+                        className="sc-button-input"
+                        value={btn.label}
+                        disabled
+                        style={{ opacity: 0.5 }}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={key} className="node-editor-btn-block">
                   <div className="sc-button-row">

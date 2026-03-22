@@ -57,7 +57,7 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
         className="flow-canvas-inner"
         style={{ transform, transformOrigin: '0 0' }}
       >
-        {Object.entries(screens).map(([id, screen]) => (
+        {Object.entries(screens).filter(([id]) => id !== 'logout_screen').map(([id, screen]) => (
           <FlowNode
             key={id}
             screenId={id}

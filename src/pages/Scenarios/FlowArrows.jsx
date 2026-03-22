@@ -28,6 +28,9 @@ export default function FlowArrows({ screens, activeScreen }) {
       const btn = screen.buttons[btnKey];
       if (!btn?.targetScreen || !screens[btn.targetScreen]) return;
 
+      // Skip arrows from "back" buttons
+      if (btn.label?.includes('Назад') || btn.label?.includes('Меню') && btnKey.includes('back')) return;
+
       const target = screens[btn.targetScreen];
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
