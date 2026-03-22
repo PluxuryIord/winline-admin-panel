@@ -1,0 +1,192 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   TgHtmlEditor — WYSIWYG for Telegram HTML
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.tg-editor-container {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.tg-editor-container:focus-within {
+  border-color: var(--color-orange);
+  box-shadow: 0 0 0 2px rgba(255, 126, 0, 0.15);
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+
+.tg-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tg-editor-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tg-editor-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-orange);
+}
+
+.tg-editor-toolbar-btn:active {
+  background: rgba(255, 126, 0, 0.15);
+}
+
+.tg-editor-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0 4px;
+}
+
+/* ── Emoji picker (inside toolbar) ────────────────────────────────────── */
+
+.tg-editor-emoji-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.tg-editor-emoji-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  width: 280px;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.tg-editor-emoji-header {
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tg-editor-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tg-editor-emoji-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.1s;
+  padding: 3px;
+}
+
+.tg-editor-emoji-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tg-editor-emoji-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* ── Editable content area ────────────────────────────────────────────── */
+
+.tg-editor-content {
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  outline: none;
+  overflow-y: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Placeholder via :empty::before */
+.tg-editor-content:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+}
+
+/* ── Inline styles for rendered Telegram tags ─────────────────────────── */
+
+.tg-editor-content b,
+.tg-editor-content strong {
+  font-weight: 700;
+}
+
+.tg-editor-content i,
+.tg-editor-content em {
+  font-style: italic;
+}
+
+.tg-editor-content code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85em;
+  color: var(--color-orange);
+}
+
+.tg-editor-content a {
+  color: #5ba5f5;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tg-editor-content a:hover {
+  color: #82bff9;
+}
+
+/* ── Inline emoji images ──────────────────────────────────────────────── */
+
+.tg-emoji-inline {
+  display: inline;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  margin: 0 1px;
+  pointer-events: none;
+  user-select: all;
+}
+
+/* ── Emoji picker backdrop (shared class from EmojiPicker) ────────────── */
+
+.tg-editor-emoji-wrapper .emoji-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}

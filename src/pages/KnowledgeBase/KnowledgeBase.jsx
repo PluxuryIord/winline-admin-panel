@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
-import EmojiPicker from '../../components/EmojiPicker/EmojiPicker';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 
 export default function KnowledgeBase() {
   const [articles, setArticles] = useState([]);
@@ -17,7 +17,6 @@ export default function KnowledgeBase() {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef(null);
-  const kbTextareaRef = useRef(null);
 
   // Modals
   const [createModal, setCreateModal] = useState(false);
@@ -392,27 +391,11 @@ export default function KnowledgeBase() {
               />
             ) : (
               <div className="kb-editor-area">
-                <div className="kb-editor-hint-row">
-                  <div className="kb-editor-hint">
-                    Telegram HTML: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;u&gt;подчёркнутый&lt;/u&gt;, &lt;a href="url"&gt;ссылка&lt;/a&gt;. Перенос строки: \n
-                  </div>
-                  <EmojiPicker
-                    textareaRef={kbTextareaRef}
-                    onInsert={(tag, pos) => {
-                      setEditContent(prev => {
-                        const insertAt = pos != null ? pos : prev.length;
-                        return prev.slice(0, insertAt) + tag + prev.slice(insertAt);
-                      });
-                    }}
-                  />
-                </div>
-                <textarea
-                  className="kb-textarea"
-                  ref={kbTextareaRef}
+                <TgHtmlEditor
                   value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  rows={25}
-                  spellCheck={false}
+                  onChange={setEditContent}
+                  minRows={15}
+                  placeholder="Содержимое статьи..."
                 />
               </div>
             )}

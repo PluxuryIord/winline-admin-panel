@@ -3,7 +3,7 @@ import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
   Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye,
 } from 'lucide-react';
-import EmojiPicker from '../../components/EmojiPicker/EmojiPicker';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
@@ -11,20 +11,12 @@ const SCREEN_ICONS = {
   socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
 };
 
-// ─── Sanitize HTML (allow only safe tags) ────────────────────────────────────
-function sanitizeHtml(html) {
-  if (!html) return '';
-  // Strip all tags except b, i, a, code, em, strong
-  return html.replace(/<\/?(?!b>|\/b>|i>|\/i>|a[\s>]|\/a>|code>|\/code>|em>|\/em>|strong>|\/strong>)[^>]*>/gi, '');
-}
-
 export default function NodeEditorPanel({
   screenId, editData, allScreens, isCustom,
   onUpdateMessage, onUpdateButtonLabel, onUpdateButtonAction,
   onUpdateButtonTarget, onMoveButton, onReorderButtons, onAddButton, onDeleteButton,
   onDeleteScreen, onClose, onSave, dirty, saving, saved,
 }) {
-  const textareaRefs = useRef({});
 
   if (!editData) return null;
 
@@ -118,32 +110,11 @@ export default function NodeEditorPanel({
             return (
               <div key={key} className="sc-message-block">
                 <label className="sc-message-label">{msg.label}</label>
-                <textarea
-                  className="sc-message-textarea"
+                <TgHtmlEditor
                   value={msg.text}
-                  onChange={e => {
-                    onUpdateMessage(key, e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.scrollHeight + 'px';
-                  }}
-                  ref={el => {
-                    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-                    if (!textareaRefs.current[key]) textareaRefs.current[key] = { current: null };
-                    textareaRefs.current[key].current = el;
-                  }}
+                  onChange={val => onUpdateMessage(key, val)}
+                  placeholder="Текст сообщения..."
                 />
-                <div className="sc-message-footer">
-                  <span className="sc-message-hint">HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
-                  <EmojiPicker
-                    textareaRef={textareaRefs.current[key] || { current: null }}
-                    onInsert={(tag, pos) => {
-                      const text = msg.text || '';
-                      const insertAt = pos != null ? pos : text.length;
-                      const newText = text.slice(0, insertAt) + tag + text.slice(insertAt);
-                      onUpdateMessage(key, newText);
-                    }}
-                  />
-                </div>
               </div>
             );
           })}
