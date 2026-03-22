@@ -213,15 +213,20 @@ export async function qrCardHandler(req, res, next) {
       },
     ];
 
-    // 4. Text overlay using TT Bluescreens Bold via SVG
+    // 4. Text overlay using TT Bluescreens Bold via SVG — centered between QR bottom and card bottom
     if (captionText) {
       const escaped = captionText
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const lines = escaped.split('\n');
-      const fontSize = 32;
-      const lineH = fontSize + 10;
-      const textH = lines.length * lineH + 20;
-      const textTop = QR_TOP + QR_SIZE + 30;
+      const fontSize = 42;
+      const lineH = fontSize + 12;
+      const textBlockH = lines.length * lineH;
+
+      // Center text vertically in the space between QR bottom and card bottom
+      const spaceTop = QR_TOP + QR_SIZE;
+      const availableH = CARD_H - spaceTop;
+      const textTop = spaceTop + Math.round((availableH - textBlockH) / 2);
+      const svgH = textBlockH + 20;
 
       // Read font as base64 for SVG embedding
       let fontFace = '';
@@ -244,7 +249,7 @@ export async function qrCardHandler(req, res, next) {
       ).join('');
 
       const svgText = Buffer.from(`
-        <svg width="${CARD_W}" height="${textH}" xmlns="http://www.w3.org/2000/svg">
+        <svg width="${CARD_W}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">
           ${fontFace}
           <text x="50%" y="${fontSize + 4}" font-family="TTBluescreens, Arial, sans-serif" font-size="${fontSize}"
             font-weight="bold" fill="#FFFFFF" text-anchor="middle">${tspans}</text>
