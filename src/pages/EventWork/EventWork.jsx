@@ -202,6 +202,91 @@ function QrCardPreview({ saved }) {
   );
 }
 
+function TestQrSection() {
+  const [testCode, setTestCode] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+
+  const handleCreate = async () => {
+    setCreating(true); setScanResult(null);
+    try {
+      const res = await api.post('/api/events/test-qr');
+      const data = await res.json();
+      if (data.ok) setTestCode(data.code);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setCreating(false); }
+  };
+
+  const handleScan = async () => {
+    if (!testCode) return;
+    setScanning(true);
+    try {
+      const res = await fetch('/api/events/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: testCode }),
+      });
+      const data = await res.json();
+      setScanResult(data);
+    } catch (e) { setScanResult({ status: 'error', message: e.message }); }
+    finally { setScanning(false); }
+  };
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    try {
+      const res = await api.delete('/api/events/test-qr');
+      const data = await res.json();
+      setTestCode(null); setScanResult(null);
+      alert(`Удалено ${data.deleted} тестовых кодов`);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setCleaning(false); }
+  };
+
+  return (
+    <div className="ew-test-qr">
+      <div className="ew-test-qr-actions">
+        <button className="ew-save-btn" onClick={handleCreate} disabled={creating}>
+          <QrCode size={14} /> {creating ? 'Создание...' : 'Создать тестовый код'}
+        </button>
+        <button className="ew-qr-remove-bg-btn" onClick={handleCleanup} disabled={cleaning}>
+          <Trash2 size={14} /> {cleaning ? 'Удаление...' : 'Удалить все тестовые'}
+        </button>
+      </div>
+
+      {testCode && (
+        <div className="ew-test-qr-result">
+          <div className="ew-test-qr-code-label">
+            Код: <code>{testCode}</code>
+          </div>
+          <div className="ew-test-qr-card">
+            <img
+              src={`/api/events/codes/${testCode}/qr-card?t=${Date.now()}`}
+              alt="Test QR"
+              className="ew-test-qr-card-img"
+            />
+          </div>
+          <div className="ew-test-qr-scan-row">
+            <button className="ew-save-btn" onClick={handleScan} disabled={scanning}>
+              <ScanLine size={14} /> {scanning ? 'Сканирование...' : 'Тестовое сканирование'}
+            </button>
+          </div>
+          {scanResult && (
+            <div className={`ew-test-qr-scan-result ew-test-qr-scan-result--${scanResult.status}`}>
+              {scanResult.status === 'give' && <><Check size={16} /> {scanResult.message}</>}
+              {scanResult.status === 'already' && <><Info size={16} /> {scanResult.message}</>}
+              {scanResult.status === 'not_found' && <><X size={16} /> {scanResult.message}</>}
+              {scanResult.status === 'error' && <><X size={16} /> Ошибка: {scanResult.message}</>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
@@ -341,6 +426,13 @@ function SettingsModal({ onClose }) {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Test QR */}
+            <div className="ew-settings-section">
+              <h3><QrCode size={18} /> Тестовый QR-код</h3>
+              <p className="ew-settings-desc">Создайте тестовый код чтобы проверить как он выглядит и как работает сканирование</p>
+              <TestQrSection />
             </div>
 
             {/* Limit */}

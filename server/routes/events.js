@@ -321,6 +321,39 @@ export async function scanHandler(req, res, next) {
 }
 router.post('/scan', scanHandler);
 
+// ─── POST /api/events/test-qr — создать тестовый QR-код ──────────────────────
+
+router.post('/test-qr', async (req, res, next) => {
+  try {
+    const testCode = 'TEST-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+
+    // Insert test code
+    await dbPool.query(
+      'INSERT INTO wl_event_codes (code, label, user_id, status) VALUES (?, ?, ?, ?)',
+      [testCode, 'Тестовый код', 0, 'active']
+    );
+
+    // Return card URL
+    const cardUrl = `/api/events/codes/${testCode}/qr-card`;
+    res.json({ ok: true, code: testCode, cardUrl });
+  } catch (err) { next(err); }
+});
+
+// ─── DELETE /api/events/test-qr — удалить все тестовые коды ──────────────────
+
+router.delete('/test-qr', async (req, res, next) => {
+  try {
+    const [result] = await dbPool.query(
+      "DELETE FROM wl_event_codes WHERE code LIKE 'TEST-%'"
+    );
+    // Also clean scan logs for test codes
+    await dbPool.query(
+      "DELETE FROM wl_admin_event_scans WHERE code LIKE 'TEST-%'"
+    );
+    res.json({ ok: true, deleted: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
 // ─── GET /api/events/stats — статистика ─────────────────────────────────────
 
 export async function statsHandler(req, res, next) {
