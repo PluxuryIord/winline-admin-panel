@@ -5,7 +5,9 @@ import FlowArrows from './FlowArrows';
 export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMoveNode }) {
   const containerRef = useRef(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
 
+  // Pan with mouse drag
   const handleBgMouseDown = useCallback((e) => {
     if (e.target !== e.currentTarget && !e.target.classList.contains('flow-canvas-inner')) return;
     if (e.button !== 0) return;
@@ -30,16 +32,30 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
     document.addEventListener('mouseup', onMouseUp);
   }, [offset]);
 
+  // Zoom with scroll wheel
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    setZoom(prev => Math.min(2, Math.max(0.3, prev + delta)));
+  }, []);
+
+  const transform = `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`;
+
   return (
-    <div className="flow-canvas" ref={containerRef} onMouseDown={handleBgMouseDown}>
-      {/* SVG arrows layer — uses offset for transform */}
-      <svg className="flow-arrows-svg" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}>
+    <div
+      className="flow-canvas"
+      ref={containerRef}
+      onMouseDown={handleBgMouseDown}
+      onWheel={handleWheel}
+    >
+      {/* SVG arrows layer */}
+      <svg className="flow-arrows-svg" style={{ transform, transformOrigin: '0 0' }}>
         <FlowArrows screens={screens} activeScreen={activeScreen} />
       </svg>
 
       <div
         className="flow-canvas-inner"
-        style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+        style={{ transform, transformOrigin: '0 0' }}
       >
         {Object.entries(screens).map(([id, screen]) => (
           <FlowNode
@@ -53,6 +69,9 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
           />
         ))}
       </div>
+
+      {/* Zoom indicator */}
+      <div className="flow-zoom-indicator">{Math.round(zoom * 100)}%</div>
     </div>
   );
 }

@@ -126,18 +126,39 @@ export default function BotScenarios() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Select screen
-  const selectScreen = (screenId) => {
-    if (dirty && !confirm('Есть несохранённые изменения. Переключить экран?')) return;
+  // Auto-save helper
+  const autoSave = async (currentEditData, currentActiveScreen) => {
+    if (!currentEditData || !currentActiveScreen) return;
+    try {
+      const updated = JSON.parse(JSON.stringify(scenarios));
+      updated.screens[currentActiveScreen] = {
+        ...currentEditData,
+        x: updated.screens[currentActiveScreen].x,
+        y: updated.screens[currentActiveScreen].y,
+      };
+      await api.put('/api/scenarios', updated);
+      setScenarios(updated);
+    } catch (e) {
+      console.error('Auto-save failed:', e);
+    }
+  };
+
+  // Select screen (auto-save previous if dirty)
+  const selectScreen = async (screenId) => {
+    if (dirty && editData && activeScreen) {
+      await autoSave(editData, activeScreen);
+    }
     setActiveScreen(screenId);
     setEditData(JSON.parse(JSON.stringify(scenarios.screens[screenId])));
     setDirty(false);
     setSaved(false);
   };
 
-  // Close editor
-  const closeEditor = () => {
-    if (dirty && !confirm('Есть несохранённые изменения. Закрыть?')) return;
+  // Close editor (auto-save if dirty)
+  const closeEditor = async () => {
+    if (dirty && editData && activeScreen) {
+      await autoSave(editData, activeScreen);
+    }
     setActiveScreen(null);
     setEditData(null);
     setDirty(false);
