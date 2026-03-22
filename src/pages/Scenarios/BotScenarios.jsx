@@ -39,15 +39,29 @@ const SCREEN_TO_CALLBACK = {
 
 // ─── Default positions for first load ───────────────────────────────────────
 const DEFAULT_POSITIONS = {
-  start_menu:        { x: 400, y: 50 },
-  registration_flow: { x: 100, y: 300 },
-  auth_flow:         { x: 650, y: 300 },
-  main_menu:         { x: 400, y: 550 },
-  offer_page:        { x: 20,  y: 820 },
-  promo_page:        { x: 240, y: 820 },
-  socials_page:      { x: 460, y: 820 },
-  event_flow:        { x: 680, y: 820 },
-  logout_screen:     { x: 900, y: 820 },
+  // Сценарий 1: Новый пользователь (левая часть)
+  start_menu:        { x: 500, y: 60 },
+  registration_flow: { x: 900, y: 60 },
+
+  // Сценарий 2: Партнёр (центр)
+  auth_flow:         { x: 100, y: 350 },
+  main_menu:         { x: 500, y: 350 },
+  offer_page:        { x: 100, y: 700 },
+  promo_page:        { x: 500, y: 700 },
+  socials_page:      { x: 900, y: 700 },
+
+  // Сценарий 3: Мероприятие
+  event_flow:        { x: 900, y: 350 },
+
+  // Выход
+  logout_screen:     { x: 1300, y: 350 },
+
+  // Сценарий 4: Работа в чатах (правая нижняя часть)
+  group_menu:        { x: 100, y: 1100 },
+  group_promo:       { x: 500, y: 1100 },
+  group_calendar:    { x: 900, y: 1100 },
+  group_landings:    { x: 500, y: 1450 },
+  group_kb:          { x: 900, y: 1450 },
 };
 
 // ─── Migrate data: add x, y, targetScreen if missing ────────────────────────
