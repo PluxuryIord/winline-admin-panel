@@ -172,6 +172,7 @@ export async function qrCardHandler(req, res, next) {
     const code = req.params.code;
     const settings = await getSettings();
     const captionText = settings.qr_caption_text || '';
+    const bgUrl = settings.qr_bg_url || '';
 
     // Template dimensions (match qr.jpg aspect ratio ~530x800)
     const CARD_W = 530;
@@ -179,9 +180,22 @@ export async function qrCardHandler(req, res, next) {
     const QR_SIZE = 320;
     const QR_TOP = 200;
 
-    // 1. Background — fixed template
+    // 1. Background — custom URL or default template
     let bg;
-    if (fs.existsSync(QR_TEMPLATE_PATH)) {
+    if (bgUrl) {
+      try {
+        const bgRes = await fetch(bgUrl);
+        const bgBuf = Buffer.from(await bgRes.arrayBuffer());
+        bg = await sharp(bgBuf).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
+      } catch {
+        // Fallback to template on fetch error
+        if (fs.existsSync(QR_TEMPLATE_PATH)) {
+          bg = await sharp(QR_TEMPLATE_PATH).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
+        } else {
+          bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 255 } } }).png().toBuffer();
+        }
+      }
+    } else if (fs.existsSync(QR_TEMPLATE_PATH)) {
       bg = await sharp(QR_TEMPLATE_PATH).resize(CARD_W, CARD_H, { fit: 'cover' }).png().toBuffer();
     } else {
       bg = await sharp({ create: { width: CARD_W, height: CARD_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 255 } } }).png().toBuffer();

@@ -206,13 +206,14 @@ function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
   const [qrCaptionText, setQrCaptionText] = useState('');
-  // qrBgUrl removed — fixed template is used
+  const [qrBgUrl, setQrBgUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  // uploading/fileInputRef removed — no bg upload
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const hostessUrl = `${window.location.origin}/hostess`;
 
   useEffect(() => {
@@ -223,7 +224,7 @@ function SettingsModal({ onClose }) {
         setEventStarts(!!data.event_starts);
         setCodeLimit(data.code_limit ?? 0);
         setQrCaptionText(data.qr_caption_text ?? '');
-        // qr_bg_url no longer needed
+        setQrBgUrl(data.qr_bg_url ?? '');
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -245,14 +246,30 @@ function SettingsModal({ onClose }) {
       await api.put('/api/events/settings', {
         code_limit: Number(codeLimit),
         qr_caption_text: qrCaptionText,
-        // qr_bg_url: fixed template
+        qr_bg_url: qrBgUrl,
       });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setSaving(false); }
   };
 
-  // Background upload removed — fixed template
+  const handleBgUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const res = await api.post('/api/upload', { data: reader.result });
+        const data = await res.json();
+        if (data.url) setQrBgUrl(data.url);
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (e) { alert('Ошибка загрузки: ' + e.message); setUploading(false); }
+  };
+
+  const handleRemoveBg = () => setQrBgUrl('');
 
   const handleReset = async () => {
     if (!confirm('Вы уверены? Все QR-коды и сканирования будут удалены. Это необратимо!')) return;
@@ -292,6 +309,22 @@ function SettingsModal({ onClose }) {
 
                 {/* Caption + Save — below preview */}
                 <div className="ew-qr-editor-controls ew-qr-editor-controls--below">
+                  <div className="ew-qr-editor-field">
+                    <label>Фоновое изображение</label>
+                    <div className="ew-qr-bg-actions">
+                      <button className="ew-qr-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                        <Upload size={14} /> {uploading ? 'Загрузка...' : qrBgUrl ? 'Заменить фон' : 'Загрузить фон'}
+                      </button>
+                      {qrBgUrl && (
+                        <button className="ew-qr-remove-bg-btn" onClick={handleRemoveBg}>
+                          <X size={14} /> По умолчанию
+                        </button>
+                      )}
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
+                    {qrBgUrl ? <span className="ew-qr-bg-hint">Кастомный фон загружен</span> : <span className="ew-qr-bg-hint">Используется шаблон Winline Partners</span>}
+                  </div>
+
                   <div className="ew-qr-editor-field">
                     <label>Текст под QR-кодом</label>
                     <textarea
