@@ -218,8 +218,8 @@ export async function qrCardHandler(req, res, next) {
       const escaped = captionText
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const lines = escaped.split('\n');
-      const fontSize = 42;
-      const lineH = fontSize + 12;
+      const fontSize = 56;
+      const lineH = fontSize + 14;
       const textBlockH = lines.length * lineH;
 
       // Center text vertically in the space between QR bottom and card bottom
