@@ -61,6 +61,7 @@ export default function ChatView() {
   const [tags, setTags] = useState([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
+  const [allTags, setAllTags] = useState([]);
   const [mediaList, setMediaList] = useState([]);   // массив прикреплений
   const [uploading, setUploading] = useState(false);
 
@@ -92,6 +93,12 @@ export default function ChatView() {
       })
       .catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    api.get('/api/users/all-tags').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setAllTags(data);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -247,8 +254,7 @@ export default function ChatView() {
   }
 
   const items = groupByDate(chat.messages);
-  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
-  const availableTags = knownTags.filter(t => !tags.includes(t));
+  const availableTags = allTags.filter(t => !tags.includes(t));
 
   return (
     <div className="chatview-container">
