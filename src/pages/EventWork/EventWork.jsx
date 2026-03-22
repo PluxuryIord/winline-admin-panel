@@ -284,9 +284,14 @@ function SettingsModal({ onClose }) {
               <h3><ImageIcon size={18} /> Шаблон QR-карточки</h3>
               <p className="ew-settings-desc">Настройте текст карточки, которую получат пользователи в боте</p>
 
-              <div className="ew-qr-editor">
-                <div className="ew-qr-editor-controls">
-                  {/* Caption */}
+              <div className="ew-qr-editor ew-qr-editor--vertical">
+                {/* Preview — large, on top */}
+                <div className="ew-qr-editor-preview ew-qr-editor-preview--large">
+                  <QrCardPreview saved={saved} />
+                </div>
+
+                {/* Caption + Save — below preview */}
+                <div className="ew-qr-editor-controls ew-qr-editor-controls--below">
                   <div className="ew-qr-editor-field">
                     <label>Текст под QR-кодом</label>
                     <textarea
@@ -294,19 +299,13 @@ function SettingsModal({ onClose }) {
                       rows={3}
                       value={qrCaptionText}
                       onChange={e => setQrCaptionText(e.target.value)}
-                      placeholder="Покажите этот QR-код на стенде для получения подарка!"
+                      placeholder="ЭКСПО, стенд F3"
                     />
                   </div>
 
                   <button className={`ew-save-btn ${saved ? 'saved' : ''}`} onClick={handleSave} disabled={saving}>
                     {saved ? <><Check size={16} /> Сохранено</> : saving ? 'Сохранение...' : 'Сохранить шаблон'}
                   </button>
-                </div>
-
-                {/* Preview */}
-                <div className="ew-qr-editor-preview">
-                  <span className="ew-qr-preview-label">Превью</span>
-                  <QrCardPreview saved={saved} />
                 </div>
               </div>
             </div>

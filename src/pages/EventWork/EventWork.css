@@ -1414,11 +1414,21 @@
   margin-top: 12px;
 }
 
+.ew-qr-editor--vertical {
+  flex-direction: column;
+  align-items: center;
+}
+
 .ew-qr-editor-controls {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.ew-qr-editor-controls--below {
+  width: 100%;
+  max-width: 400px;
 }
 
 .ew-qr-editor-field {
@@ -1433,60 +1443,26 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
-.ew-qr-bg-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ew-qr-upload-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.ew-qr-upload-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.ew-qr-remove-bg-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 80, 80, 0.2);
-  background: rgba(255, 80, 80, 0.06);
-  color: rgba(255, 80, 80, 0.8);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.ew-qr-remove-bg-btn:hover {
-  background: rgba(255, 80, 80, 0.12);
-}
-
-.ew-qr-bg-hint {
-  font-size: 0.78rem;
-  color: rgba(74, 222, 128, 0.7);
-}
-
 .ew-qr-editor-preview {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.ew-qr-editor-preview--large {
+  width: 100%;
+  max-width: 400px;
+}
+
+.ew-qr-editor-preview--large .ew-qr-preview-img {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
 }
 
 .ew-qr-preview-label {
@@ -1506,9 +1482,10 @@
 }
 
 .ew-qr-preview-empty {
-  width: 210px;
-  height: 280px;
-  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  height: 500px;
+  border-radius: 16px;
   border: 1px dashed rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.03);
   display: flex;
