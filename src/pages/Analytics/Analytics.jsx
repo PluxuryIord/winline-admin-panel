@@ -17,10 +17,9 @@ const PERIOD_MAP = {
 const emptyStats = { totalUsers: 0, partners: 0, guests: 0, blocked: 0, requests: 0, newUsers: 0, channels: 0, groups: 0, posts: 0 };
 
 async function fetchStats(params) {
-  const token = localStorage.getItem('wl_admin_token');
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/api/analytics?${qs}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'same-origin',
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
