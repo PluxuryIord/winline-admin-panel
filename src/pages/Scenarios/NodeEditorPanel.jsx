@@ -61,8 +61,12 @@ export default function NodeEditorPanel({
                 <textarea
                   className="sc-message-textarea"
                   value={msg.text}
-                  onChange={e => onUpdateMessage(key, e.target.value)}
-                  rows={Math.max(3, (msg.text.match(/\n/g) || []).length + 2)}
+                  onChange={e => {
+                    onUpdateMessage(key, e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                 />
                 <span className="sc-message-hint">HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
               </div>
