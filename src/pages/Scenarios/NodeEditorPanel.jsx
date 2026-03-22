@@ -1,6 +1,6 @@
 import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
-  Loader, Check, ExternalLink, Link,
+  Loader, Check, ExternalLink, Link, Plus, Trash2,
 } from 'lucide-react';
 
 const SCREEN_ICONS = {
@@ -10,10 +10,10 @@ const SCREEN_ICONS = {
 };
 
 export default function NodeEditorPanel({
-  screenId, editData, allScreens,
+  screenId, editData, allScreens, isCustom,
   onUpdateMessage, onUpdateButtonLabel, onUpdateButtonAction,
-  onUpdateButtonTarget, onMoveButton,
-  onClose, onSave, dirty, saving, saved,
+  onUpdateButtonTarget, onMoveButton, onAddButton, onDeleteButton,
+  onDeleteScreen, onClose, onSave, dirty, saving, saved,
 }) {
   if (!editData) return null;
 
@@ -34,6 +34,11 @@ export default function NodeEditorPanel({
           <p>{editData.description}</p>
         </div>
         <div className="node-editor-actions">
+          {isCustom && (
+            <button className="sc-delete-screen-btn" onClick={onDeleteScreen} title="Удалить блок">
+              <Trash2 size={16} />
+            </button>
+          )}
           <button
             className={`sc-save-btn ${saved ? 'saved' : ''}`}
             onClick={onSave}
@@ -76,9 +81,16 @@ export default function NodeEditorPanel({
       )}
 
       {/* Buttons */}
-      {buttonOrder.length > 0 && (
-        <div className="sc-section">
+      <div className="sc-section">
+        <div className="sc-section-header">
           <h3 className="sc-section-title"><MousePointer size={16} /> Кнопки</h3>
+          {isCustom && (
+            <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
+              <Plus size={14} /> Добавить
+            </button>
+          )}
+        </div>
+        {buttonOrder.length > 0 && (
           <div className="sc-buttons-list">
             {buttonOrder.map((key, idx) => {
               const btn = editData.buttons[key];
@@ -103,6 +115,11 @@ export default function NodeEditorPanel({
                       onChange={e => onUpdateButtonLabel(key, e.target.value)}
                       placeholder="Текст кнопки"
                     />
+                    {isCustom && (
+                      <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
 
                   {/* Action: URL or Target Screen */}
@@ -137,8 +154,11 @@ export default function NodeEditorPanel({
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+        {buttonOrder.length === 0 && (
+          <p className="sc-no-buttons">Нет кнопок{isCustom ? '. Нажмите «Добавить» чтобы создать.' : ''}</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader } from 'lucide-react';
+import { Loader, Plus } from 'lucide-react';
 import { api } from '../../utils/api';
 import FlowCanvas from './FlowCanvas';
 import NodeEditorPanel from './NodeEditorPanel';
 import './BotScenarios.css';
+
+// System screens that cannot be deleted
+const SYSTEM_SCREENS = new Set([
+  'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+]);
 
 // ─── Callback → Screen mapping (for auto-migration) ────────────────────────
 const CALLBACK_TO_SCREEN = {
@@ -213,9 +219,13 @@ export default function BotScenarios() {
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
       const updates = { targetScreen: targetScreen || undefined };
-      // Also update the callback action to match the new target screen
-      if (targetScreen && SCREEN_TO_CALLBACK[targetScreen]) {
-        updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
+      // Update callback: system screens use SCREEN_TO_CALLBACK, custom use sc_{id}
+      if (targetScreen) {
+        if (SCREEN_TO_CALLBACK[targetScreen]) {
+          updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
+        } else {
+          updates.action = `callback:sc_${targetScreen}`;
+        }
       }
       next.buttons[key] = { ...next.buttons[key], ...updates };
       return next;
@@ -234,6 +244,86 @@ export default function BotScenarios() {
       if (newIdx < 0 || newIdx >= order.length) return prev;
       [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
       return { ...prev, buttons: { ...prev.buttons, _order: order } };
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Create new custom screen
+  const createScreen = () => {
+    const name = prompt('Название нового блока:');
+    if (!name || !name.trim()) return;
+    const id = `custom_${Date.now()}`;
+    setScenarios(prev => {
+      const next = { ...prev, screens: { ...prev.screens } };
+      next.screens[id] = {
+        title: name.trim(),
+        description: 'Кастомный экран',
+        x: 300,
+        y: 300,
+        messages: {
+          main_text: { label: 'Текст сообщения', text: '<b>' + name.trim() + '</b>' },
+        },
+        buttons: { _order: [] },
+      };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Delete custom screen
+  const deleteScreen = (screenId) => {
+    if (SYSTEM_SCREENS.has(screenId)) return;
+    if (!confirm('Удалить блок? Все связи на него будут удалены.')) return;
+
+    setScenarios(prev => {
+      const next = { ...prev, screens: { ...prev.screens } };
+      delete next.screens[screenId];
+      // Remove targetScreen references from all buttons
+      for (const [, screen] of Object.entries(next.screens)) {
+        const order = screen.buttons?._order || [];
+        for (const btnKey of order) {
+          const btn = screen.buttons[btnKey];
+          if (btn?.targetScreen === screenId) {
+            delete btn.targetScreen;
+          }
+        }
+      }
+      return next;
+    });
+    if (activeScreen === screenId) {
+      setActiveScreen(null);
+      setEditData(null);
+    }
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Add button to current screen (custom only)
+  const addButton = () => {
+    const label = prompt('Текст кнопки:');
+    if (!label || !label.trim()) return;
+    const btnId = `btn_${Date.now()}`;
+    setEditData(prev => {
+      const next = { ...prev, buttons: { ...prev.buttons } };
+      const order = [...(next.buttons._order || []), btnId];
+      next.buttons = { ...next.buttons, _order: order, [btnId]: { label: label.trim(), action: 'callback:noop' } };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Delete button from current screen
+  const deleteButton = (btnKey) => {
+    setEditData(prev => {
+      const next = { ...prev, buttons: { ...prev.buttons } };
+      const order = (next.buttons._order || []).filter(k => k !== btnKey);
+      const { [btnKey]: _, ...rest } = next.buttons;
+      rest._order = order;
+      next.buttons = rest;
+      return next;
     });
     setDirty(true);
     setSaved(false);
@@ -274,16 +364,26 @@ export default function BotScenarios() {
         onSelectNode={selectScreen}
         onMoveNode={moveNode}
       />
+
+      {/* Add new block button */}
+      <button className="sc-add-block-btn" onClick={createScreen} title="Добавить блок">
+        <Plus size={22} />
+      </button>
+
       {activeScreen && editData && (
         <NodeEditorPanel
           screenId={activeScreen}
           editData={editData}
           allScreens={scenarios.screens}
+          isCustom={!SYSTEM_SCREENS.has(activeScreen)}
           onUpdateMessage={updateMessage}
           onUpdateButtonLabel={updateButtonLabel}
           onUpdateButtonAction={updateButtonAction}
           onUpdateButtonTarget={updateButtonTarget}
           onMoveButton={moveButton}
+          onAddButton={addButton}
+          onDeleteButton={deleteButton}
+          onDeleteScreen={() => deleteScreen(activeScreen)}
           onClose={closeEditor}
           onSave={handleSave}
           dirty={dirty}

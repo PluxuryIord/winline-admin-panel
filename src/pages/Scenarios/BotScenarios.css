@@ -461,3 +461,91 @@
 .sc-save-btn:hover:not(:disabled) { opacity: 0.9; }
 .sc-save-btn:disabled { opacity: 0.4; cursor: default; }
 .sc-save-btn.saved { background: #22c55e; }
+
+/* ─── Add block button (floating) ─── */
+.sc-add-block-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-orange);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  box-shadow: 0 4px 16px rgba(232, 100, 10, 0.4);
+  transition: all 0.2s;
+}
+.sc-add-block-btn:hover { transform: scale(1.1); }
+
+/* ─── Delete screen button ─── */
+.sc-delete-screen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.sc-delete-screen-btn:hover { background: rgba(239, 68, 68, 0.25); }
+
+/* ─── Add button (inline) ─── */
+.sc-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.sc-section-header .sc-section-title { margin-bottom: 0; }
+
+.sc-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 126, 0, 0.3);
+  background: rgba(255, 126, 0, 0.1);
+  color: var(--color-orange);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sc-add-btn:hover { background: rgba(255, 126, 0, 0.2); }
+
+/* ─── Delete button (small X) ─── */
+.sc-delete-btn-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.sc-delete-btn-small:hover { background: rgba(239, 68, 68, 0.3); }
+
+/* ─── No buttons text ─── */
+.sc-no-buttons {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 12px;
+}
