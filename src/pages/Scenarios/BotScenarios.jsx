@@ -103,6 +103,8 @@ export default function BotScenarios() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBlockName, setNewBlockName] = useState('');
   const [newBlockDesc, setNewBlockDesc] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
 
   // Load scenarios
   const loadData = useCallback(async () => {
@@ -282,31 +284,36 @@ export default function BotScenarios() {
   };
 
   // Delete custom screen
-  const deleteScreen = (screenId) => {
+  const openDeleteModal = (screenId) => {
     if (SYSTEM_SCREENS.has(screenId)) return;
-    if (!confirm('Удалить блок? Все связи на него будут удалены.')) return;
+    setDeleteTargetId(screenId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDeleteScreen = () => {
+    if (!deleteTargetId) return;
     setScenarios(prev => {
       const next = { ...prev, screens: { ...prev.screens } };
-      delete next.screens[screenId];
-      // Remove targetScreen references from all buttons
+      delete next.screens[deleteTargetId];
       for (const [, screen] of Object.entries(next.screens)) {
         const order = screen.buttons?._order || [];
         for (const btnKey of order) {
           const btn = screen.buttons[btnKey];
-          if (btn?.targetScreen === screenId) {
+          if (btn?.targetScreen === deleteTargetId) {
             delete btn.targetScreen;
           }
         }
       }
       return next;
     });
-    if (activeScreen === screenId) {
+    if (activeScreen === deleteTargetId) {
       setActiveScreen(null);
       setEditData(null);
     }
     setDirty(true);
     setSaved(false);
+    setShowDeleteModal(false);
+    setDeleteTargetId(null);
   };
 
   // Add button to current screen (custom only)
@@ -422,6 +429,32 @@ export default function BotScenarios() {
         </div>
       )}
 
+      {/* Delete block modal */}
+      {showDeleteModal && deleteTargetId && (
+        <div className="sc-modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="sc-modal" onClick={e => e.stopPropagation()}>
+            <div className="sc-modal-header">
+              <h3>Удалить блок</h3>
+              <button className="sc-modal-close" onClick={() => setShowDeleteModal(false)}>
+                <span>&times;</span>
+              </button>
+            </div>
+            <div className="sc-modal-body">
+              <p className="sc-delete-warning">
+                Вы уверены что хотите удалить блок <strong>«{scenarios.screens[deleteTargetId]?.title}»</strong>?
+              </p>
+              <p className="sc-delete-hint">Все связи на этот блок будут удалены. Это действие нельзя отменить.</p>
+            </div>
+            <div className="sc-modal-footer">
+              <button className="sc-modal-cancel" onClick={() => setShowDeleteModal(false)}>Отмена</button>
+              <button className="sc-modal-delete" onClick={confirmDeleteScreen}>
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeScreen && editData && (
         <NodeEditorPanel
           screenId={activeScreen}
@@ -435,7 +468,7 @@ export default function BotScenarios() {
           onMoveButton={moveButton}
           onAddButton={addButton}
           onDeleteButton={deleteButton}
-          onDeleteScreen={() => deleteScreen(activeScreen)}
+          onDeleteScreen={() => openDeleteModal(activeScreen)}
           onClose={closeEditor}
           onSave={handleSave}
           dirty={dirty}

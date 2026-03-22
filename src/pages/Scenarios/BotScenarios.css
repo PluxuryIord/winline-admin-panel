@@ -675,3 +675,29 @@
 }
 .sc-modal-confirm:hover:not(:disabled) { opacity: 0.9; }
 .sc-modal-confirm:disabled { opacity: 0.4; cursor: default; }
+
+.sc-modal-delete {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sc-modal-delete:hover { background: #dc2626; }
+
+.sc-delete-warning {
+  color: var(--color-white);
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sc-delete-hint {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.8rem;
+  margin: 0;
+}
