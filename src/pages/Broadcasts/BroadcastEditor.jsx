@@ -6,6 +6,7 @@ import {
   Send, CheckCircle, AlertCircle, Loader, Hash
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import './BroadcastEditor.css';
 
 /* ── метаданные типов ── */
@@ -22,12 +23,11 @@ function PostEditor({ text, onText }) {
   return (
     <div className="be-editor-section">
       <label className="be-label">Текст публикации</label>
-      <textarea
-        className="be-textarea"
-        rows={8}
-        placeholder="Введите текст поста (поддерживается HTML: <b>, <i>, <a href>...)"
+      <TgHtmlEditor
         value={text}
-        onChange={e => onText(e.target.value)}
+        onChange={onText}
+        placeholder="Введите текст поста..."
+        minRows={6}
       />
     </div>
   );
@@ -84,12 +84,11 @@ function ContestEditor({ text, onText, randomizer, onRandomizer }) {
   return (
     <div className="be-editor-section">
       <label className="be-label">Описание конкурса</label>
-      <textarea
-        className="be-textarea"
-        rows={6}
-        placeholder="Опишите условия конкурса и приз..."
+      <TgHtmlEditor
         value={text}
-        onChange={e => onText(e.target.value)}
+        onChange={onText}
+        placeholder="Опишите условия конкурса и приз..."
+        minRows={4}
       />
 
       <div className="be-randomizer-block">

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import './Broadcasts.css';
 
 const STATUS_LABELS = {
@@ -204,12 +205,11 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
       {/* Текстовый режим */}
       {mode === 'text' && (
         <>
-          <textarea
-            className="bc-compose-textarea"
-            placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
+          <TgHtmlEditor
             value={text}
-            onChange={e => setText(e.target.value)}
-            rows={4}
+            onChange={setText}
+            placeholder="Текст сообщения..."
+            minRows={3}
           />
           <MediaAttach media={media} onChange={setMedia} />
         </>

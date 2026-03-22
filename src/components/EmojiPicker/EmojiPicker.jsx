@@ -19,12 +19,20 @@ const CUSTOM_EMOJI_IDS = [
 
 export default function EmojiPicker({ onInsert, textareaRef }) {
   const [open, setOpen] = useState(false);
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
   const cursorPosRef = useRef(null);
+  const triggerRef = useRef(null);
 
   const handleOpen = () => {
-    // Save cursor position before opening picker
     if (textareaRef?.current) {
       cursorPosRef.current = textareaRef.current.selectionStart;
+    }
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPopupPos({
+        top: rect.top - 8,
+        left: Math.max(8, rect.right - 280),
+      });
     }
     setOpen(!open);
   };
@@ -38,11 +46,9 @@ export default function EmojiPicker({ onInsert, textareaRef }) {
   return (
     <div className="emoji-picker-wrapper">
       <button
+        ref={triggerRef}
         className="emoji-picker-trigger"
-        onMouseDown={(e) => {
-          // Prevent textarea from losing focus
-          e.preventDefault();
-        }}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={handleOpen}
         title="Фирменные эмодзи"
         type="button"
@@ -53,7 +59,15 @@ export default function EmojiPicker({ onInsert, textareaRef }) {
       {open && (
         <>
           <div className="emoji-picker-backdrop" onClick={() => setOpen(false)} />
-          <div className="emoji-picker-popup">
+          <div
+            className="emoji-picker-popup"
+            style={{
+              position: 'fixed',
+              top: popupPos.top,
+              left: popupPos.left,
+              transform: 'translateY(-100%)',
+            }}
+          >
             <div className="emoji-picker-header">Фирменные эмодзи</div>
             <div className="emoji-picker-grid">
               {CUSTOM_EMOJI_IDS.map((id) => (
