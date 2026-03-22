@@ -228,30 +228,13 @@ export async function qrCardHandler(req, res, next) {
       const textTop = spaceTop + Math.round((availableH - textBlockH) / 2);
       const svgH = textBlockH + 20;
 
-      // Read font as base64 for SVG embedding
-      let fontFace = '';
-      if (fs.existsSync(FONT_PATH)) {
-        const fontBase64 = fs.readFileSync(FONT_PATH).toString('base64');
-        fontFace = `
-          <defs>
-            <style type="text/css">
-              @font-face {
-                font-family: 'TTBluescreens';
-                src: url('data:font/opentype;base64,${fontBase64}');
-                font-weight: bold;
-              }
-            </style>
-          </defs>`;
-      }
-
       const tspans = lines.map((line, i) =>
         `<tspan x="50%" dy="${i === 0 ? 0 : lineH}">${line}</tspan>`
       ).join('');
 
       const svgText = Buffer.from(`
         <svg width="${CARD_W}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">
-          ${fontFace}
-          <text x="50%" y="${fontSize + 4}" font-family="TTBluescreens, Arial, sans-serif" font-size="${fontSize}"
+          <text x="50%" y="${fontSize + 4}" font-family="TTBluescreens-Bold, TTBluescreens, Arial, sans-serif" font-size="${fontSize}"
             font-weight="bold" fill="#FFFFFF" text-anchor="middle">${tspans}</text>
         </svg>
       `);
