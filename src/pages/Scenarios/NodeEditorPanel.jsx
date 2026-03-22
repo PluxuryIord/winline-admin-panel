@@ -132,32 +132,6 @@ export default function NodeEditorPanel({
         </div>
       )}
 
-      {/* ─── Telegram Preview (Feature 5) ───────────────────────────────── */}
-      <div className="sc-section">
-        <h3 className="sc-section-title"><Eye size={16} /> Превью</h3>
-        <div className="sc-tg-preview">
-          <div className="sc-tg-preview-bubble">
-            <div
-              className="sc-tg-preview-text"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewText) }}
-            />
-          </div>
-          {buttonOrder.length > 0 && (
-            <div className="sc-tg-preview-buttons">
-              {buttonOrder.map((key) => {
-                const btn = editData.buttons[key];
-                if (!btn) return null;
-                return (
-                  <div key={key} className="sc-tg-preview-btn">
-                    {btn.label}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Buttons */}
       <div className="sc-section">
         <div className="sc-section-header">

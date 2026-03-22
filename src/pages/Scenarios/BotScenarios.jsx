@@ -106,12 +106,6 @@ function migrateData(data) {
   return data;
 }
 
-// ─── Sanitize HTML for test overlay ─────────────────────────────────────────
-function sanitizeHtml(html) {
-  if (!html) return '';
-  return html.replace(/<\/?(?!b>|\/b>|i>|\/i>|a[\s>]|\/a>|code>|\/code>|em>|\/em>|strong>|\/strong>)[^>]*>/gi, '');
-}
-
 const MAX_HISTORY = 20;
 
 export default function BotScenarios() {
@@ -137,8 +131,7 @@ export default function BotScenarios() {
   const [hoveredNode, setHoveredNode] = useState(null);
 
   // Feature 13: Flow testing
-  const [testMode, setTestMode] = useState(false);
-  const [testScreen, setTestScreen] = useState('start_menu');
+  // test mode removed
 
   // Feature 8: Undo/Redo
   const historyRef = useRef([]);
@@ -516,22 +509,8 @@ export default function BotScenarios() {
     }
   };
 
-  // Feature 13: Flow test navigation
-  const handleTestClick = (btnKey) => {
-    if (!scenarios?.screens[testScreen]) return;
-    const btn = scenarios.screens[testScreen].buttons?.[btnKey];
-    if (btn?.targetScreen && scenarios.screens[btn.targetScreen]) {
-      setTestScreen(btn.targetScreen);
-    }
-  };
-
   if (loading) return <div className="sc-loading"><Loader size={24} className="sc-spinner" /> Загрузка сценариев...</div>;
   if (!scenarios) return <div className="sc-loading">Не удалось загрузить</div>;
-
-  // Current test screen data
-  const testScreenData = testMode ? scenarios.screens[testScreen] : null;
-  const testMessages = testScreenData ? Object.keys(testScreenData.messages || {}).map(k => testScreenData.messages[k]?.text || '').join('\n\n') : '';
-  const testButtons = testScreenData ? (testScreenData.buttons?._order || []) : [];
 
   return (
     <div className="sc-flow-layout">
@@ -546,7 +525,7 @@ export default function BotScenarios() {
         setSearchQuery={setSearchQuery}
         hoveredNode={hoveredNode}
         setHoveredNode={setHoveredNode}
-        onStartTest={() => { setTestMode(true); setTestScreen('start_menu'); }}
+        onStartTest={() => {}}
       />
 
       {/* Add new block button */}
@@ -651,52 +630,6 @@ export default function BotScenarios() {
               <button className="sc-modal-confirm" onClick={confirmAddButton} disabled={!newBtnLabel.trim()}>
                 <Plus size={16} /> Добавить
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Feature 13: Flow Test Overlay */}
-      {testMode && testScreenData && (
-        <div className="sc-test-overlay" onClick={() => setTestMode(false)}>
-          <div className="sc-test-phone" onClick={e => e.stopPropagation()}>
-            <div className="sc-test-phone-notch" />
-            <div className="sc-test-phone-header">
-              <span className="sc-test-phone-title">WL Bot</span>
-              <button className="sc-test-phone-close" onClick={() => setTestMode(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="sc-test-phone-screen">
-              <div className="sc-test-phone-messages">
-                <div className="sc-test-bubble">
-                  <div
-                    className="sc-test-bubble-text"
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(testMessages) }}
-                  />
-                </div>
-              </div>
-              <div className="sc-test-phone-buttons">
-                {testButtons.map(btnKey => {
-                  const btn = testScreenData.buttons?.[btnKey];
-                  if (!btn) return null;
-                  return (
-                    <button
-                      key={btnKey}
-                      className="sc-test-btn"
-                      onClick={() => handleTestClick(btnKey)}
-                    >
-                      {btn.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="sc-test-phone-footer">
-                <button className="sc-test-reset" onClick={() => setTestScreen('start_menu')}>
-                  <RotateCcw size={14} /> Сброс
-                </button>
-                <span className="sc-test-screen-id">{testScreen}</span>
-              </div>
             </div>
           </div>
         </div>

@@ -190,9 +190,6 @@ export default function FlowCanvas({
           <button className="sc-toolbar-btn" onClick={handleFitAll} title="Уместить всё">
             <Maximize2 size={16} />
           </button>
-          <button className="sc-toolbar-btn sc-toolbar-btn-test" onClick={onStartTest} title="Тестирование потока">
-            <Play size={16} /> Тест
-          </button>
         </div>
       </div>
 
