@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 
 import errorHandler from './middleware/errorHandler.js';
 import authMiddleware from './middleware/auth.js';
@@ -21,6 +22,26 @@ import eventsRouter, { scanHandler } from './routes/events.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1); // Trust reverse proxy (nginx/caddy) for secure cookies
+
+// === Rate limiting ===
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 5,
+  message: { error: 'Слишком много попыток входа, попробуйте через 15 минут' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 минута
+  max: 100,
+  message: { error: 'Слишком много запросов, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/auth/login', loginLimiter);
+app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());

@@ -48,7 +48,24 @@ router.get('/stream', (req, res) => {
   });
   res.write(':ok\n\n');
   sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+
+  // Heartbeat каждые 30 секунд чтобы обнаруживать мёртвые соединения
+  const heartbeat = setInterval(() => {
+    try { res.write(':heartbeat\n\n'); } catch { /* connection dead */ }
+  }, 30_000);
+
+  // Принудительное закрытие через 5 минут для предотвращения memory leak
+  const timeout = setTimeout(() => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+    try { res.end(); } catch { /* already closed */ }
+  }, 300_000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    clearTimeout(timeout);
+    sseClients.delete(res);
+  });
 });
 
 // ===================== WEBHOOK (отдельный роутер, без JWT) =====================
@@ -63,15 +80,12 @@ async function handleWebhook(req, res, next) {
     console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video);
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
-    // Находим или создаём чат
-    let [chats] = await dbPool.query('SELECT id FROM wl_admin_chats WHERE user_id = ?', [user_id]);
-    let chatId;
-    if (!chats.length) {
-      const [result] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [user_id]);
-      chatId = result.insertId;
-    } else {
-      chatId = chats[0].id;
-    }
+    // Находим или создаём чат (атомарно, без race condition)
+    await dbPool.query(
+      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+      [user_id]
+    );
+    const [[{ chatId }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS chatId');
 
     // Обработка медиа от бота — поддержка разных форматов
     // media: массив (альбом) ИЛИ photo/document/video/voice/audio (одиночное)
@@ -179,12 +193,19 @@ router.get('/', async (req, res, next) => {
 router.get('/by-user/:userId', async (req, res, next) => {
   try {
     const userId = Number(req.params.userId);
-    let [chats] = await dbPool.query('SELECT id, user_id AS userId FROM wl_admin_chats WHERE user_id = ?', [userId]);
+
+    // Атомарно находим или создаём чат (без race condition)
+    await dbPool.query(
+      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+      [userId]
+    );
+    const [[{ id: chatIdResolved }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS id');
+
+    let [chats] = await dbPool.query('SELECT id, user_id AS userId FROM wl_admin_chats WHERE id = ?', [chatIdResolved]);
 
     let chat;
     if (!chats.length) {
-      const [result] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [userId]);
-      chat = { id: result.insertId, userId, messages: [] };
+      chat = { id: chatIdResolved, userId, messages: [] };
     } else {
       chat = { id: chats[0].id, userId: chats[0].userId };
       const [msgs] = await dbPool.query(

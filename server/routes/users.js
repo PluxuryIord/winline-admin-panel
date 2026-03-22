@@ -23,17 +23,19 @@ function mapUserRow(r, userTags, comment = '') {
   };
 }
 
-// Получить теги и комментарии для массива user_id из MySQL
+// Получить теги, комментарии и editedIds для массива user_id из MySQL (один запрос вместо двух)
 async function getTagsAndComments(userIds) {
-  if (!userIds.length) return { tags: {}, comments: {} };
+  if (!userIds.length) return { tags: {}, comments: {}, editedIds: new Set() };
   const [rows] = await dbPool.query(
     'SELECT user_id, tag FROM wl_admin_user_tags WHERE user_id IN (?)',
     [userIds]
   );
   const tags = {};
   const comments = {};
+  const editedIds = new Set();
   for (const r of rows) {
     const uid = String(r.user_id);
+    editedIds.add(uid);
     if (r.tag.startsWith(COMMENT_PREFIX)) {
       comments[uid] = r.tag.slice(COMMENT_PREFIX.length);
     } else {
@@ -41,17 +43,7 @@ async function getTagsAndComments(userIds) {
       tags[uid].push(r.tag);
     }
   }
-  return { tags, comments };
-}
-
-// Какие user_id имеют хоть одну запись в wl_admin_user_tags (для определения «редактировался ли»)
-async function getUserIdsWithTags(userIds) {
-  if (!userIds.length) return new Set();
-  const [rows] = await dbPool.query(
-    'SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE user_id IN (?)',
-    [userIds]
-  );
-  return new Set(rows.map(r => String(r.user_id)));
+  return { tags, comments, editedIds };
 }
 
 // Проверяем, есть ли «пустая» запись-маркер (user_id с 0 тегов, но был отредактирован)
@@ -108,8 +100,7 @@ router.get('/', async (req, res, next) => {
     );
 
     const userIds = rows.map(r => r.user_id);
-    const { tags: tagsMap, comments: commentsMap } = await getTagsAndComments(userIds);
-    const editedIds = await getUserIdsWithTags(userIds);
+    const { tags: tagsMap, comments: commentsMap, editedIds } = await getTagsAndComments(userIds);
 
     const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.date_reg), commentsMap[String(r.user_id)] || ''));
     res.json({ users, total, limit, offset });
@@ -167,8 +158,7 @@ router.get('/:id', async (req, res, next) => {
     if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
 
     const userId = rows[0].user_id;
-    const { tags: tagsMap, comments: commentsMap } = await getTagsAndComments([userId]);
-    const editedIds = await getUserIdsWithTags([userId]);
+    const { tags: tagsMap, comments: commentsMap, editedIds } = await getTagsAndComments([userId]);
     const tags = buildTagsForUser(userId, tagsMap, editedIds, rows[0].date_reg);
 
     res.json(mapUserRow(rows[0], tags, commentsMap[String(userId)] || ''));
