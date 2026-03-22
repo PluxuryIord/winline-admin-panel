@@ -185,6 +185,72 @@ const SEED_DATA = {
       },
       buttons: {},
     },
+    // ── Сценарий 4: Работа бота в чатах ──
+    group_menu: {
+      title: 'Меню группы',
+      description: 'Главное меню поддержки в группе (/menu)',
+      scenario: 4,
+      messages: {
+        menu_text: { label: 'Текст меню', text: '<b>📋 Меню поддержки WINLINE PARTNERS</b>' },
+      },
+      buttons: {
+        _order: ['btn_kb', 'btn_promo', 'btn_calendar', 'btn_landings'],
+        btn_kb: { label: '📚 База знаний', action: 'callback:group_knowledge_base', targetScreen: 'group_kb' },
+        btn_promo: { label: '📢 Промо', action: 'callback:group_promo', targetScreen: 'group_promo' },
+        btn_calendar: { label: '📅 Календарь', action: 'callback:group_calendar', targetScreen: 'group_calendar' },
+        btn_landings: { label: '🌐 Лендинги', action: 'callback:group_landings', targetScreen: 'group_landings' },
+      },
+    },
+    group_promo: {
+      title: 'Промо (группа)',
+      description: 'Промо-материалы в группе',
+      scenario: 4,
+      messages: {
+        promo_text: { label: 'Текст промо', text: '<b>📢 Актуальные промо материалы</b>\n\nПерейдите по ссылке для просмотра актуальных баннеров и промо материалов.' },
+      },
+      buttons: {
+        _order: ['btn_link', 'btn_back'],
+        btn_link: { label: 'Открыть материалы', action: 'url:https://winline.tv/m/banner' },
+        btn_back: { label: '🔙 Меню', action: 'callback:group_main_menu', targetScreen: 'group_menu' },
+      },
+    },
+    group_calendar: {
+      title: 'Календарь (группа)',
+      description: 'Календарь событий в группе',
+      scenario: 4,
+      messages: {
+        calendar_text: { label: 'Текст календаря', text: '<b>📅 Календарь</b>\n\nПерейдите по ссылке для просмотра актуального календаря.' },
+      },
+      buttons: {
+        _order: ['btn_link', 'btn_back'],
+        btn_link: { label: 'Открыть календарь', action: 'url:https://winline.tv/m/calendar' },
+        btn_back: { label: '🔙 Меню', action: 'callback:group_main_menu', targetScreen: 'group_menu' },
+      },
+    },
+    group_landings: {
+      title: 'Лендинги (группа)',
+      description: 'Актуальные лендинги в группе',
+      scenario: 4,
+      messages: {
+        landings_text: { label: 'Текст лендингов', text: '<b>🌐 Список актуальных лендингов</b>' },
+      },
+      buttons: {
+        _order: ['btn_back'],
+        btn_back: { label: '🔙 Меню', action: 'callback:group_main_menu', targetScreen: 'group_menu' },
+      },
+    },
+    group_kb: {
+      title: 'База знаний (группа)',
+      description: 'База знаний в групповых чатах',
+      scenario: 4,
+      messages: {
+        kb_text: { label: 'Заголовок', text: '<b>📚 База знаний</b>\n\n<i>Выберите интересующую тему:</i>' },
+      },
+      buttons: {
+        _order: ['btn_back'],
+        btn_back: { label: '🔙 Меню', action: 'callback:group_main_menu', targetScreen: 'group_menu' },
+      },
+    },
   },
 };
 
