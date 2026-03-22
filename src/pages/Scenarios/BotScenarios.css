@@ -1,11 +1,12 @@
 /* ─── Flow Layout ─── */
 .sc-flow-layout {
   position: relative;
-  width: 100%;
-  height: calc(100vh - 80px);
   overflow: hidden;
-  border-radius: 16px;
   background: var(--color-black);
+  border-radius: 0;
+  margin: -32px;
+  width: calc(100% + 64px);
+  height: calc(100vh - 70px);
 }
 
 .sc-loading {
