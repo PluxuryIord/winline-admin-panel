@@ -25,6 +25,7 @@ export default function UserProfile() {
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
+  const [allTags, setAllTags] = useState([]);
 
   // Editable fields
   const [editingField, setEditingField] = useState(null);
@@ -60,6 +61,17 @@ export default function UserProfile() {
     })();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Загрузка всех тегов из БД
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/api/users/all-tags');
+        const data = await res.json();
+        if (Array.isArray(data)) setAllTags(data);
+      } catch {}
+    })();
+  }, []);
 
   // Загрузка аватарки
   useEffect(() => {
@@ -221,8 +233,7 @@ export default function UserProfile() {
 
   const exportPDF = () => { window.print(); setShowExportDropdown(false); };
 
-  const knownTags = ['Старый пользователь', 'VIP', 'Арбитраж', 'SEO', 'Новичок', 'Агентство'];
-  const availableTags = knownTags.filter(t => !tags.includes(t));
+  const availableTags = allTags.filter(t => !tags.includes(t));
 
   return (
     <div className="profile-container">
