@@ -35,8 +35,16 @@ router.post('/login', async (req, res, next) => {
       { expiresIn: '24h' }
     );
 
+    // Set httpOnly cookie (secure from XSS)
+    res.cookie('wl_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+      path: '/',
+    });
+
     res.json({
-      token,
       user: { id: user.id, username: user.username, displayName: user.display_name },
     });
   } catch (err) { next(err); }
@@ -46,10 +54,14 @@ router.post('/login', async (req, res, next) => {
 router.get('/me', async (req, res, next) => {
   try {
     const header = req.headers.authorization;
-    if (!header || !header.startsWith('Bearer ')) {
+    let token;
+    if (header && header.startsWith('Bearer ')) {
+      token = header.slice(7);
+    } else if (req.cookies?.wl_token) {
+      token = req.cookies.wl_token;
+    } else {
       return res.status(401).json({ error: 'Требуется авторизация' });
     }
-    const token = header.slice(7);
     const payload = jwt.verify(token, JWT_SECRET);
 
     const [rows] = await dbPool.query(
@@ -66,6 +78,12 @@ router.get('/me', async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// POST /api/auth/logout
+router.post('/logout', (req, res) => {
+  res.clearCookie('wl_token', { path: '/' });
+  res.json({ ok: true });
 });
 
 export default router;

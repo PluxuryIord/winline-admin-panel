@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getToken, setToken, removeToken, api } from '../utils/api.js';
+import { removeToken, api } from '../utils/api.js';
 
 const AuthContext = createContext(null);
 
@@ -7,22 +7,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Проверяем токен при загрузке
+  // Check auth on load (cookie sent automatically)
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     api.get('/api/auth/me')
       .then(r => {
         if (r.ok) return r.json();
-        throw new Error('Invalid token');
+        throw new Error('Not authenticated');
       })
       .then(data => setUser(data))
       .catch(() => {
-        removeToken();
+        removeToken(); // Clean up old localStorage token if any
         setUser(null);
       })
       .finally(() => setLoading(false));
@@ -33,15 +27,19 @@ export function AuthProvider({ children }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
+      credentials: 'same-origin', // Important: receive the cookie
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка авторизации');
-    setToken(data.token);
+    removeToken(); // Clean up old localStorage token
     setUser(data.user);
     return data;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    } catch { /* ignore */ }
     removeToken();
     setUser(null);
   }, []);

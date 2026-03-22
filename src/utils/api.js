@@ -1,3 +1,6 @@
+// Token stored in httpOnly cookie (set by server), not accessible from JS.
+// localStorage kept only as migration fallback — will be removed after first cookie login.
+
 const TOKEN_KEY = 'wl_admin_token';
 
 export function getToken() {
@@ -5,7 +8,9 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  // No longer store in localStorage — cookie is set by server
+  // Keep for backward compat during migration
+  if (token) localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function removeToken() {
@@ -13,11 +18,12 @@ export function removeToken() {
 }
 
 async function request(url, options = {}, retries = 2) {
-  const token = getToken();
   const headers = { ...options.headers };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Fallback: if old localStorage token exists, send it (migration)
+  const legacyToken = localStorage.getItem(TOKEN_KEY);
+  if (legacyToken) {
+    headers['Authorization'] = `Bearer ${legacyToken}`;
   }
 
   if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
@@ -27,7 +33,11 @@ async function request(url, options = {}, retries = 2) {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, { ...options, headers });
+      const res = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'same-origin', // Send cookies with every request
+      });
 
       if (res.status === 401) {
         removeToken();
@@ -47,7 +57,6 @@ async function request(url, options = {}, retries = 2) {
     } catch (err) {
       lastError = err;
       if (err.message === 'Unauthorized') throw err;
-      // Network error — retry
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         continue;
@@ -70,7 +79,6 @@ export const api = {
     body: JSON.stringify(body),
   }),
   delete: (url) => request(url, { method: 'DELETE' }),
-  // Для upload (base64 data)
   upload: (url, body) => request(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -10,6 +10,8 @@ export default function authMiddleware(req, res, next) {
 
   if (header && header.startsWith('Bearer ')) {
     token = header.slice(7);
+  } else if (req.cookies?.wl_token) {
+    token = req.cookies.wl_token;
   } else if (req.query.token) {
     token = req.query.token;
   } else {
