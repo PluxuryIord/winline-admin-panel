@@ -549,3 +549,129 @@
   text-align: center;
   padding: 12px;
 }
+
+/* ─── Create Block Modal ─── */
+.sc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-modal {
+  background: var(--color-panel, #12121e);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: sc-modal-in 0.2s ease;
+}
+
+@keyframes sc-modal-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.sc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+
+.sc-modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-white);
+  margin: 0;
+}
+
+.sc-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+.sc-modal-close:hover { color: var(--color-white); }
+
+.sc-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sc-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-modal-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sc-modal-optional {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.sc-modal-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--color-white);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.sc-modal-input:focus { border-color: rgba(255, 126, 0, 0.5); }
+.sc-modal-input::placeholder { color: rgba(255, 255, 255, 0.2); }
+
+.sc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 20px;
+}
+
+.sc-modal-cancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sc-modal-cancel:hover { background: rgba(255, 255, 255, 0.05); }
+
+.sc-modal-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-orange);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sc-modal-confirm:hover:not(:disabled) { opacity: 0.9; }
+.sc-modal-confirm:disabled { opacity: 0.4; cursor: default; }

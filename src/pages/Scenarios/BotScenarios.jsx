@@ -100,6 +100,9 @@ export default function BotScenarios() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBlockName, setNewBlockName] = useState('');
+  const [newBlockDesc, setNewBlockDesc] = useState('');
 
   // Load scenarios
   const loadData = useCallback(async () => {
@@ -250,19 +253,24 @@ export default function BotScenarios() {
   };
 
   // Create new custom screen
-  const createScreen = () => {
-    const name = prompt('Название нового блока:');
-    if (!name || !name.trim()) return;
+  const openCreateModal = () => {
+    setNewBlockName('');
+    setNewBlockDesc('');
+    setShowCreateModal(true);
+  };
+
+  const confirmCreateScreen = () => {
+    if (!newBlockName.trim()) return;
     const id = `custom_${Date.now()}`;
     setScenarios(prev => {
       const next = { ...prev, screens: { ...prev.screens } };
       next.screens[id] = {
-        title: name.trim(),
-        description: 'Кастомный экран',
+        title: newBlockName.trim(),
+        description: newBlockDesc.trim() || 'Кастомный экран',
         x: 300,
         y: 300,
         messages: {
-          main_text: { label: 'Текст сообщения', text: '<b>' + name.trim() + '</b>' },
+          main_text: { label: 'Текст сообщения', text: '<b>' + newBlockName.trim() + '</b>' },
         },
         buttons: { _order: [] },
       };
@@ -270,6 +278,7 @@ export default function BotScenarios() {
     });
     setDirty(true);
     setSaved(false);
+    setShowCreateModal(false);
   };
 
   // Delete custom screen
@@ -366,9 +375,52 @@ export default function BotScenarios() {
       />
 
       {/* Add new block button */}
-      <button className="sc-add-block-btn" onClick={createScreen} title="Добавить блок">
+      <button className="sc-add-block-btn" onClick={openCreateModal} title="Добавить блок">
         <Plus size={22} />
       </button>
+
+      {/* Create block modal */}
+      {showCreateModal && (
+        <div className="sc-modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="sc-modal" onClick={e => e.stopPropagation()}>
+            <div className="sc-modal-header">
+              <h3>Новый блок</h3>
+              <button className="sc-modal-close" onClick={() => setShowCreateModal(false)}>
+                <span>&times;</span>
+              </button>
+            </div>
+            <div className="sc-modal-body">
+              <div className="sc-modal-field">
+                <label>Название</label>
+                <input
+                  className="sc-modal-input"
+                  value={newBlockName}
+                  onChange={e => setNewBlockName(e.target.value)}
+                  placeholder="Например: Промо-акция"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && confirmCreateScreen()}
+                />
+              </div>
+              <div className="sc-modal-field">
+                <label>Описание <span className="sc-modal-optional">(необязательно)</span></label>
+                <input
+                  className="sc-modal-input"
+                  value={newBlockDesc}
+                  onChange={e => setNewBlockDesc(e.target.value)}
+                  placeholder="Краткое описание экрана"
+                  onKeyDown={e => e.key === 'Enter' && confirmCreateScreen()}
+                />
+              </div>
+            </div>
+            <div className="sc-modal-footer">
+              <button className="sc-modal-cancel" onClick={() => setShowCreateModal(false)}>Отмена</button>
+              <button className="sc-modal-confirm" onClick={confirmCreateScreen} disabled={!newBlockName.trim()}>
+                <Plus size={16} /> Создать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeScreen && editData && (
         <NodeEditorPanel
