@@ -17,6 +17,7 @@ export default function KnowledgeBase() {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef(null);
+  const kbTextareaRef = useRef(null);
 
   // Modals
   const [createModal, setCreateModal] = useState(false);
@@ -395,10 +396,19 @@ export default function KnowledgeBase() {
                   <div className="kb-editor-hint">
                     Telegram HTML: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;u&gt;подчёркнутый&lt;/u&gt;, &lt;a href="url"&gt;ссылка&lt;/a&gt;. Перенос строки: \n
                   </div>
-                  <EmojiPicker onInsert={(tag) => setEditContent(prev => prev + tag)} />
+                  <EmojiPicker
+                    textareaRef={kbTextareaRef}
+                    onInsert={(tag, pos) => {
+                      setEditContent(prev => {
+                        const insertAt = pos != null ? pos : prev.length;
+                        return prev.slice(0, insertAt) + tag + prev.slice(insertAt);
+                      });
+                    }}
+                  />
                 </div>
                 <textarea
                   className="kb-textarea"
+                  ref={kbTextareaRef}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   rows={25}

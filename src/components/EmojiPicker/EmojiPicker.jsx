@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Smile } from 'lucide-react';
 import './EmojiPicker.css';
 
@@ -17,12 +17,21 @@ const CUSTOM_EMOJI_IDS = [
   '5249311528842196557','5249350832087925208',
 ];
 
-export default function EmojiPicker({ onInsert }) {
+export default function EmojiPicker({ onInsert, textareaRef }) {
   const [open, setOpen] = useState(false);
+  const cursorPosRef = useRef(null);
+
+  const handleOpen = () => {
+    // Save cursor position before opening picker
+    if (textareaRef?.current) {
+      cursorPosRef.current = textareaRef.current.selectionStart;
+    }
+    setOpen(!open);
+  };
 
   const handleSelect = (emojiId) => {
     const tag = `<tg-emoji emoji-id="${emojiId}">⭐</tg-emoji>`;
-    onInsert(tag);
+    onInsert(tag, cursorPosRef.current);
     setOpen(false);
   };
 
@@ -30,7 +39,11 @@ export default function EmojiPicker({ onInsert }) {
     <div className="emoji-picker-wrapper">
       <button
         className="emoji-picker-trigger"
-        onClick={() => setOpen(!open)}
+        onMouseDown={(e) => {
+          // Prevent textarea from losing focus
+          e.preventDefault();
+        }}
+        onClick={handleOpen}
         title="Фирменные эмодзи"
         type="button"
       >
@@ -47,6 +60,7 @@ export default function EmojiPicker({ onInsert }) {
                 <button
                   key={id}
                   className="emoji-picker-item"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(id)}
                   title={id}
                 >

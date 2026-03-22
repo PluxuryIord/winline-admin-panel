@@ -24,6 +24,8 @@ export default function NodeEditorPanel({
   onUpdateButtonTarget, onMoveButton, onReorderButtons, onAddButton, onDeleteButton,
   onDeleteScreen, onClose, onSave, dirty, saving, saved,
 }) {
+  const textareaRefs = useRef({});
+
   if (!editData) return null;
 
   const messageKeys = Object.keys(editData.messages || {});
@@ -124,11 +126,23 @@ export default function NodeEditorPanel({
                     e.target.style.height = 'auto';
                     e.target.style.height = e.target.scrollHeight + 'px';
                   }}
-                  ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                  ref={el => {
+                    if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+                    if (!textareaRefs.current[key]) textareaRefs.current[key] = { current: null };
+                    textareaRefs.current[key].current = el;
+                  }}
                 />
                 <div className="sc-message-footer">
                   <span className="sc-message-hint">HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
-                  <EmojiPicker onInsert={(tag) => onUpdateMessage(key, msg.text + tag)} />
+                  <EmojiPicker
+                    textareaRef={textareaRefs.current[key] || { current: null }}
+                    onInsert={(tag, pos) => {
+                      const text = msg.text || '';
+                      const insertAt = pos != null ? pos : text.length;
+                      const newText = text.slice(0, insertAt) + tag + text.slice(insertAt);
+                      onUpdateMessage(key, newText);
+                    }}
+                  />
                 </div>
               </div>
             );
