@@ -876,56 +876,51 @@
   background: rgba(255, 126, 0, 0.06);
 }
 
-/* Дропдаун тегов (glass) */
+/* Дропдаун тегов — как в карточке пользователя */
 .chatview-tag-dropdown {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  background: rgba(18, 18, 30, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 6px;
   z-index: 100;
-  min-width: 160px;
-  max-width: 220px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  min-width: 200px;
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 .chatview-tag-dropdown-item {
-  padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.75);
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s;
 }
 
 .chatview-tag-dropdown-item:hover {
-  background: rgba(255, 126, 0, 0.1);
+  background-color: rgba(255, 126, 0, 0.12);
   color: var(--color-orange);
 }
 
 .chatview-tag-dropdown-input-row {
-  padding: 4px 2px 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  margin-top: 2px;
+  padding: 6px 4px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
 }
 
 .chatview-tag-dropdown-input {
   width: 100%;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
+  background-color: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
   color: var(--color-white);
+  padding: 7px 10px;
+  border-radius: 6px;
   font-family: inherit;
-  font-size: 0.82rem;
-  padding: 6px 10px;
+  font-size: 0.85rem;
   outline: none;
   box-sizing: border-box;
 }
