@@ -310,19 +310,6 @@ function SettingsModal({ onClose }) {
               </div>
             </div>
 
-            {/* Toggle */}
-            <div className="ew-settings-section">
-              <div className="ew-toggle-row">
-                <div className="ew-toggle-info">
-                  <span className="ew-toggle-label">Мероприятие активно</span>
-                  <span className="ew-toggle-desc">Пользователи видят кнопку «Я на мероприятии» в боте</span>
-                </div>
-                <button className={`ew-toggle-switch ${eventStarts ? 'on' : ''}`} onClick={handleToggle} disabled={toggling}>
-                  {eventStarts ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
-                </button>
-              </div>
-            </div>
-
             {/* Limit */}
             <div className="ew-settings-section">
               <h3>Лимит QR-кодов</h3>
