@@ -890,6 +890,8 @@
   z-index: 100;
   min-width: 160px;
   max-width: 220px;
+  max-height: 240px;
+  overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
