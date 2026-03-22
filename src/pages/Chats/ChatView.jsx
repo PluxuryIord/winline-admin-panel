@@ -75,7 +75,18 @@ export default function ChatView() {
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const tagDropdownRef = useRef(null);
+  const tagBtnRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const tagDropdownPos = (() => {
+    if (!tagBtnRef.current) return {};
+    const rect = tagBtnRef.current.getBoundingClientRect();
+    return {
+      position: 'fixed',
+      top: rect.bottom + 6,
+      right: window.innerWidth - rect.right,
+    };
+  })();
 
   // Загрузка чата
   useEffect(() => {
@@ -406,11 +417,11 @@ export default function ChatView() {
                     </span>
                   ))}
                   <div className="chatview-tag-add-wrapper" ref={tagDropdownRef}>
-                    <button className="chatview-tag-add-btn" onClick={() => setShowTagDropdown(!showTagDropdown)}>
+                    <button className="chatview-tag-add-btn" ref={tagBtnRef} onClick={() => setShowTagDropdown(!showTagDropdown)}>
                       <Plus size={13} />
                     </button>
                     {showTagDropdown && (
-                      <div className="chatview-tag-dropdown">
+                      <div className="chatview-tag-dropdown" style={tagDropdownPos}>
                         {availableTags.map(tag => (
                           <div key={tag} className="chatview-tag-dropdown-item" onClick={() => handleAddExistingTag(tag)}>{tag}</div>
                         ))}
