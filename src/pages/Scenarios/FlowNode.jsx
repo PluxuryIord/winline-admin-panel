@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 
 const SCREEN_ICONS = {
@@ -9,14 +9,32 @@ const SCREEN_ICONS = {
   group_landings: '🌐', group_kb: '📚',
 };
 
+// System screens that cannot be deleted
+const SYSTEM_SCREENS = new Set([
+  'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+]);
+
 // Exported constants for FlowArrows to use
 export const NODE_W = 280;
 export const NODE_HEADER_H = 52;
 export const BTN_ROW_H = 36;
 export const NODE_PAD_BOTTOM = 10;
 
-export default function FlowNode({ screenId, screen, position, isActive, onSelect, onMove }) {
+export default function FlowNode({
+  screenId, screen, position, isActive, isSearchMatch, isConnected, isHovered,
+  onSelect, onMove, onDuplicate, onDelete, onHover,
+}) {
   const dragRef = useRef(null);
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [contextMenu]);
 
   const handleMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
@@ -45,41 +63,93 @@ export default function FlowNode({ screenId, screen, position, isActive, onSelec
     document.addEventListener('mouseup', onMouseUp);
   }, [screenId, position, onSelect, onMove]);
 
+  // Context menu (right click)
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleDuplicate = () => {
+    setContextMenu(null);
+    onDuplicate?.(screenId);
+  };
+
+  const handleDelete = () => {
+    setContextMenu(null);
+    onDelete?.(screenId);
+  };
+
   const buttonOrder = screen.buttons?._order || [];
   const icon = SCREEN_ICONS[screenId] || '📄';
 
-  return (
-    <div
-      ref={dragRef}
-      className={`flow-node ${isActive ? 'active' : ''}`}
-      style={{ left: position.x, top: position.y }}
-      onMouseDown={handleMouseDown}
-    >
-      {/* Top anchor dot (incoming arrows land here) */}
-      <div className="flow-node-anchor flow-node-anchor-top" />
+  const classNames = [
+    'flow-node',
+    isActive ? 'active' : '',
+    isSearchMatch ? 'search-match' : '',
+    isConnected ? 'connected' : '',
+    isHovered ? 'hovered' : '',
+  ].filter(Boolean).join(' ');
 
-      <div className="flow-node-header">
-        <span className="flow-node-icon">{icon}</span>
-        <span className="flow-node-title">{screen.title}</span>
+  return (
+    <>
+      <div
+        ref={dragRef}
+        className={classNames}
+        style={{ left: position.x, top: position.y }}
+        onMouseDown={handleMouseDown}
+        onContextMenu={handleContextMenu}
+        onMouseEnter={() => onHover?.(screenId)}
+        onMouseLeave={() => onHover?.(null)}
+      >
+        {/* Top anchor dot (incoming arrows land here) */}
+        <div className="flow-node-anchor flow-node-anchor-top" />
+
+        <div className="flow-node-header">
+          <span className="flow-node-icon">{icon}</span>
+          <span className="flow-node-title">{screen.title}</span>
+        </div>
+        {buttonOrder.length > 0 && (
+          <div className="flow-node-buttons">
+            {buttonOrder.map((key) => {
+              const btn = screen.buttons[key];
+              if (!btn) return null;
+              const isUrl = btn.action?.startsWith('url:');
+              const hasTarget = !!btn.targetScreen;
+              return (
+                <div key={key} className={`flow-node-btn ${isUrl ? 'url' : 'callback'}`} data-btn-key={key}>
+                  <span className="flow-node-btn-label">{btn.label}</span>
+                  {isUrl && <ExternalLink size={12} />}
+                  {/* Bottom anchor dot for outgoing arrows */}
+                  {hasTarget && <div className="flow-node-anchor flow-node-anchor-btn" />}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      {buttonOrder.length > 0 && (
-        <div className="flow-node-buttons">
-          {buttonOrder.map((key) => {
-            const btn = screen.buttons[key];
-            if (!btn) return null;
-            const isUrl = btn.action?.startsWith('url:');
-            const hasTarget = !!btn.targetScreen;
-            return (
-              <div key={key} className={`flow-node-btn ${isUrl ? 'url' : 'callback'}`} data-btn-key={key}>
-                <span className="flow-node-btn-label">{btn.label}</span>
-                {isUrl && <ExternalLink size={12} />}
-                {/* Bottom anchor dot for outgoing arrows */}
-                {hasTarget && <div className="flow-node-anchor flow-node-anchor-btn" />}
-              </div>
-            );
-          })}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          className="flow-node-context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000,
+          }}
+        >
+          <button className="flow-node-context-item" onClick={handleDuplicate}>
+            Дублировать
+          </button>
+          {!SYSTEM_SCREENS.has(screenId) && (
+            <button className="flow-node-context-item flow-node-context-item-danger" onClick={handleDelete}>
+              Удалить
+            </button>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
 }

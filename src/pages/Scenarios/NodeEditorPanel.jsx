@@ -1,6 +1,7 @@
+import { useState, useRef, useCallback } from 'react';
 import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
-  Loader, Check, ExternalLink, Link, Plus, Trash2,
+  Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye,
 } from 'lucide-react';
 
 const SCREEN_ICONS = {
@@ -9,10 +10,17 @@ const SCREEN_ICONS = {
   socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
 };
 
+// ─── Sanitize HTML (allow only safe tags) ────────────────────────────────────
+function sanitizeHtml(html) {
+  if (!html) return '';
+  // Strip all tags except b, i, a, code, em, strong
+  return html.replace(/<\/?(?!b>|\/b>|i>|\/i>|a[\s>]|\/a>|code>|\/code>|em>|\/em>|strong>|\/strong>)[^>]*>/gi, '');
+}
+
 export default function NodeEditorPanel({
   screenId, editData, allScreens, isCustom,
   onUpdateMessage, onUpdateButtonLabel, onUpdateButtonAction,
-  onUpdateButtonTarget, onMoveButton, onAddButton, onDeleteButton,
+  onUpdateButtonTarget, onMoveButton, onReorderButtons, onAddButton, onDeleteButton,
   onDeleteScreen, onClose, onSave, dirty, saving, saved,
 }) {
   if (!editData) return null;
@@ -25,6 +33,50 @@ export default function NodeEditorPanel({
     id,
     title: `${SCREEN_ICONS[id] || '📄'} ${s.title}`,
   }));
+
+  // ─── Drag & drop state ─────────────────────────────────────────────────────
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const dragStartY = useRef(0);
+
+  const handleDragStart = useCallback((e, idx) => {
+    e.stopPropagation();
+    setDragIdx(idx);
+    dragStartY.current = e.clientY;
+
+    const onMouseMove = (ev) => {
+      // Find which button index we're over
+      const btnEls = document.querySelectorAll('.node-editor-btn-block');
+      for (let i = 0; i < btnEls.length; i++) {
+        const rect = btnEls[i].getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+          setDragOverIdx(i);
+          break;
+        }
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      // Reorder
+      setDragIdx(prevDragIdx => {
+        setDragOverIdx(prevOverIdx => {
+          if (prevDragIdx !== null && prevOverIdx !== null && prevDragIdx !== prevOverIdx) {
+            onReorderButtons?.(prevDragIdx, prevOverIdx);
+          }
+          return null;
+        });
+        return null;
+      });
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [onReorderButtons]);
+
+  // ─── Get combined message text for preview ─────────────────────────────────
+  const previewText = messageKeys.map(key => editData.messages[key]?.text || '').join('\n\n');
 
   return (
     <div className="node-editor-panel">
@@ -80,6 +132,32 @@ export default function NodeEditorPanel({
         </div>
       )}
 
+      {/* ─── Telegram Preview (Feature 5) ───────────────────────────────── */}
+      <div className="sc-section">
+        <h3 className="sc-section-title"><Eye size={16} /> Превью</h3>
+        <div className="sc-tg-preview">
+          <div className="sc-tg-preview-bubble">
+            <div
+              className="sc-tg-preview-text"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewText) }}
+            />
+          </div>
+          {buttonOrder.length > 0 && (
+            <div className="sc-tg-preview-buttons">
+              {buttonOrder.map((key) => {
+                const btn = editData.buttons[key];
+                if (!btn) return null;
+                return (
+                  <div key={key} className="sc-tg-preview-btn">
+                    {btn.label}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Buttons */}
       <div className="sc-section">
         <div className="sc-section-header">
@@ -95,6 +173,8 @@ export default function NodeEditorPanel({
               if (!btn) return null;
               const isUrl = btn.action?.startsWith('url:');
               const urlValue = isUrl ? btn.action.slice(4) : '';
+              const isDragging = dragIdx === idx;
+              const isDragOver = dragOverIdx === idx && dragIdx !== idx;
 
               if (btn.locked) {
                 return (
@@ -112,8 +192,19 @@ export default function NodeEditorPanel({
               }
 
               return (
-                <div key={key} className="node-editor-btn-block">
+                <div
+                  key={key}
+                  className={`node-editor-btn-block ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                >
                   <div className="sc-button-row">
+                    {/* Drag handle */}
+                    <div
+                      className="sc-drag-handle"
+                      onMouseDown={(e) => handleDragStart(e, idx)}
+                      title="Перетащите для перемещения"
+                    >
+                      <GripVertical size={16} />
+                    </div>
                     <div className="sc-button-arrows">
                       <button className="sc-arrow-btn" onClick={() => onMoveButton(key, -1)} disabled={idx === 0}>
                         <ChevronUp size={14} />

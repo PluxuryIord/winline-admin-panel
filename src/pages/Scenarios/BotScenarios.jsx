@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Loader, Plus } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Loader, Plus, RotateCcw, X } from 'lucide-react';
 import { api } from '../../utils/api';
 import FlowCanvas from './FlowCanvas';
 import NodeEditorPanel from './NodeEditorPanel';
@@ -106,6 +106,14 @@ function migrateData(data) {
   return data;
 }
 
+// ─── Sanitize HTML for test overlay ─────────────────────────────────────────
+function sanitizeHtml(html) {
+  if (!html) return '';
+  return html.replace(/<\/?(?!b>|\/b>|i>|\/i>|a[\s>]|\/a>|code>|\/code>|em>|\/em>|strong>|\/strong>)[^>]*>/gi, '');
+}
+
+const MAX_HISTORY = 20;
+
 export default function BotScenarios() {
   const [scenarios, setScenarios] = useState(null);
   const [activeScreen, setActiveScreen] = useState(null);
@@ -121,6 +129,68 @@ export default function BotScenarios() {
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [showAddBtnModal, setShowAddBtnModal] = useState(false);
   const [newBtnLabel, setNewBtnLabel] = useState('');
+
+  // Feature 3: Search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Feature 10: Hover highlighting
+  const [hoveredNode, setHoveredNode] = useState(null);
+
+  // Feature 13: Flow testing
+  const [testMode, setTestMode] = useState(false);
+  const [testScreen, setTestScreen] = useState('start_menu');
+
+  // Feature 8: Undo/Redo
+  const historyRef = useRef([]);
+  const historyIndexRef = useRef(-1);
+  const skipHistoryRef = useRef(false);
+
+  const pushHistory = useCallback((data) => {
+    if (skipHistoryRef.current) return;
+    const json = JSON.stringify(data);
+    const history = historyRef.current;
+    const idx = historyIndexRef.current;
+    // Remove future states
+    historyRef.current = history.slice(0, idx + 1);
+    historyRef.current.push(json);
+    if (historyRef.current.length > MAX_HISTORY) {
+      historyRef.current.shift();
+    }
+    historyIndexRef.current = historyRef.current.length - 1;
+  }, []);
+
+  // Undo/Redo keyboard handler
+  useEffect(() => {
+    const handler = (e) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        // Undo
+        if (historyIndexRef.current > 0) {
+          historyIndexRef.current--;
+          skipHistoryRef.current = true;
+          const state = JSON.parse(historyRef.current[historyIndexRef.current]);
+          setScenarios(state);
+          skipHistoryRef.current = false;
+        }
+      } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        // Redo
+        if (historyIndexRef.current < historyRef.current.length - 1) {
+          historyIndexRef.current++;
+          skipHistoryRef.current = true;
+          const state = JSON.parse(historyRef.current[historyIndexRef.current]);
+          setScenarios(state);
+          skipHistoryRef.current = false;
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // Load scenarios
   const loadData = useCallback(async () => {
@@ -139,6 +209,7 @@ export default function BotScenarios() {
       const origJson = JSON.stringify(data);
       const migrated = migrateData(JSON.parse(JSON.stringify(data)));
       setScenarios(migrated);
+      pushHistory(migrated);
 
       // Auto-save if migration changed anything (added targetScreen/positions)
       if (JSON.stringify(migrated) !== origJson) {
@@ -149,9 +220,18 @@ export default function BotScenarios() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pushHistory]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Helper: update scenarios and push to history
+  const updateScenarios = useCallback((updater) => {
+    setScenarios(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      pushHistory(next);
+      return next;
+    });
+  }, [pushHistory]);
 
   // Auto-save helper
   const autoSave = async (currentEditData, currentActiveScreen) => {
@@ -270,6 +350,19 @@ export default function BotScenarios() {
     setSaved(false);
   };
 
+  // Feature 6: Reorder buttons by drag indices
+  const reorderButtons = (fromIdx, toIdx) => {
+    setEditData(prev => {
+      const order = [...(prev.buttons._order || [])];
+      if (fromIdx < 0 || fromIdx >= order.length || toIdx < 0 || toIdx >= order.length) return prev;
+      const [item] = order.splice(fromIdx, 1);
+      order.splice(toIdx, 0, item);
+      return { ...prev, buttons: { ...prev.buttons, _order: order } };
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
   // Create new custom screen
   const openCreateModal = () => {
     setNewBlockName('');
@@ -280,7 +373,7 @@ export default function BotScenarios() {
   const confirmCreateScreen = () => {
     if (!newBlockName.trim()) return;
     const id = `custom_${Date.now()}`;
-    setScenarios(prev => {
+    updateScenarios(prev => {
       const next = { ...prev, screens: { ...prev.screens } };
       next.screens[id] = {
         title: newBlockName.trim(),
@@ -299,6 +392,38 @@ export default function BotScenarios() {
     setShowCreateModal(false);
   };
 
+  // Feature 7: Duplicate block
+  const duplicateBlock = (screenId) => {
+    const screen = scenarios.screens[screenId];
+    if (!screen) return;
+    const newId = `${screenId}_copy`;
+    // Avoid collision
+    let finalId = newId;
+    let counter = 1;
+    while (scenarios.screens[finalId]) {
+      finalId = `${screenId}_copy${counter++}`;
+    }
+    updateScenarios(prev => {
+      const next = { ...prev, screens: { ...prev.screens } };
+      next.screens[finalId] = {
+        ...JSON.parse(JSON.stringify(screen)),
+        title: screen.title + ' (копия)',
+        x: (screen.x ?? 0) + 50,
+        y: (screen.y ?? 0) + 50,
+      };
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
+  // Delete custom screen (called from context menu)
+  const deleteBlock = (screenId) => {
+    if (SYSTEM_SCREENS.has(screenId)) return;
+    setDeleteTargetId(screenId);
+    setShowDeleteModal(true);
+  };
+
   // Delete custom screen
   const openDeleteModal = (screenId) => {
     if (SYSTEM_SCREENS.has(screenId)) return;
@@ -308,7 +433,7 @@ export default function BotScenarios() {
 
   const confirmDeleteScreen = () => {
     if (!deleteTargetId) return;
-    setScenarios(prev => {
+    updateScenarios(prev => {
       const next = { ...prev, screens: { ...prev.screens } };
       delete next.screens[deleteTargetId];
       for (const [, screen] of Object.entries(next.screens)) {
@@ -380,6 +505,7 @@ export default function BotScenarios() {
       }
       await api.put('/api/scenarios', updated);
       setScenarios(updated);
+      pushHistory(updated);
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -390,8 +516,22 @@ export default function BotScenarios() {
     }
   };
 
+  // Feature 13: Flow test navigation
+  const handleTestClick = (btnKey) => {
+    if (!scenarios?.screens[testScreen]) return;
+    const btn = scenarios.screens[testScreen].buttons?.[btnKey];
+    if (btn?.targetScreen && scenarios.screens[btn.targetScreen]) {
+      setTestScreen(btn.targetScreen);
+    }
+  };
+
   if (loading) return <div className="sc-loading"><Loader size={24} className="sc-spinner" /> Загрузка сценариев...</div>;
   if (!scenarios) return <div className="sc-loading">Не удалось загрузить</div>;
+
+  // Current test screen data
+  const testScreenData = testMode ? scenarios.screens[testScreen] : null;
+  const testMessages = testScreenData ? Object.keys(testScreenData.messages || {}).map(k => testScreenData.messages[k]?.text || '').join('\n\n') : '';
+  const testButtons = testScreenData ? (testScreenData.buttons?._order || []) : [];
 
   return (
     <div className="sc-flow-layout">
@@ -400,6 +540,13 @@ export default function BotScenarios() {
         activeScreen={activeScreen}
         onSelectNode={selectScreen}
         onMoveNode={moveNode}
+        onDuplicate={duplicateBlock}
+        onDeleteBlock={deleteBlock}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        hoveredNode={hoveredNode}
+        setHoveredNode={setHoveredNode}
+        onStartTest={() => { setTestMode(true); setTestScreen('start_menu'); }}
       />
 
       {/* Add new block button */}
@@ -509,6 +656,52 @@ export default function BotScenarios() {
         </div>
       )}
 
+      {/* Feature 13: Flow Test Overlay */}
+      {testMode && testScreenData && (
+        <div className="sc-test-overlay" onClick={() => setTestMode(false)}>
+          <div className="sc-test-phone" onClick={e => e.stopPropagation()}>
+            <div className="sc-test-phone-notch" />
+            <div className="sc-test-phone-header">
+              <span className="sc-test-phone-title">WL Bot</span>
+              <button className="sc-test-phone-close" onClick={() => setTestMode(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="sc-test-phone-screen">
+              <div className="sc-test-phone-messages">
+                <div className="sc-test-bubble">
+                  <div
+                    className="sc-test-bubble-text"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(testMessages) }}
+                  />
+                </div>
+              </div>
+              <div className="sc-test-phone-buttons">
+                {testButtons.map(btnKey => {
+                  const btn = testScreenData.buttons?.[btnKey];
+                  if (!btn) return null;
+                  return (
+                    <button
+                      key={btnKey}
+                      className="sc-test-btn"
+                      onClick={() => handleTestClick(btnKey)}
+                    >
+                      {btn.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="sc-test-phone-footer">
+                <button className="sc-test-reset" onClick={() => setTestScreen('start_menu')}>
+                  <RotateCcw size={14} /> Сброс
+                </button>
+                <span className="sc-test-screen-id">{testScreen}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeScreen && editData && (
         <NodeEditorPanel
           screenId={activeScreen}
@@ -520,6 +713,7 @@ export default function BotScenarios() {
           onUpdateButtonAction={updateButtonAction}
           onUpdateButtonTarget={updateButtonTarget}
           onMoveButton={moveButton}
+          onReorderButtons={reorderButtons}
           onAddButton={openAddBtnModal}
           onDeleteButton={deleteButton}
           onDeleteScreen={() => openDeleteModal(activeScreen)}

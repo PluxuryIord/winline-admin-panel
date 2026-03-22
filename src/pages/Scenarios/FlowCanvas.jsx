@@ -1,13 +1,103 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useMemo } from 'react';
+import { Search, Maximize2, Play, Filter } from 'lucide-react';
 import FlowNode from './FlowNode';
 import FlowArrows from './FlowArrows';
+import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
 
-export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMoveNode }) {
+// ─── Scenario groups mapping ─────────────────────────────────────────────────
+const SCENARIO_GROUPS = {
+  'Сценарий 1': ['start_menu', 'registration_flow'],
+  'Сценарий 2': ['auth_flow', 'main_menu', 'offer_page', 'promo_page', 'socials_page'],
+  'Сценарий 3': ['event_flow'],
+  'Сценарий 4': ['group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb'],
+};
+
+export default function FlowCanvas({
+  screens, activeScreen, onSelectNode, onMoveNode,
+  onDuplicate, onDeleteBlock, searchQuery, setSearchQuery,
+  hoveredNode, setHoveredNode, onStartTest,
+}) {
   const containerRef = useRef(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [activeFilter, setActiveFilter] = useState(null);
 
-  // Pan with mouse drag
+  // ─── Search matching ─────────────────────────────────────────────────────────
+  const searchMatches = useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return new Set();
+    const q = searchQuery.toLowerCase();
+    const matches = new Set();
+    for (const [id, screen] of Object.entries(screens)) {
+      if (screen.title?.toLowerCase().includes(q)) {
+        matches.add(id);
+        continue;
+      }
+      const order = screen.buttons?._order || [];
+      for (const btnKey of order) {
+        const btn = screen.buttons[btnKey];
+        if (btn?.label?.toLowerCase().includes(q)) {
+          matches.add(id);
+          break;
+        }
+      }
+    }
+    return matches;
+  }, [screens, searchQuery]);
+
+  // ─── Connected nodes for hover highlighting ──────────────────────────────────
+  const connectedNodes = useMemo(() => {
+    if (!hoveredNode) return new Set();
+    const connected = new Set();
+    for (const [srcId, screen] of Object.entries(screens)) {
+      const order = screen.buttons?._order || [];
+      for (const btnKey of order) {
+        const btn = screen.buttons[btnKey];
+        if (!btn?.targetScreen) continue;
+        if (srcId === hoveredNode) connected.add(btn.targetScreen);
+        if (btn.targetScreen === hoveredNode) connected.add(srcId);
+      }
+    }
+    return connected;
+  }, [screens, hoveredNode]);
+
+  // ─── Fit to bounding box helper ──────────────────────────────────────────────
+  const fitToNodes = useCallback((nodeIds) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const padding = 50;
+
+    const ids = nodeIds.filter(id => screens[id]);
+    if (ids.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of ids) {
+      const s = screens[id];
+      const x = s.x ?? 0;
+      const y = s.y ?? 0;
+      const btnCount = (s.buttons?._order || []).length;
+      const h = NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + NODE_W > maxX) maxX = x + NODE_W;
+      if (y + h > maxY) maxY = y + h;
+    }
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    const scaleX = (rect.width - padding * 2) / contentW;
+    const scaleY = (rect.height - padding * 2) / contentH;
+    const newZoom = Math.min(2, Math.max(0.3, Math.min(scaleX, scaleY)));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    setZoom(newZoom);
+    setOffset({
+      x: rect.width / 2 - centerX * newZoom,
+      y: rect.height / 2 - centerY * newZoom,
+    });
+  }, [screens]);
+
+  // ─── Pan with mouse drag ─────────────────────────────────────────────────────
   const handleBgMouseDown = useCallback((e) => {
     if (e.target !== e.currentTarget && !e.target.classList.contains('flow-canvas-inner')) return;
     if (e.button !== 0) return;
@@ -32,12 +122,29 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
     document.addEventListener('mouseup', onMouseUp);
   }, [offset]);
 
-  // Zoom with scroll wheel
+  // ─── Zoom with scroll wheel ──────────────────────────────────────────────────
   const handleWheel = useCallback((e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.08 : 0.08;
     setZoom(prev => Math.min(2, Math.max(0.3, prev + delta)));
   }, []);
+
+  // ─── Scenario filter handler ─────────────────────────────────────────────────
+  const handleFilter = (name) => {
+    if (name === null) {
+      setActiveFilter(null);
+      fitToNodes(Object.keys(screens).filter(id => id !== 'logout_screen'));
+    } else {
+      setActiveFilter(name);
+      fitToNodes(SCENARIO_GROUPS[name] || []);
+    }
+  };
+
+  // ─── Fit all handler ─────────────────────────────────────────────────────────
+  const handleFitAll = () => {
+    setActiveFilter(null);
+    fitToNodes(Object.keys(screens).filter(id => id !== 'logout_screen'));
+  };
 
   const transform = `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`;
 
@@ -48,9 +155,50 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
       onMouseDown={handleBgMouseDown}
       onWheel={handleWheel}
     >
+      {/* ─── Toolbar ──────────────────────────────────────────────────── */}
+      <div className="sc-toolbar">
+        <div className="sc-toolbar-filters">
+          <Filter size={14} />
+          <button
+            className={`sc-toolbar-filter-btn ${activeFilter === null ? 'active' : ''}`}
+            onClick={() => handleFilter(null)}
+          >
+            Все
+          </button>
+          {Object.keys(SCENARIO_GROUPS).map(name => (
+            <button
+              key={name}
+              className={`sc-toolbar-filter-btn ${activeFilter === name ? 'active' : ''}`}
+              onClick={() => handleFilter(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+
+        <div className="sc-toolbar-right">
+          <div className="sc-toolbar-search">
+            <Search size={14} />
+            <input
+              className="sc-toolbar-search-input"
+              type="text"
+              placeholder="Поиск по блокам..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button className="sc-toolbar-btn" onClick={handleFitAll} title="Уместить всё">
+            <Maximize2 size={16} />
+          </button>
+          <button className="sc-toolbar-btn sc-toolbar-btn-test" onClick={onStartTest} title="Тестирование потока">
+            <Play size={16} /> Тест
+          </button>
+        </div>
+      </div>
+
       {/* SVG arrows layer */}
       <svg className="flow-arrows-svg" style={{ transform, transformOrigin: '0 0' }}>
-        <FlowArrows screens={screens} activeScreen={activeScreen} />
+        <FlowArrows screens={screens} activeScreen={activeScreen} hoveredNode={hoveredNode} />
       </svg>
 
       <div
@@ -64,8 +212,14 @@ export default function FlowCanvas({ screens, activeScreen, onSelectNode, onMove
             screen={screen}
             position={{ x: screen.x ?? 0, y: screen.y ?? 0 }}
             isActive={id === activeScreen}
+            isSearchMatch={searchMatches.has(id)}
+            isConnected={connectedNodes.has(id)}
+            isHovered={id === hoveredNode}
             onSelect={onSelectNode}
             onMove={onMoveNode}
+            onDuplicate={onDuplicate}
+            onDelete={onDeleteBlock}
+            onHover={setHoveredNode}
           />
         ))}
       </div>

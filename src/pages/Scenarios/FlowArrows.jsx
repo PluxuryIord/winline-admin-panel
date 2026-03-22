@@ -16,7 +16,7 @@ function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
-export default function FlowArrows({ screens, activeScreen }) {
+export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
   const arrows = [];
 
   for (const [srcId, screen] of Object.entries(screens)) {
@@ -51,14 +51,17 @@ export default function FlowArrows({ screens, activeScreen }) {
       const cp2x = tx;
       const cp2y = ty - cpOffset;
 
-      const isHighlighted = srcId === activeScreen || btn.targetScreen === activeScreen;
+      const isHighlightedActive = srcId === activeScreen || btn.targetScreen === activeScreen;
+      const isHighlightedHover = hoveredNode && (srcId === hoveredNode || btn.targetScreen === hoveredNode);
+      const highlighted = isHighlightedActive || isHighlightedHover;
+
       const mid = bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
       const angle = bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
 
       arrows.push({
         key: `${srcId}-${btnKey}`,
         d: `M ${sx},${sy} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${tx},${ty}`,
-        highlighted: isHighlighted,
+        highlighted,
         mid, angle, sx, sy, tx, ty,
       });
     });
