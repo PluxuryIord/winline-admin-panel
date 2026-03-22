@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
+import EmojiPicker from '../../components/EmojiPicker/EmojiPicker';
 
 export default function KnowledgeBase() {
   const [articles, setArticles] = useState([]);
@@ -390,8 +391,11 @@ export default function KnowledgeBase() {
               />
             ) : (
               <div className="kb-editor-area">
-                <div className="kb-editor-hint">
-                  Telegram HTML: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;u&gt;подчёркнутый&lt;/u&gt;, &lt;a href="url"&gt;ссылка&lt;/a&gt;. Перенос строки: \n
+                <div className="kb-editor-hint-row">
+                  <div className="kb-editor-hint">
+                    Telegram HTML: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, &lt;u&gt;подчёркнутый&lt;/u&gt;, &lt;a href="url"&gt;ссылка&lt;/a&gt;. Перенос строки: \n
+                  </div>
+                  <EmojiPicker onInsert={(tag) => setEditContent(prev => prev + tag)} />
                 </div>
                 <textarea
                   className="kb-textarea"

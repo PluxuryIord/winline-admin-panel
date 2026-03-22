@@ -201,7 +201,14 @@
   min-height: 0;
 }
 
+.kb-editor-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .kb-editor-hint {
+  flex: 1;
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.35);
   padding: 8px 12px;
