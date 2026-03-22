@@ -105,6 +105,8 @@ export default function BotScenarios() {
   const [newBlockDesc, setNewBlockDesc] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [showAddBtnModal, setShowAddBtnModal] = useState(false);
+  const [newBtnLabel, setNewBtnLabel] = useState('');
 
   // Load scenarios
   const loadData = useCallback(async () => {
@@ -316,19 +318,24 @@ export default function BotScenarios() {
     setDeleteTargetId(null);
   };
 
-  // Add button to current screen (custom only)
-  const addButton = () => {
-    const label = prompt('Текст кнопки:');
-    if (!label || !label.trim()) return;
+  // Add button modal
+  const openAddBtnModal = () => {
+    setNewBtnLabel('');
+    setShowAddBtnModal(true);
+  };
+
+  const confirmAddButton = () => {
+    if (!newBtnLabel.trim()) return;
     const btnId = `btn_${Date.now()}`;
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
       const order = [...(next.buttons._order || []), btnId];
-      next.buttons = { ...next.buttons, _order: order, [btnId]: { label: label.trim(), action: 'callback:noop' } };
+      next.buttons = { ...next.buttons, _order: order, [btnId]: { label: newBtnLabel.trim(), action: 'callback:noop' } };
       return next;
     });
     setDirty(true);
     setSaved(false);
+    setShowAddBtnModal(false);
   };
 
   // Delete button from current screen
@@ -455,6 +462,39 @@ export default function BotScenarios() {
         </div>
       )}
 
+      {/* Add button modal */}
+      {showAddBtnModal && (
+        <div className="sc-modal-overlay" onClick={() => setShowAddBtnModal(false)}>
+          <div className="sc-modal" onClick={e => e.stopPropagation()}>
+            <div className="sc-modal-header">
+              <h3>Новая кнопка</h3>
+              <button className="sc-modal-close" onClick={() => setShowAddBtnModal(false)}>
+                <span>&times;</span>
+              </button>
+            </div>
+            <div className="sc-modal-body">
+              <div className="sc-modal-field">
+                <label>Текст кнопки</label>
+                <input
+                  className="sc-modal-input"
+                  value={newBtnLabel}
+                  onChange={e => setNewBtnLabel(e.target.value)}
+                  placeholder="Например: Подробнее"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && confirmAddButton()}
+                />
+              </div>
+            </div>
+            <div className="sc-modal-footer">
+              <button className="sc-modal-cancel" onClick={() => setShowAddBtnModal(false)}>Отмена</button>
+              <button className="sc-modal-confirm" onClick={confirmAddButton} disabled={!newBtnLabel.trim()}>
+                <Plus size={16} /> Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeScreen && editData && (
         <NodeEditorPanel
           screenId={activeScreen}
@@ -466,7 +506,7 @@ export default function BotScenarios() {
           onUpdateButtonAction={updateButtonAction}
           onUpdateButtonTarget={updateButtonTarget}
           onMoveButton={moveButton}
-          onAddButton={addButton}
+          onAddButton={openAddBtnModal}
           onDeleteButton={deleteButton}
           onDeleteScreen={() => openDeleteModal(activeScreen)}
           onClose={closeEditor}

@@ -84,11 +84,9 @@ export default function NodeEditorPanel({
       <div className="sc-section">
         <div className="sc-section-header">
           <h3 className="sc-section-title"><MousePointer size={16} /> Кнопки</h3>
-          {isCustom && (
-            <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
-              <Plus size={14} /> Добавить
-            </button>
-          )}
+          <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
+            <Plus size={14} /> Добавить
+          </button>
         </div>
         {buttonOrder.length > 0 && (
           <div className="sc-buttons-list">
@@ -115,11 +113,9 @@ export default function NodeEditorPanel({
                       onChange={e => onUpdateButtonLabel(key, e.target.value)}
                       placeholder="Текст кнопки"
                     />
-                    {isCustom && (
-                      <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
-                        <X size={14} />
-                      </button>
-                    )}
+                    <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
+                      <X size={14} />
+                    </button>
                   </div>
 
                   {/* Action: URL or Target Screen */}
