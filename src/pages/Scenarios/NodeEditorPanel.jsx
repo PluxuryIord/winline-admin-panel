@@ -3,6 +3,7 @@ import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
   Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye,
 } from 'lucide-react';
+import EmojiPicker from '../../components/EmojiPicker/EmojiPicker';
 
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
@@ -125,7 +126,10 @@ export default function NodeEditorPanel({
                   }}
                   ref={el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
                 />
-                <span className="sc-message-hint">HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
+                <div className="sc-message-footer">
+                  <span className="sc-message-hint">HTML: &lt;b&gt;, &lt;i&gt;, &lt;a href&gt;, &lt;code&gt;</span>
+                  <EmojiPicker onInsert={(tag) => onUpdateMessage(key, msg.text + tag)} />
+                </div>
               </div>
             );
           })}

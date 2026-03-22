@@ -304,6 +304,13 @@
   border-color: rgba(255, 126, 0, 0.4);
 }
 
+.sc-message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sc-message-hint {
   font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.2);
