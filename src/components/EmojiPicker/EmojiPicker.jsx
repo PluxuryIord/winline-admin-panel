@@ -86,7 +86,6 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false }) 
               width: popupWidth,
             }}
           >
-            <div className="emoji-picker-header">Фирменные эмодзи</div>
             <div className="emoji-picker-grid">
               {CUSTOM_EMOJI_IDS.map((id) => (
                 <button

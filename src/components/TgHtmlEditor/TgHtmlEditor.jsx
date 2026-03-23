@@ -430,7 +430,6 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
             <>
               <div className="emoji-picker-backdrop" onClick={() => setEmojiOpen(false)} />
               <div className="tg-editor-emoji-popup" style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 280 }}>
-                <div className="tg-editor-emoji-header">Фирменные эмодзи</div>
                 <div className="tg-editor-emoji-grid">
                   {CUSTOM_EMOJI_IDS.map((id) => (
                     <button
