@@ -130,22 +130,35 @@ export default function ChatView() {
 
   // SSE
   useEffect(() => {
-    const token = localStorage.getItem('wl_admin_token');
-    const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
-    const es = new EventSource(url);
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'new_message' && data.chatId === Number(id)) {
-          setChat(prev => {
-            if (!prev) return prev;
-            if (prev.messages.some(m => m.id === data.message.id)) return prev;
-            return { ...prev, messages: [...prev.messages, data.message] };
-          });
-        }
-      } catch {}
+    let es;
+    let reconnectTimer;
+    const connect = () => {
+      const token = localStorage.getItem('wl_admin_token');
+      const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
+      es = new EventSource(url);
+      es.onmessage = (e) => {
+        if (!e.data || e.data.startsWith(':')) return;
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'new_message' && data.chatId === Number(id)) {
+            setChat(prev => {
+              if (!prev) return prev;
+              if (prev.messages.some(m => m.id === data.message.id)) return prev;
+              return { ...prev, messages: [...prev.messages, data.message] };
+            });
+          }
+        } catch { /* ignore non-JSON */ }
+      };
+      es.onerror = () => {
+        es.close();
+        reconnectTimer = setTimeout(connect, 3000);
+      };
     };
-    return () => es.close();
+    connect();
+    return () => {
+      clearTimeout(reconnectTimer);
+      es?.close();
+    };
   }, [id]);
 
   const saveTags = async (newTags) => {

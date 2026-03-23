@@ -331,11 +331,14 @@ router.get('/', async (req, res, next) => {
 // POST /api/broadcasts — отправить в каналы
 router.post('/', async (req, res, next) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
+  const conn = await dbPool.getConnection();
   try {
     const { text, channelIds, media, poll } = req.body;
     console.log('[broadcasts POST /] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
-    if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
-    if (!channelIds?.length) return res.status(400).json({ error: 'Выберите хотя бы один канал' });
+    if (!text?.trim() && !media && !poll) { conn.release(); return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' }); }
+    if (!channelIds?.length) { conn.release(); return res.status(400).json({ error: 'Выберите хотя бы один канал' }); }
+
+    await conn.beginTransaction();
 
     const results = [];
     for (const chatId of channelIds) {
@@ -348,7 +351,7 @@ router.post('/', async (req, res, next) => {
     }
 
     const success = results.filter(r => r.ok).length;
-    const [channels] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
+    const [channels] = await conn.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
     const channelNames = channelIds.map(id => {
       const ch = channels.find(c => String(c.chat_id) === String(id));
       return ch?.title || id;
@@ -359,10 +362,16 @@ router.post('/', async (req, res, next) => {
     const record = await saveBroadcast({
       text: broadcastText, type: 'channels', channels: channelNames, channelIds,
       total: channelIds.length, success, failed: channelIds.length - success, results, media,
-    });
+    }, conn);
 
+    await conn.commit();
     res.json(record);
-  } catch (err) { next(err); }
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
 });
 
 router.delete('/:id', async (req, res, next) => {
@@ -446,7 +455,8 @@ router.get('/users/tags', async (req, res, next) => {
 
 // ===================== ХЕЛПЕР =====================
 
-async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media }) {
+async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media }, conn) {
+  const db = conn || dbPool;
   const status = success === total ? 'published' : (success > 0 ? 'partial' : 'failed');
   const withMedia = await checkMediaColumn();
 
@@ -465,7 +475,7 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
     params = baseVals;
   }
 
-  const [result] = await dbPool.query(sql, params);
+  const [result] = await db.query(sql, params);
   return {
     id: result.insertId, text: (text || '').substring(0, 200), type, channels, channelIds,
     total, success, failed, results, media: media || null, date: new Date().toISOString(), status,

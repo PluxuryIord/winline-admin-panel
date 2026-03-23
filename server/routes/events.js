@@ -230,7 +230,8 @@ export async function qrCardHandler(req, res, next) {
     // 4. Text overlay using TT Bluescreens Bold via SVG — centered between QR bottom and card bottom
     if (captionText) {
       const escaped = captionText
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
       const lines = escaped.split('\n');
       const fontSize = 72;
       const lineH = fontSize + 16;

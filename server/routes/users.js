@@ -213,6 +213,9 @@ router.put('/:id/comment', async (req, res, next) => {
   try {
     const userId = Number(req.params.id);
     const { comment } = req.body;
+    if (comment && comment.trim().length > 1000) {
+      return res.status(400).json({ error: 'Комментарий слишком длинный (макс. 1000 символов)' });
+    }
     // Удаляем старый комментарий
     await dbPool.query('DELETE FROM wl_admin_user_tags WHERE user_id = ? AND tag LIKE ?', [userId, `${COMMENT_PREFIX}%`]);
     // Вставляем новый если не пустой

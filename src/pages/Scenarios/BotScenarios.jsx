@@ -106,7 +106,7 @@ function migrateData(data) {
   return data;
 }
 
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 10;
 
 export default function BotScenarios() {
   const [scenarios, setScenarios] = useState(null);
@@ -141,6 +141,7 @@ export default function BotScenarios() {
   const pushHistory = useCallback((data) => {
     if (skipHistoryRef.current) return;
     const json = JSON.stringify(data);
+    if (json.length > 500000) return; // skip huge states
     const history = historyRef.current;
     const idx = historyIndexRef.current;
     // Remove future states

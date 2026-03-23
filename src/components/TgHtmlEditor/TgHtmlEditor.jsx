@@ -41,10 +41,14 @@ function tgHtmlToEditable(tgHtml) {
   html = html.replace(/&lt;em&gt;/g, '<i>').replace(/&lt;\/em&gt;/g, '</i>');
   // <code>, </code>
   html = html.replace(/&lt;code&gt;/g, '<code>').replace(/&lt;\/code&gt;/g, '</code>');
-  // <a href="...">
-  html = html.replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">');
-  html = html.replace(/&lt;a href=&amp;quot;([^&]*)&amp;quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">');
-  html = html.replace(/&lt;a href="([^"]*)"&gt;/g, '<a href="$1" target="_blank" rel="noopener">');
+  // <a href="..."> — validate href, remove javascript: links
+  const sanitizeHref = (match, href) => {
+    if (/^javascript:/i.test(href)) return '';
+    return `<a href="${href}" target="_blank" rel="noopener">`;
+  };
+  html = html.replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, sanitizeHref);
+  html = html.replace(/&lt;a href=&amp;quot;([^&]*)&amp;quot;&gt;/g, sanitizeHref);
+  html = html.replace(/&lt;a href="([^"]*)"&gt;/g, sanitizeHref);
   html = html.replace(/&lt;\/a&gt;/g, '</a>');
 
   // <tg-emoji emoji-id="ID">...</tg-emoji> -> <img>
@@ -135,7 +139,8 @@ function editableDomToTgHtml(container) {
     // Link
     if (tag === 'a') {
       const href = node.getAttribute('href') || '';
-      result += `<a href="${href}">`;
+      const escapedHref = href.replace(/"/g, '&quot;').replace(/javascript:/gi, '');
+      result += `<a href="${escapedHref}">`;
       for (const child of node.childNodes) walk(child);
       result += '</a>';
       return;
@@ -194,6 +199,8 @@ function insertHtmlAtCaret(html) {
   }
 }
 
+const MAX_HTML_LENGTH = 10000;
+
 /* ══════════════════════════════════════════════════════════════════════════
    TgHtmlEditor component
    ══════════════════════════════════════════════════════════════════════════ */
@@ -223,6 +230,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
     debounceRef.current = setTimeout(() => {
       if (!editorRef.current) return;
       const tgHtml = editableDomToTgHtml(editorRef.current);
+      if (tgHtml.length > MAX_HTML_LENGTH) return;
       if (tgHtml !== lastHtmlRef.current) {
         lastHtmlRef.current = tgHtml;
         onChange?.(tgHtml);
