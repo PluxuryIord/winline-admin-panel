@@ -292,21 +292,36 @@ export default function UserProfile() {
                 </button>
                 {showTagDropdown && (
                   <div className="profile-tag-dropdown">
-                    {availableTags.map(tag => (
-                      <div key={tag} className="profile-tag-dropdown-item" onClick={() => handleAddExistingTag(tag)}>
-                        {tag}
-                      </div>
-                    ))}
                     <div className="profile-tag-dropdown-input-row">
                       <input
                         className="profile-tag-dropdown-input"
-                        placeholder="Новый тег..."
+                        placeholder="Введите или выберите тег..."
                         value={newTagInput}
                         onChange={(e) => setNewTagInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
                         autoFocus
                       />
                     </div>
+                    {availableTags
+                      .filter(t => !newTagInput.trim() || t.toLowerCase().includes(newTagInput.trim().toLowerCase()))
+                      .map(tag => (
+                        <div key={tag} className="profile-tag-dropdown-item" onClick={() => { handleAddExistingTag(tag); setNewTagInput(''); }}>
+                          {newTagInput.trim() ? (
+                            <span dangerouslySetInnerHTML={{
+                              __html: tag.replace(
+                                new RegExp(`(${newTagInput.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'),
+                                '<b>$1</b>'
+                              )
+                            }} />
+                          ) : tag}
+                        </div>
+                      ))
+                    }
+                    {newTagInput.trim() && !allTags.some(t => t.toLowerCase() === newTagInput.trim().toLowerCase()) && (
+                      <div className="profile-tag-dropdown-item profile-tag-dropdown-create" onClick={handleCreateTag}>
+                        + Создать «{newTagInput.trim()}»
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

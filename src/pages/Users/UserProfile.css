@@ -249,9 +249,18 @@
 }
 
 .profile-tag-dropdown-input-row {
-  padding: 6px 4px 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin-top: 4px;
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
+}
+
+.profile-tag-dropdown-create {
+  color: var(--color-orange) !important;
+  font-weight: 500;
+}
+
+.profile-tag-dropdown-item b {
+  color: var(--color-orange);
 }
 
 .profile-tag-dropdown-input {
@@ -630,5 +639,72 @@
     top: auto;
     left: 0;
     right: 0;
+  }
+}
+
+/* ─── Print (PDF Export) ─── */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: #0a0a14 !important;
+    color: #fff !important;
+  }
+
+  .layout-container {
+    display: block !important;
+  }
+
+  .sidebar, .header, .profile-actions,
+  .profile-tag-add-wrapper, .profile-comment-edit-btn {
+    display: none !important;
+  }
+
+  .workspace {
+    padding: 0 !important;
+  }
+
+  .profile-container {
+    background: #0a0a14 !important;
+    color: #fff !important;
+  }
+
+  .profile-card {
+    background: rgba(18, 18, 30, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+  }
+
+  .profile-panel {
+    background: rgba(18, 18, 30, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: #fff !important;
+  }
+
+  .profile-panel-title,
+  .profile-name,
+  .info-value {
+    color: #fff !important;
+  }
+
+  .info-label {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  .profile-tag {
+    background: rgba(255, 126, 0, 0.15) !important;
+    color: #ff7e00 !important;
+    border: 1px solid rgba(255, 126, 0, 0.3) !important;
+  }
+
+  .profile-tag-remove {
+    display: none !important;
+  }
+
+  .profile-comment-text {
+    color: rgba(255, 255, 255, 0.7) !important;
   }
 }
