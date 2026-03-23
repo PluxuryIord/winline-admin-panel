@@ -30,7 +30,7 @@
 }
 
 .emoji-picker-popup {
-  width: 280px;
+  width: 280px; /* overridden by inline style */
   background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -80,4 +80,20 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+/* Compact variant for narrow panels */
+.emoji-picker-popup--compact .emoji-picker-grid {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.emoji-picker-popup--compact .emoji-picker-item {
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+}
+
+.emoji-picker-popup--compact .emoji-picker-img {
+  width: 20px;
+  height: 20px;
 }

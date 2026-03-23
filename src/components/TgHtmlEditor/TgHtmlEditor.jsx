@@ -317,10 +317,19 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
   };
 
   /* ── Emoji picker ────────────────────────────────────────────────────── */
+  const emojiTriggerRef = useRef(null);
+  const [emojiPos, setEmojiPos] = useState({ top: 0, left: 0 });
+
   const handleEmojiOpen = (e) => {
     e.preventDefault();
-    // Save selection before opening picker
     savedSelectionRef.current = saveSelection();
+    if (!emojiOpen && emojiTriggerRef.current) {
+      const rect = emojiTriggerRef.current.getBoundingClientRect();
+      const spaceRight = window.innerWidth - rect.right;
+      const popW = 220;
+      let left = spaceRight >= popW + 8 ? rect.right + 4 : Math.max(8, rect.left - popW - 4);
+      setEmojiPos({ top: rect.bottom + 6, left });
+    }
     setEmojiOpen(!emojiOpen);
   };
 
@@ -409,6 +418,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
         {/* Emoji picker */}
         <div className="tg-editor-emoji-wrapper">
           <button
+            ref={emojiTriggerRef}
             className="tg-editor-toolbar-btn"
             onMouseDown={handleEmojiOpen}
             title="Фирменные эмодзи"
@@ -419,7 +429,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
           {emojiOpen && (
             <>
               <div className="emoji-picker-backdrop" onClick={() => setEmojiOpen(false)} />
-              <div className="tg-editor-emoji-popup">
+              <div className="tg-editor-emoji-popup" style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 220 }}>
                 <div className="tg-editor-emoji-header">Фирменные эмодзи</div>
                 <div className="tg-editor-emoji-grid">
                   {CUSTOM_EMOJI_IDS.map((id) => (

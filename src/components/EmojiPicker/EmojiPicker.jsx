@@ -17,11 +17,13 @@ const CUSTOM_EMOJI_IDS = [
   '5249311528842196557','5249350832087925208',
 ];
 
-export default function EmojiPicker({ onInsert, textareaRef }) {
+export default function EmojiPicker({ onInsert, textareaRef, compact = false }) {
   const [open, setOpen] = useState(false);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
   const cursorPosRef = useRef(null);
   const triggerRef = useRef(null);
+
+  const popupWidth = compact ? 220 : 280;
 
   const handleOpen = () => {
     if (textareaRef?.current) {
@@ -29,9 +31,24 @@ export default function EmojiPicker({ onInsert, textareaRef }) {
     }
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
+      const spaceRight = window.innerWidth - rect.right;
+      const spaceLeft = rect.left;
+
+      let left;
+      if (spaceRight >= popupWidth + 8) {
+        // Show to the right of the button
+        left = rect.right + 4;
+      } else if (spaceLeft >= popupWidth + 8) {
+        // Show to the left
+        left = rect.left - popupWidth - 4;
+      } else {
+        // Fallback: align right edge with button
+        left = Math.max(8, rect.right - popupWidth);
+      }
+
       setPopupPos({
         top: rect.top - 8,
-        left: Math.max(8, rect.right - 280),
+        left,
       });
     }
     setOpen(!open);
@@ -60,12 +77,13 @@ export default function EmojiPicker({ onInsert, textareaRef }) {
         <>
           <div className="emoji-picker-backdrop" onClick={() => setOpen(false)} />
           <div
-            className="emoji-picker-popup"
+            className={`emoji-picker-popup ${compact ? 'emoji-picker-popup--compact' : ''}`}
             style={{
               position: 'fixed',
               top: popupPos.top,
               left: popupPos.left,
               transform: 'translateY(-100%)',
+              width: popupWidth,
             }}
           >
             <div className="emoji-picker-header">Фирменные эмодзи</div>
