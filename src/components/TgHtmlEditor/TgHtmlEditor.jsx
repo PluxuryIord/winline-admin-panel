@@ -326,7 +326,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
     if (!emojiOpen && emojiTriggerRef.current) {
       const rect = emojiTriggerRef.current.getBoundingClientRect();
       const spaceRight = window.innerWidth - rect.right;
-      const popW = 220;
+      const popW = 280;
       let left = spaceRight >= popW + 8 ? rect.right + 4 : Math.max(8, rect.left - popW - 4);
       setEmojiPos({ top: rect.bottom + 6, left });
     }
@@ -429,7 +429,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
           {emojiOpen && (
             <>
               <div className="emoji-picker-backdrop" onClick={() => setEmojiOpen(false)} />
-              <div className="tg-editor-emoji-popup" style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 220 }}>
+              <div className="tg-editor-emoji-popup" style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 280 }}>
                 <div className="tg-editor-emoji-header">Фирменные эмодзи</div>
                 <div className="tg-editor-emoji-grid">
                   {CUSTOM_EMOJI_IDS.map((id) => (

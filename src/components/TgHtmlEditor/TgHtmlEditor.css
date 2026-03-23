@@ -84,11 +84,9 @@
 
 .tg-editor-emoji-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
   padding: 8px;
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 .tg-editor-emoji-item {
