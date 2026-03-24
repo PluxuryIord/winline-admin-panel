@@ -313,18 +313,24 @@ export default function BotScenarios() {
   const updateButtonTarget = (key, targetScreen) => {
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
+      const currentBtn = next.buttons[key] || {};
       const updates = { targetScreen: targetScreen || undefined };
-      // Only change action for buttons in CUSTOM screens
-      // System screen buttons have special actions (FSM flows etc.) that shouldn't be overwritten
-      const isCustomScreen = !SYSTEM_SCREENS.has(activeScreen);
-      if (targetScreen && isCustomScreen) {
-        if (SCREEN_TO_CALLBACK[targetScreen]) {
-          updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
-        } else {
+
+      if (targetScreen) {
+        const isTargetCustom = !SYSTEM_SCREENS.has(targetScreen);
+        const isSourceSystem = SYSTEM_SCREENS.has(activeScreen);
+
+        if (isTargetCustom) {
+          // Target is custom screen → always use sc_ callback
           updates.action = `callback:sc_${targetScreen}`;
+        } else if (!isSourceSystem) {
+          // Source is custom, target is system → use system callback
+          updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen] || targetScreen}`;
         }
+        // If source is system AND target is system → don't change action (FSM flows)
       }
-      next.buttons[key] = { ...next.buttons[key], ...updates };
+
+      next.buttons[key] = { ...currentBtn, ...updates };
       return next;
     });
     setDirty(true);
