@@ -32,6 +32,7 @@ export default function KnowledgeBase() {
 
   // Kebab menu
   const [openMenu, setOpenMenu] = useState(null); // key of open menu
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
   const fetchArticles = () => {
     api.get('/api/knowledge')
@@ -265,13 +266,23 @@ export default function KnowledgeBase() {
                   className={`kb-item-menu-btn ${openMenu === article.key ? 'open' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpenMenu(openMenu === article.key ? null : article.key);
+                    if (openMenu === article.key) {
+                      setOpenMenu(null);
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const spaceBelow = window.innerHeight - rect.bottom;
+                      setMenuPos({
+                        top: spaceBelow < 120 ? rect.top - 90 : rect.bottom + 4,
+                        left: Math.min(rect.right, window.innerWidth - 180),
+                      });
+                      setOpenMenu(article.key);
+                    }
                   }}
                 >
                   <MoreHorizontal size={16} />
                 </button>
                 {openMenu === article.key && (
-                  <div className="kb-item-menu-dropdown">
+                  <div className="kb-item-menu-dropdown" style={{ top: menuPos.top, left: menuPos.left }}>
                     <button
                       className="kb-item-menu-item"
                       onClick={() => {

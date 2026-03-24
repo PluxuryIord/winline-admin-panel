@@ -342,14 +342,12 @@
 }
 
 .kb-item-menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
+  position: fixed;
   background: #1e1e2e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 6px;
-  z-index: 100;
+  z-index: 1000;
   min-width: 168px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: flex;
