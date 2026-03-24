@@ -314,8 +314,10 @@ export default function BotScenarios() {
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
       const updates = { targetScreen: targetScreen || undefined };
-      // Update callback: system screens use SCREEN_TO_CALLBACK, custom use sc_{id}
-      if (targetScreen) {
+      // Only change action for buttons in CUSTOM screens
+      // System screen buttons have special actions (FSM flows etc.) that shouldn't be overwritten
+      const isCustomScreen = !SYSTEM_SCREENS.has(activeScreen);
+      if (targetScreen && isCustomScreen) {
         if (SCREEN_TO_CALLBACK[targetScreen]) {
           updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
         } else {
