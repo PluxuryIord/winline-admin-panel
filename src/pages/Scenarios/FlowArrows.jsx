@@ -16,6 +16,11 @@ function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
+function getNodeHeight(screen) {
+  const btnCount = (screen.buttons?._order || []).length;
+  return NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
+}
+
 export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
   const arrows = [];
 
@@ -23,6 +28,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
     const order = screen.buttons?._order || [];
     const srcX = screen.x ?? 0;
     const srcY = screen.y ?? 0;
+    const srcH = getNodeHeight(screen);
 
     order.forEach((btnKey, btnIdx) => {
       const btn = screen.buttons[btnKey];
@@ -34,22 +40,70 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const target = screens[btn.targetScreen];
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
+      const tgtH = getNodeHeight(target);
 
-      // Source: right edge of the specific button row
-      const sx = srcX + NODE_W;
-      const sy = srcY + NODE_HEADER_H + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
+      // Button Y position (source)
+      const btnCenterY = srcY + NODE_HEADER_H + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
-      // Target: top center of target node
-      const tx = tgtX + NODE_W / 2;
-      const ty = tgtY;
+      // Determine best direction based on relative position
+      const dx = (tgtX + NODE_W / 2) - (srcX + NODE_W / 2);
+      const dy = (tgtY + tgtH / 2) - btnCenterY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
 
-      // Bezier control points
-      const dist = Math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2);
-      const cpOffset = Math.max(80, dist * 0.35);
-      const cp1x = sx + cpOffset;
-      const cp1y = sy;
-      const cp2x = tx;
-      const cp2y = ty - cpOffset;
+      let sx, sy, tx, ty, cp1x, cp1y, cp2x, cp2y;
+
+      if (absDx > absDy * 0.6) {
+        // Horizontal: right→left or left→right
+        if (dx > 0) {
+          // Target is to the right
+          sx = srcX + NODE_W;
+          sy = btnCenterY;
+          tx = tgtX;
+          ty = tgtY + tgtH / 2;
+          const cpOff = Math.max(60, absDx * 0.4);
+          cp1x = sx + cpOff;
+          cp1y = sy;
+          cp2x = tx - cpOff;
+          cp2y = ty;
+        } else {
+          // Target is to the left
+          sx = srcX;
+          sy = btnCenterY;
+          tx = tgtX + NODE_W;
+          ty = tgtY + tgtH / 2;
+          const cpOff = Math.max(60, absDx * 0.4);
+          cp1x = sx - cpOff;
+          cp1y = sy;
+          cp2x = tx + cpOff;
+          cp2y = ty;
+        }
+      } else {
+        // Vertical: bottom→top or top→bottom
+        if (dy > 0) {
+          // Target is below
+          sx = srcX + NODE_W / 2;
+          sy = srcY + srcH;
+          tx = tgtX + NODE_W / 2;
+          ty = tgtY;
+          const cpOff = Math.max(60, absDy * 0.4);
+          cp1x = sx;
+          cp1y = sy + cpOff;
+          cp2x = tx;
+          cp2y = ty - cpOff;
+        } else {
+          // Target is above
+          sx = srcX + NODE_W / 2;
+          sy = srcY;
+          tx = tgtX + NODE_W / 2;
+          ty = tgtY + tgtH;
+          const cpOff = Math.max(60, absDy * 0.4);
+          cp1x = sx;
+          cp1y = sy - cpOff;
+          cp2x = tx;
+          cp2y = ty + cpOff;
+        }
+      }
 
       const isHighlightedActive = srcId === activeScreen || btn.targetScreen === activeScreen;
       const isHighlightedHover = hoveredNode && (srcId === hoveredNode || btn.targetScreen === hoveredNode);
