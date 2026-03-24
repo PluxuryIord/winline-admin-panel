@@ -1,7 +1,7 @@
 .kb-container {
   display: flex;
   gap: 24px;
-  height: calc(100vh - 134px); /* Высота экрана минус шапка и паддинги рабочего поля */
+  min-height: calc(100vh - 134px); /* Минимальная высота, но страница может расти */
   margin-right: 50px; /* <--- Добавили отступ справа */
 }
 
@@ -119,8 +119,7 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;    /* Скролл всего правого блока */
-  min-height: 0;
+  overflow-y: visible; /* Скроллится вся страница, а не блок */
 }
 
 .kb-content-header {
@@ -129,10 +128,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  position: sticky;
-  top: 0;
-  background-color: var(--color-panel);
-  z-index: 10;
 }
 
 .kb-header-row {

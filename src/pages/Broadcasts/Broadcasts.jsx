@@ -777,6 +777,7 @@ export default function Broadcasts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteModal, setDeleteModal] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -804,6 +805,9 @@ export default function Broadcasts() {
   const filtered = broadcasts.filter(b =>
     (b.text || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const paginatedFiltered = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
 
   const TYPE_ICONS = { users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
@@ -862,7 +866,7 @@ export default function Broadcasts() {
               className="bc-search-input"
               placeholder="Поиск..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setVisibleCount(20); }}
             />
           </div>
         </div>
@@ -879,9 +883,9 @@ export default function Broadcasts() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {paginatedFiltered.length === 0 ? (
                 <tr><td colSpan={5} className="broadcasts-empty">Рассылок пока нет</td></tr>
-              ) : filtered.map(b => (
+              ) : paginatedFiltered.map(b => (
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
@@ -913,6 +917,16 @@ export default function Broadcasts() {
             </tbody>
           </table>
         </div>
+
+        {hasMore && (
+          <button
+            className="broadcasts-create-btn"
+            style={{ alignSelf: 'center', margin: '12px auto 0' }}
+            onClick={() => setVisibleCount(prev => prev + 20)}
+          >
+            Загрузить ещё ({filtered.length - visibleCount} осталось)
+          </button>
+        )}
       </div>
 
       {deleteModal && (

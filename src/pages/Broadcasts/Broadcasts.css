@@ -336,8 +336,28 @@
   background: rgba(255, 255, 255, 0.06);
 }
 .bc-channel-item input[type="checkbox"] {
-  accent-color: var(--color-orange);
   cursor: pointer;
+}
+
+/* ===== ТЁМНЫЕ ЧЕКБОКСЫ ===== */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+input[type="checkbox"]:checked {
+  background: var(--color-orange);
+  border-color: var(--color-orange);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .bc-channel-item--all {
   font-weight: 600;
