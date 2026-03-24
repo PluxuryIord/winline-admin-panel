@@ -50,7 +50,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const tgtH = getNodeHeight(target);
 
       // Button Y position (source) — account for preview text
-      const srcPreviewH = hasPreview(srcScreen) ? MSG_PREVIEW_H : 0;
+      const srcPreviewH = hasPreview(screen) ? MSG_PREVIEW_H : 0;
       const btnCenterY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
       // Determine best direction based on relative position
