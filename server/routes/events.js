@@ -205,9 +205,9 @@ export async function qrCardHandler(req, res, next) {
     const qrDataUrl = await QRCode.toDataURL(String(code), {
       type: 'image/png',
       width: QR_SIZE,
-      margin: 0,
+      margin: 2,
       color: { dark: '#E8640A', light: '#00000000' },
-      errorCorrectionLevel: 'M',
+      errorCorrectionLevel: 'H',
     });
     const qrBase64 = qrDataUrl.split(',')[1];
     const qrRawBuffer = Buffer.from(qrBase64, 'base64');
