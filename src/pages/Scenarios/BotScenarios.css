@@ -126,11 +126,7 @@
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.4);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  max-height: 40px;
+  word-break: break-word;
 }
 
 .flow-node-icon {

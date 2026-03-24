@@ -1,4 +1,4 @@
-import { NODE_W, NODE_HEADER_H, MSG_PREVIEW_H, BTN_ROW_H } from './FlowNode';
+import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
 
 // Get point on cubic bezier at t (0..1)
 function bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
@@ -16,15 +16,19 @@ function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
-function hasPreview(screen) {
+function getPreviewHeight(screen) {
   const msgs = screen.messages || {};
   const firstKey = Object.keys(msgs)[0];
-  return firstKey && msgs[firstKey].text;
+  if (!firstKey || !msgs[firstKey].text) return 0;
+  const text = msgs[firstKey].text.replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
+  // Approximate: ~40 chars per line at font-size 0.7rem in 280px node, line-height ~14px
+  const lines = Math.max(1, Math.ceil(text.length / 40));
+  return 14 + lines * 14; // padding + lines
 }
 
 function getNodeHeight(screen) {
   const btnCount = (screen.buttons?._order || []).length;
-  const previewH = hasPreview(screen) ? MSG_PREVIEW_H : 0;
+  const previewH = getPreviewHeight(screen);
   return NODE_HEADER_H + previewH + 8 + btnCount * BTN_ROW_H + 10;
 }
 
@@ -50,7 +54,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const tgtH = getNodeHeight(target);
 
       // Button Y position (source) — account for preview text
-      const srcPreviewH = hasPreview(screen) ? MSG_PREVIEW_H : 0;
+      const srcPreviewH = getPreviewHeight(screen);
       const btnCenterY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
       // Determine best direction based on relative position
