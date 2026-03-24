@@ -1,4 +1,4 @@
-import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
+import { NODE_W, NODE_HEADER_H, MSG_PREVIEW_H, BTN_ROW_H } from './FlowNode';
 
 // Get point on cubic bezier at t (0..1)
 function bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
@@ -16,9 +16,16 @@ function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
+function hasPreview(screen) {
+  const msgs = screen.messages || {};
+  const firstKey = Object.keys(msgs)[0];
+  return firstKey && msgs[firstKey].text;
+}
+
 function getNodeHeight(screen) {
   const btnCount = (screen.buttons?._order || []).length;
-  return NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
+  const previewH = hasPreview(screen) ? MSG_PREVIEW_H : 0;
+  return NODE_HEADER_H + previewH + 8 + btnCount * BTN_ROW_H + 10;
 }
 
 export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
@@ -42,8 +49,9 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const tgtY = target.y ?? 0;
       const tgtH = getNodeHeight(target);
 
-      // Button Y position (source)
-      const btnCenterY = srcY + NODE_HEADER_H + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
+      // Button Y position (source) — account for preview text
+      const srcPreviewH = hasPreview(srcScreen) ? MSG_PREVIEW_H : 0;
+      const btnCenterY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
       // Determine best direction based on relative position
       const dx = (tgtX + NODE_W / 2) - (srcX + NODE_W / 2);

@@ -15,9 +15,23 @@ const SYSTEM_SCREENS = new Set([
   'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
 ]);
 
+// Strip HTML tags for preview, show custom emoji as ⭐
+function stripTgHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Exported constants for FlowArrows to use
 export const NODE_W = 280;
 export const NODE_HEADER_H = 52;
+export const MSG_PREVIEW_H = 48;
 export const BTN_ROW_H = 36;
 export const NODE_PAD_BOTTOM = 10;
 
@@ -83,6 +97,11 @@ export default function FlowNode({
   const buttonOrder = screen.buttons?._order || [];
   const icon = SCREEN_ICONS[screenId] || '📄';
 
+  // Get first message text for preview
+  const messages = screen.messages || {};
+  const firstMsgKey = Object.keys(messages)[0];
+  const previewText = firstMsgKey ? stripTgHtml(messages[firstMsgKey].text) : '';
+
   const classNames = [
     'flow-node',
     isActive ? 'active' : '',
@@ -110,6 +129,9 @@ export default function FlowNode({
           <span className="flow-node-icon">{icon}</span>
           <span className="flow-node-title">{screen.title}</span>
         </div>
+        {previewText && (
+          <div className="flow-node-preview">{previewText}</div>
+        )}
         {buttonOrder.length > 0 && (
           <div className="flow-node-buttons">
             {buttonOrder.map((key) => {
