@@ -62,38 +62,41 @@ export default function FlowCanvas({
 
   // ─── Fit to bounding box helper ──────────────────────────────────────────────
   const fitToNodes = useCallback((nodeIds) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const padding = 50;
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const padding = 80;
 
-    const ids = nodeIds.filter(id => screens[id]);
-    if (ids.length === 0) return;
+      const ids = nodeIds.filter(id => screens[id]);
+      if (ids.length === 0) return;
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const id of ids) {
-      const s = screens[id];
-      const x = s.x ?? 0;
-      const y = s.y ?? 0;
-      const btnCount = (s.buttons?._order || []).length;
-      const h = NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x + NODE_W > maxX) maxX = x + NODE_W;
-      if (y + h > maxY) maxY = y + h;
-    }
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const id of ids) {
+        const s = screens[id];
+        const x = s.x ?? 0;
+        const y = s.y ?? 0;
+        const btnCount = (s.buttons?._order || []).length;
+        const h = NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + NODE_W > maxX) maxX = x + NODE_W;
+        if (y + h > maxY) maxY = y + h;
+      }
 
-    const contentW = maxX - minX;
-    const contentH = maxY - minY;
-    const scaleX = (rect.width - padding * 2) / contentW;
-    const scaleY = (rect.height - padding * 2) / contentH;
-    const newZoom = Math.min(2, Math.max(0.3, Math.min(scaleX, scaleY)));
+      const contentW = maxX - minX || 1;
+      const contentH = maxY - minY || 1;
+      const scaleX = (rect.width - padding * 2) / contentW;
+      const scaleY = (rect.height - padding * 2) / contentH;
+      const newZoom = Math.min(1.5, Math.max(0.3, Math.min(scaleX, scaleY)));
 
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    setZoom(newZoom);
-    setOffset({
-      x: rect.width / 2 - centerX * newZoom,
-      y: rect.height / 2 - centerY * newZoom,
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      setZoom(newZoom);
+      setOffset({
+        x: rect.width / 2 - centerX * newZoom,
+        y: rect.height / 2 - centerY * newZoom,
+      });
     });
   }, [screens]);
 
@@ -129,6 +132,24 @@ export default function FlowCanvas({
     setZoom(prev => Math.min(2, Math.max(0.3, prev + delta)));
   }, []);
 
+  // ─── Build dynamic scenario groups (include custom blocks with scenario field) ──
+  const dynamicGroups = useMemo(() => {
+    const groups = {};
+    for (const [key, ids] of Object.entries(SCENARIO_GROUPS)) {
+      groups[key] = [...ids];
+    }
+    // Add custom blocks based on their scenario field
+    for (const [id, screen] of Object.entries(screens)) {
+      if (screen.scenario) {
+        const groupName = `Сценарий ${screen.scenario}`;
+        if (groups[groupName] && !groups[groupName].includes(id)) {
+          groups[groupName].push(id);
+        }
+      }
+    }
+    return groups;
+  }, [screens]);
+
   // ─── Scenario filter handler ─────────────────────────────────────────────────
   const handleFilter = (name) => {
     if (name === null) {
@@ -136,7 +157,7 @@ export default function FlowCanvas({
       fitToNodes(Object.keys(screens).filter(id => id !== 'logout_screen'));
     } else {
       setActiveFilter(name);
-      fitToNodes(SCENARIO_GROUPS[name] || []);
+      fitToNodes(dynamicGroups[name] || SCENARIO_GROUPS[name] || []);
     }
   };
 
