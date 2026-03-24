@@ -22,7 +22,7 @@ export const BTN_ROW_H = 36;
 export const NODE_PAD_BOTTOM = 10;
 
 export default function FlowNode({
-  screenId, screen, position, isActive, isSearchMatch, isConnected, isHovered,
+  screenId, screen, position, isActive, isSearchMatch, isConnected, isHovered, isHighlighted,
   onSelect, onMove, onDuplicate, onDelete, onHover,
 }) {
   const dragRef = useRef(null);
@@ -89,6 +89,7 @@ export default function FlowNode({
     isSearchMatch ? 'search-match' : '',
     isConnected ? 'connected' : '',
     isHovered ? 'hovered' : '',
+    isHighlighted ? 'highlighted' : '',
   ].filter(Boolean).join(' ');
 
   return (

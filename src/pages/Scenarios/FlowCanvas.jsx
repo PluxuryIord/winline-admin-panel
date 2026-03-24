@@ -29,6 +29,7 @@ export default function FlowCanvas({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [highlightedNode, setHighlightedNode] = useState(null);
 
   // ─── Search matching ─────────────────────────────────────────────────────────
   const searchMatches = useMemo(() => {
@@ -186,13 +187,18 @@ export default function FlowCanvas({
   const handleFilter = (name) => {
     if (name === null) {
       setActiveFilter(null);
+      setHighlightedNode(null);
       fitToNodes(Object.keys(screens).filter(id => id !== 'logout_screen'));
     } else {
       setActiveFilter(name);
       const centerId = SCENARIO_CENTER[name];
       if (centerId && screens[centerId]) {
+        setHighlightedNode(centerId);
         centerOnNode(centerId);
+        // Убрать подсветку через 2 секунды
+        setTimeout(() => setHighlightedNode(null), 2000);
       } else {
+        setHighlightedNode(null);
         fitToNodes(dynamicGroups[name] || SCENARIO_GROUPS[name] || []);
       }
     }
@@ -270,6 +276,7 @@ export default function FlowCanvas({
             isSearchMatch={searchMatches.has(id)}
             isConnected={connectedNodes.has(id)}
             isHovered={id === hoveredNode}
+            isHighlighted={id === highlightedNode}
             onSelect={onSelectNode}
             onMove={onMoveNode}
             onDuplicate={onDuplicate}
