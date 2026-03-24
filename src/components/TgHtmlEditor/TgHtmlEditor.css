@@ -49,6 +49,15 @@
   background: rgba(255, 126, 0, 0.15);
 }
 
+.tg-toolbar-btn--active {
+  background: rgba(255, 126, 0, 0.2);
+  color: var(--color-orange);
+}
+
+.tg-toolbar-btn--active:hover {
+  background: rgba(255, 126, 0, 0.3);
+}
+
 .tg-editor-toolbar-sep {
   width: 1px;
   height: 18px;

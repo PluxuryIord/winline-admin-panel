@@ -430,11 +430,21 @@ router.post('/users', async (req, res, next) => {
           successCount++;
           // Save broadcast message to user's chat
           try {
-            await dbPool.query(
-              'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+            // Find existing chat or create new one
+            const [existingChats] = await dbPool.query(
+              'SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1',
               [row.user_id]
             );
-            const [[{ chatId: userChatId }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS chatId');
+            let userChatId;
+            if (existingChats.length) {
+              userChatId = existingChats[0].id;
+            } else {
+              const [insertResult] = await dbPool.query(
+                'INSERT INTO wl_admin_chats (user_id) VALUES (?)',
+                [row.user_id]
+              );
+              userChatId = insertResult.insertId;
+            }
             if (userChatId) {
               await dbPool.query(
                 'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
@@ -450,10 +460,23 @@ router.post('/users', async (req, res, next) => {
       }
     }
 
-    const record = await saveBroadcast({
-      text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
-      total: rows.length, success: successCount, failed: rows.length - successCount, results, media,
-    });
+    // Limit results to avoid exceeding DB column size
+    const truncatedResults = results.slice(0, 100);
+
+    let record;
+    try {
+      record = await saveBroadcast({
+        text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
+        total: rows.length, success: successCount, failed: rows.length - successCount, results: truncatedResults, media,
+      });
+    } catch (saveErr) {
+      console.error('[broadcasts] saveBroadcast failed:', saveErr.message);
+      record = {
+        text: (text || '').substring(0, 200), type: 'users', channels: [`Пользователи (${rows.length})`],
+        total: rows.length, success: successCount, failed: rows.length - successCount,
+        date: new Date().toISOString(), status: successCount === rows.length ? 'published' : 'partial',
+      };
+    }
 
     res.json(record);
   } catch (err) { next(err); }
@@ -472,6 +495,25 @@ router.get('/users/count', async (req, res, next) => {
     }
     const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
     res.json({ count });
+  } catch (err) { next(err); }
+});
+
+router.get('/users/list', async (req, res, next) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    let where = ['u.user_id IS NOT NULL'];
+    const params = [];
+    let join = '';
+    if (req.query.tag && req.query.tag !== 'all') {
+      join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
+      where.push('t.tag = ?');
+      params.push(req.query.tag);
+    }
+    const [rows] = await dbPool.query(
+      `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u ${join} WHERE ${where.join(' AND ')} LIMIT 100`,
+      params
+    );
+    res.json(rows);
   } catch (err) { next(err); }
 });
 

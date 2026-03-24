@@ -211,7 +211,38 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
   const isComposingRef = useRef(false);
 
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, code: false });
   const savedSelectionRef = useRef(null);
+
+  /* ── Track active formatting on selection change ────────────────────── */
+  useEffect(() => {
+    const updateFormats = () => {
+      if (!editorRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      // Only track if selection is inside our editor
+      if (!editorRef.current.contains(sel.anchorNode)) return;
+
+      const bold = document.queryCommandState('bold');
+      const italic = document.queryCommandState('italic');
+
+      // Check code: walk up from selection to see if inside <code>
+      let inCode = false;
+      let node = sel.anchorNode;
+      while (node && node !== editorRef.current) {
+        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'CODE') {
+          inCode = true;
+          break;
+        }
+        node = node.parentNode;
+      }
+
+      setActiveFormats({ bold, italic, code: inCode });
+    };
+
+    document.addEventListener('selectionchange', updateFormats);
+    return () => document.removeEventListener('selectionchange', updateFormats);
+  }, []);
 
   /* ── Sync external value into editor ─────────────────────────────────── */
   useEffect(() => {
@@ -389,7 +420,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
       {/* Toolbar */}
       <div className="tg-editor-toolbar">
         <button
-          className="tg-editor-toolbar-btn"
+          className={`tg-editor-toolbar-btn${activeFormats.bold ? ' tg-toolbar-btn--active' : ''}`}
           onMouseDown={execBold}
           title="Жирный (Ctrl+B)"
           type="button"
@@ -397,7 +428,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
           <Bold size={15} />
         </button>
         <button
-          className="tg-editor-toolbar-btn"
+          className={`tg-editor-toolbar-btn${activeFormats.italic ? ' tg-toolbar-btn--active' : ''}`}
           onMouseDown={execItalic}
           title="Курсив (Ctrl+I)"
           type="button"
@@ -405,7 +436,7 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
           <Italic size={15} />
         </button>
         <button
-          className="tg-editor-toolbar-btn"
+          className={`tg-editor-toolbar-btn${activeFormats.code ? ' tg-toolbar-btn--active' : ''}`}
           onMouseDown={execCode}
           title="Код"
           type="button"

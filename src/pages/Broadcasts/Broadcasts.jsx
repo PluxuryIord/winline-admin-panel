@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
-  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag
+  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -543,7 +543,28 @@ function UsersTab({ onSendResult }) {
   };
 
   const [showTagDD, setShowTagDD] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
   const tagRef = useRef(null);
+  const tagSearchRef = useRef(null);
+
+  // Recipients list
+  const [showRecipients, setShowRecipients] = useState(false);
+  const [recipientsList, setRecipientsList] = useState([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+
+  const loadRecipients = async () => {
+    if (showRecipients) { setShowRecipients(false); return; }
+    setRecipientsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterTag !== 'all') params.set('tag', filterTag);
+      const res = await api.get(`/api/broadcasts/users/list?${params}`);
+      const data = await res.json();
+      setRecipientsList(data);
+      setShowRecipients(true);
+    } catch { setRecipientsList([]); }
+    setRecipientsLoading(false);
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -565,14 +586,37 @@ function UsersTab({ onSendResult }) {
           </button>
           {showTagDD && (
             <div className="bc-tag-dropdown">
-              <div className={`bc-tag-option ${filterTag === 'all' ? 'active' : ''}`} onClick={() => { setFilterTag('all'); setShowTagDD(false); }}>
-                Все теги
-              </div>
-              {tags.map(t => (
-                <div key={t} className={`bc-tag-option ${filterTag === t ? 'active' : ''}`} onClick={() => { setFilterTag(t); setShowTagDD(false); }}>
-                  {t}
+              {tags.length > 5 && (
+                <div className="bc-tag-search-wrap">
+                  <Search size={13} className="bc-tag-search-icon" />
+                  <input
+                    ref={tagSearchRef}
+                    className="bc-tag-search-input"
+                    type="text"
+                    placeholder="Поиск тега..."
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    autoFocus
+                  />
                 </div>
-              ))}
+              )}
+              <div className="bc-tag-options-list">
+                {(!tagSearch.trim()) && (
+                  <div className={`bc-tag-option ${filterTag === 'all' ? 'active' : ''}`} onClick={() => { setFilterTag('all'); setShowTagDD(false); setTagSearch(''); }}>
+                    Все теги
+                  </div>
+                )}
+                {tags
+                  .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                  .map(t => (
+                    <div key={t} className={`bc-tag-option ${filterTag === t ? 'active' : ''}`} onClick={() => { setFilterTag(t); setShowTagDD(false); setTagSearch(''); }}>
+                      {t}
+                    </div>
+                  ))}
+                {tagSearch.trim() && tags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).length === 0 && (
+                  <div className="bc-tag-option bc-tag-option--empty">Ничего не найдено</div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -580,7 +624,37 @@ function UsersTab({ onSendResult }) {
         <div className="bc-user-count">
           <Users size={15} />
           {countLoading ? <span>Подсчёт...</span> : <span>Получателей: <b>{userCount ?? '—'}</b></span>}
+          {userCount > 0 && (
+            <button
+              className="bc-show-recipients-btn"
+              onClick={loadRecipients}
+              disabled={recipientsLoading}
+              title="Показать список получателей"
+            >
+              {recipientsLoading ? <Loader size={14} className="spin" /> : <Eye size={14} />}
+              Показать список
+            </button>
+          )}
         </div>
+
+        {showRecipients && (
+          <div className="bc-recipients-popup">
+            <div className="bc-recipients-header">
+              <span>Получатели ({recipientsList.length}{userCount > 100 ? ` из ${userCount}` : ''})</span>
+              <button className="bc-recipients-close" onClick={() => setShowRecipients(false)}><X size={14} /></button>
+            </div>
+            <div className="bc-recipients-list">
+              {recipientsList.map(u => (
+                <div key={u.user_id} className="bc-recipient-row">
+                  <span className="bc-recipient-name">{u.full_name || '—'}</span>
+                  {u.username && <span className="bc-recipient-username">@{u.username}</span>}
+                  <span className="bc-recipient-id">{u.user_id}</span>
+                </div>
+              ))}
+              {recipientsList.length === 0 && <div className="bc-recipients-empty">Нет получателей</div>}
+            </div>
+          </div>
+        )}
       </div>
 
       <ComposeBlock

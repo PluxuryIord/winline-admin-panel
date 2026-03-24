@@ -80,12 +80,17 @@ async function handleWebhook(req, res, next) {
     console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video);
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
-    // Находим или создаём чат (атомарно, без race condition)
-    await dbPool.query(
-      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
-      [user_id]
+    // Находим или создаём чат
+    const [existingChats] = await dbPool.query(
+      'SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [user_id]
     );
-    const [[{ chatId }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS chatId');
+    let chatId;
+    if (existingChats.length) {
+      chatId = existingChats[0].id;
+    } else {
+      const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [user_id]);
+      chatId = ins.insertId;
+    }
 
     // Обработка медиа от бота — поддержка разных форматов
     // media: массив (альбом) ИЛИ photo/document/video/voice/audio (одиночное)
@@ -194,12 +199,15 @@ router.get('/by-user/:userId', async (req, res, next) => {
   try {
     const userId = Number(req.params.userId);
 
-    // Атомарно находим или создаём чат (без race condition)
-    await dbPool.query(
-      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
-      [userId]
-    );
-    const [[{ id: chatIdResolved }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS id');
+    // Находим или создаём чат
+    const [existing] = await dbPool.query('SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [userId]);
+    let chatIdResolved;
+    if (existing.length) {
+      chatIdResolved = existing[0].id;
+    } else {
+      const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [userId]);
+      chatIdResolved = ins.insertId;
+    }
 
     let [chats] = await dbPool.query('SELECT id, user_id AS userId FROM wl_admin_chats WHERE id = ?', [chatIdResolved]);
 
