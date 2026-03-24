@@ -15,16 +15,19 @@ const SYSTEM_SCREENS = new Set([
   'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
 ]);
 
-// Strip HTML tags for preview, show custom emoji as ⭐
-function stripTgHtml(html) {
+// Convert Telegram HTML to safe preview HTML
+function tgHtmlToPreview(html) {
   if (!html) return '';
   return html
-    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
-    .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
+    // Custom emoji → inline image
+    .replace(/<tg-emoji\s+emoji-id="(\d+)">[^<]*<\/tg-emoji>/g,
+      '<img src="/emoji/$1.webp" class="flow-preview-emoji" />')
+    // Keep safe tags
+    .replace(/<\/?(b|strong|i|em|code|u|s)>/gi, (m) => m)
+    // Convert \n to <br>
+    .replace(/\n/g, '<br/>')
+    // Strip all other tags except allowed
+    .replace(/<(?!\/?(?:b|strong|i|em|code|u|s|br|img)\b)[^>]+>/gi, '')
     .trim();
 }
 
@@ -100,7 +103,7 @@ export default function FlowNode({
   // Get first message text for preview
   const messages = screen.messages || {};
   const firstMsgKey = Object.keys(messages)[0];
-  const previewText = firstMsgKey ? stripTgHtml(messages[firstMsgKey].text) : '';
+  const previewHtml = firstMsgKey ? tgHtmlToPreview(messages[firstMsgKey].text) : '';
 
   const classNames = [
     'flow-node',
@@ -129,8 +132,8 @@ export default function FlowNode({
           <span className="flow-node-icon">{icon}</span>
           <span className="flow-node-title">{screen.title}</span>
         </div>
-        {previewText && (
-          <div className="flow-node-preview">{previewText}</div>
+        {previewHtml && (
+          <div className="flow-node-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         )}
         {buttonOrder.length > 0 && (
           <div className="flow-node-buttons">

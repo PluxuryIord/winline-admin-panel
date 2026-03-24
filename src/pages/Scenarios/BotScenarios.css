@@ -123,10 +123,36 @@
 .flow-node-preview {
   padding: 6px 16px 8px;
   font-size: 0.7rem;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.45);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   word-break: break-word;
+}
+
+.flow-node-preview b,
+.flow-node-preview strong {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.flow-node-preview i,
+.flow-node-preview em {
+  font-style: italic;
+}
+
+.flow-node-preview code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.65rem;
+}
+
+.flow-preview-emoji {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  display: inline-block;
 }
 
 .flow-node-icon {
