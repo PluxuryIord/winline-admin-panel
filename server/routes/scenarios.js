@@ -99,7 +99,7 @@ const SEED_DATA = {
       messages: {},
       buttons: {
         _order: ['btn_kb', 'btn_offer', 'btn_promo', 'btn_chat', 'btn_socials', 'btn_event', 'btn_logout'],
-        btn_kb: { label: 'База знаний', action: 'callback:client_knowledge_base' },
+        btn_kb: { label: 'База знаний', action: 'callback:client_knowledge_base', targetScreen: 'knowledge_base' },
         btn_offer: { label: 'Информация по офферу', action: 'callback:client_offers' },
         btn_promo: { label: 'Актуальные крео и лендинги', action: 'callback:client_promo' },
         btn_chat: { label: 'Чат с менеджером', action: 'url:https://t.me/winline_affiliate' },
