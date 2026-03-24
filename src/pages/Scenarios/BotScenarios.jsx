@@ -318,16 +318,21 @@ export default function BotScenarios() {
 
       if (targetScreen) {
         const isTargetCustom = !SYSTEM_SCREENS.has(targetScreen);
-        const isSourceSystem = SYSTEM_SCREENS.has(activeScreen);
+        const currentAction = currentBtn.action || '';
+        const wasCustomTarget = currentAction.includes('sc_');
 
         if (isTargetCustom) {
           // Target is custom screen → always use sc_ callback
           updates.action = `callback:sc_${targetScreen}`;
-        } else if (!isSourceSystem) {
-          // Source is custom, target is system → use system callback
-          updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen] || targetScreen}`;
+        } else if (SCREEN_TO_CALLBACK[targetScreen]) {
+          // Target is system screen
+          // Only change action if: current action is sc_ (was pointing to custom) OR source is custom block
+          const isSourceSystem = SYSTEM_SCREENS.has(activeScreen);
+          if (wasCustomTarget || !isSourceSystem) {
+            updates.action = `callback:${SCREEN_TO_CALLBACK[targetScreen]}`;
+          }
+          // If source is system AND action is NOT sc_ → preserve original action (FSM flows)
         }
-        // If source is system AND target is system → don't change action (FSM flows)
       }
 
       next.buttons[key] = { ...currentBtn, ...updates };
