@@ -12,6 +12,14 @@ const SCENARIO_GROUPS = {
   'Сценарий 4': ['group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb'],
 };
 
+// Центральный блок для каждого сценария
+const SCENARIO_CENTER = {
+  'Сценарий 1': 'registration_flow',
+  'Сценарий 2': 'auth_flow',
+  'Сценарий 3': 'event_flow',
+  'Сценарий 4': 'group_menu',
+};
+
 export default function FlowCanvas({
   screens, activeScreen, onSelectNode, onMoveNode,
   onDuplicate, onDeleteBlock, searchQuery, setSearchQuery,
@@ -150,6 +158,30 @@ export default function FlowCanvas({
     return groups;
   }, [screens]);
 
+  // ─── Center on a single node ────────────────────────────────────────────────
+  const centerOnNode = useCallback((nodeId, targetZoom = 0.85) => {
+    requestAnimationFrame(() => {
+      if (!containerRef.current || !screens[nodeId]) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const s = screens[nodeId];
+      const x = s.x ?? 0;
+      const y = s.y ?? 0;
+      const btnCount = (s.buttons?._order || []).length;
+      const h = NODE_HEADER_H + 8 + btnCount * BTN_ROW_H + 10;
+
+      const nodeCenterX = x + NODE_W / 2;
+      const nodeCenterY = y + h / 2;
+
+      setZoom(targetZoom);
+      setOffset({
+        x: rect.width / 2 - nodeCenterX * targetZoom,
+        y: rect.height / 2 - nodeCenterY * targetZoom,
+      });
+    });
+  }, [screens]);
+
   // ─── Scenario filter handler ─────────────────────────────────────────────────
   const handleFilter = (name) => {
     if (name === null) {
@@ -157,7 +189,12 @@ export default function FlowCanvas({
       fitToNodes(Object.keys(screens).filter(id => id !== 'logout_screen'));
     } else {
       setActiveFilter(name);
-      fitToNodes(dynamicGroups[name] || SCENARIO_GROUPS[name] || []);
+      const centerId = SCENARIO_CENTER[name];
+      if (centerId && screens[centerId]) {
+        centerOnNode(centerId);
+      } else {
+        fitToNodes(dynamicGroups[name] || SCENARIO_GROUPS[name] || []);
+      }
     }
   };
 
