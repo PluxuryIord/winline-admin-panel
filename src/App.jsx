@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
 import { Loader } from 'lucide-react';
 
@@ -14,7 +14,7 @@ import Chats from './pages/Chats/Chats.jsx';
 import ChatView from './pages/Chats/ChatView.jsx';
 import EventWork from './pages/EventWork/EventWork.jsx';
 import BotScenarios from './pages/Scenarios/BotScenarios.jsx';
-import Hostess from './pages/Hostess/Hostess.jsx';
+
 import Broadcasts from './pages/Broadcasts/Broadcasts.jsx';
 import BroadcastNew from './pages/Broadcasts/BroadcastNew.jsx';
 import BroadcastEditor from './pages/Broadcasts/BroadcastEditor.jsx';
@@ -40,11 +40,9 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    <BrowserRouter>
       <Routes>
         {/* Публичные страницы */}
         <Route path="/login" element={<Login />} />
-        <Route path="/hostess" element={<Hostess />} />
 
         {/* Защищённые страницы */}
         <Route path="/" element={<ProtectedRoute><UnreadProvider><Layout /></UnreadProvider></ProtectedRoute>}>
@@ -64,7 +62,6 @@ function App() {
           <Route path="events" element={<EventWork />} />
         </Route>
       </Routes>
-    </BrowserRouter>
   );
 }
 
