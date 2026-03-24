@@ -771,6 +771,21 @@ function GroupsTab({ onSendResult }) {
 }
 
 /* ═══ Главный компонент ═══ */
+function LoadMoreTrigger({ onVisible }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) onVisible(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onVisible]);
+  return <div ref={ref} style={{ height: 1 }} />;
+}
+
 export default function Broadcasts() {
   const [openSection, setOpenSection] = useState('channels');
   const [broadcasts, setBroadcasts] = useState([]);
@@ -918,15 +933,7 @@ export default function Broadcasts() {
           </table>
         </div>
 
-        {hasMore && (
-          <button
-            className="broadcasts-create-btn"
-            style={{ alignSelf: 'center', margin: '12px auto 0' }}
-            onClick={() => setVisibleCount(prev => prev + 20)}
-          >
-            Загрузить ещё ({filtered.length - visibleCount} осталось)
-          </button>
-        )}
+        {hasMore && <LoadMoreTrigger onVisible={() => setVisibleCount(prev => prev + 20)} />}
       </div>
 
       {deleteModal && (
