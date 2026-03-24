@@ -410,11 +410,41 @@ router.post('/users', async (req, res, next) => {
 
     const results = [];
     let successCount = 0;
+
+    // Prepare broadcast message text for chat storage
+    const MEDIA_PREFIX = '__media__:';
+    let chatMessageText = '';
+    if (poll) {
+      chatMessageText = `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}`;
+    } else if (media) {
+      chatMessageText = `${MEDIA_PREFIX}${JSON.stringify(media)}\n${text?.trim() || ''}`;
+    } else {
+      chatMessageText = text?.trim() || '';
+    }
+
     for (const row of rows) {
       try {
         const data = await sendToChat(row.user_id, text?.trim() || '', media, poll);
         results.push({ chatId: row.user_id, ok: data.ok, error: data.description || null });
-        if (data.ok) successCount++;
+        if (data.ok) {
+          successCount++;
+          // Save broadcast message to user's chat
+          try {
+            await dbPool.query(
+              'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+              [row.user_id]
+            );
+            const [[{ chatId: userChatId }]] = await dbPool.query('SELECT LAST_INSERT_ID() AS chatId');
+            if (userChatId) {
+              await dbPool.query(
+                'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
+                [userChatId, 'admin', chatMessageText]
+              );
+            }
+          } catch (chatErr) {
+            console.warn(`[broadcasts] Failed to save to chat for user ${row.user_id}:`, chatErr.message);
+          }
+        }
       } catch (err) {
         results.push({ chatId: row.user_id, ok: false, error: err.message });
       }
