@@ -134,11 +134,30 @@ export default function FlowCanvas({
     document.addEventListener('mouseup', onMouseUp);
   }, [offset]);
 
-  // ─── Zoom with scroll wheel ──────────────────────────────────────────────────
+  // ─── Zoom with scroll wheel (toward cursor) ────────────────────────────────
   const handleWheel = useCallback((e) => {
     e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Cursor position relative to canvas element
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
     const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    setZoom(prev => Math.min(2, Math.max(0.3, prev + delta)));
+
+    setZoom(prevZoom => {
+      const newZoom = Math.min(2, Math.max(0.3, prevZoom + delta));
+      const scale = newZoom / prevZoom;
+
+      // Adjust offset so the point under cursor stays fixed
+      setOffset(prev => ({
+        x: mouseX - scale * (mouseX - prev.x),
+        y: mouseY - scale * (mouseY - prev.y),
+      }));
+
+      return newZoom;
+    });
   }, []);
 
   // ─── Build dynamic scenario groups (include custom blocks with scenario field) ──
