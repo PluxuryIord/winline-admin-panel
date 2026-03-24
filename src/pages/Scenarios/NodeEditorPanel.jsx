@@ -9,7 +9,17 @@ const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
   main_menu: '🏠', offer_page: '📋', promo_page: '🎨',
   socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
+  knowledge_base: '📚', group_menu: '💬', group_promo: '📢',
+  group_calendar: '📅', group_landings: '🌐', group_kb: '📖',
 };
+
+// Точки входа — нельзя направлять стрелки В эти блоки
+const ENTRY_POINTS = new Set(['start_menu', 'event_flow', 'group_menu']);
+
+// Блоки с заблокированными связями — нельзя менять targetScreen кнопок
+const LOCKED_CONNECTIONS = new Set([
+  'start_menu', 'registration_flow', 'auth_flow',
+]);
 
 export default function NodeEditorPanel({
   screenId, editData, allScreens, isCustom,
@@ -23,11 +33,15 @@ export default function NodeEditorPanel({
   const messageKeys = Object.keys(editData.messages || {});
   const buttonOrder = editData.buttons?._order || [];
 
-  // Build list of screens for the dropdown
-  const screenOptions = Object.entries(allScreens).map(([id, s]) => ({
-    id,
-    title: `${SCREEN_ICONS[id] || '📄'} ${s.title}`,
-  }));
+  // Build list of screens for the dropdown (exclude entry points)
+  const screenOptions = Object.entries(allScreens)
+    .filter(([id]) => !ENTRY_POINTS.has(id))
+    .map(([id, s]) => ({
+      id,
+      title: `${SCREEN_ICONS[id] || '📄'} ${s.title}`,
+    }));
+
+  const isConnectionsLocked = LOCKED_CONNECTIONS.has(screenId);
 
   // ─── Drag & drop state ─────────────────────────────────────────────────────
   const [dragIdx, setDragIdx] = useState(null);
@@ -101,8 +115,16 @@ export default function NodeEditorPanel({
         </div>
       </div>
 
+      {/* Read-only notice */}
+      {editData.readOnly && (
+        <div className="sc-readonly-notice">
+          <Eye size={16} />
+          <span>{editData.description || 'Этот блок нельзя редактировать здесь'}</span>
+        </div>
+      )}
+
       {/* Messages */}
-      {messageKeys.length > 0 && (
+      {messageKeys.length > 0 && !editData.readOnly && (
         <div className="sc-section">
           <h3 className="sc-section-title"><MessageSquare size={16} /> Сообщения</h3>
           {messageKeys.map(key => {
@@ -206,12 +228,15 @@ export default function NodeEditorPanel({
                           className="node-editor-target-select"
                           value={btn.targetScreen || ''}
                           onChange={e => onUpdateButtonTarget(key, e.target.value)}
+                          disabled={isConnectionsLocked || btn.locked}
+                          title={isConnectionsLocked ? 'Связи этого блока нельзя менять' : ''}
                         >
                           <option value="">— Действие без перехода —</option>
                           {screenOptions.map(opt => (
                             <option key={opt.id} value={opt.id}>{opt.title}</option>
                           ))}
                         </select>
+                        {isConnectionsLocked && <span className="node-editor-locked-hint">🔒</span>}
                       </div>
                     )}
                   </div>

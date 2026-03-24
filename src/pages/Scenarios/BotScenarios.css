@@ -1188,3 +1188,28 @@
   color: rgba(255, 255, 255, 0.25);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* ─── Read-only notice ─── */
+.sc-readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 10px;
+  color: #eab308;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* ─── Locked connection hint ─── */
+.node-editor-locked-hint {
+  font-size: 0.75rem;
+  opacity: 0.5;
+}
+
+.node-editor-target-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -122,6 +122,21 @@ const SEED_DATA = {
         btn_back: { label: '🔙 Меню', action: 'callback:client_back_menu' },
       },
     },
+    knowledge_base: {
+      title: 'База знаний',
+      description: 'Редактируется в разделе «База знаний»',
+      readOnly: true,
+      messages: {
+        info_text: {
+          label: 'Информация',
+          text: '📚 Содержимое базы знаний управляется в отдельном разделе панели — «База знаний». Здесь отображается только связь с другими экранами.',
+        },
+      },
+      buttons: {
+        _order: ['btn_back'],
+        btn_back: { label: '🔙 Меню', action: 'callback:client_back_menu', locked: true },
+      },
+    },
     promo_page: {
       title: 'Актуальные крео и лендинги',
       description: 'Промо-материалы и лендинги',
