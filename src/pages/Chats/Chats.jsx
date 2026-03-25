@@ -124,6 +124,7 @@ export default function Chats() {
         )}
         {sortedChats.map(chat => {
           const user = getUser(chat.userId);
+          const chatName = chat.fullName || (user ? user.fullName : null) || `Пользователь #${chat.userId}`;
           const msg = lastMsg(chat);
           return (
             <div
@@ -132,11 +133,11 @@ export default function Chats() {
               onClick={() => navigate(`/chats/${chat.id}`)}
             >
               <div className="chat-item-avatar">
-                {user ? user.fullName.charAt(0) : '?'}
+                {chatName.charAt(0)}
               </div>
               <div className="chat-item-info">
                 <span className="chat-item-name">
-                  {user ? user.fullName : `Пользователь #${chat.userId}`}
+                  {chatName}
                 </span>
                 {msg && (
                   <span className="chat-item-last">

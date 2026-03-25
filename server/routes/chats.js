@@ -171,7 +171,13 @@ webhookRouter.post('/', handleWebhook);
 // GET /api/chats
 router.get('/', async (req, res, next) => {
   try {
-    const [chats] = await dbPool.query('SELECT id, user_id AS userId, created_at FROM wl_admin_chats ORDER BY created_at DESC');
+    const [chats] = await dbPool.query(`
+      SELECT c.id, c.user_id AS userId, c.created_at,
+        u.full_name AS fullName, u.username AS telegram
+      FROM wl_admin_chats c
+      LEFT JOIN users u ON u.user_id = c.user_id
+      ORDER BY c.created_at DESC
+    `);
     const chatIds = chats.map(c => c.id);
 
     let messagesMap = {};
@@ -189,6 +195,8 @@ router.get('/', async (req, res, next) => {
     res.json(chats.map(c => ({
       id: c.id,
       userId: c.userId,
+      fullName: c.fullName || null,
+      telegram: c.telegram || null,
       messages: messagesMap[c.id] || [],
     })));
   } catch (err) { next(err); }
