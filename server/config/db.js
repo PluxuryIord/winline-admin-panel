@@ -14,6 +14,7 @@ if (MYSQL_HOST && MYSQL_USER && MYSQL_DATABASE) {
     connectionLimit: 10,
     queueLimit: 0,
     connectTimeout: 10000,
+    timezone: '+03:00',
   });
   console.log('[db] MySQL pool created for', MYSQL_DATABASE, '@', MYSQL_HOST);
 } else {
