@@ -1013,7 +1013,7 @@ export default function Broadcasts() {
                       {b.status === 'failed' && <XCircle size={12} />}
                       {b.status === 'partial' && <AlertCircle size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
-                      {b.total > 1 && (
+                      {b.total > 0 && (
                         <button className="bc-delivery-btn" onClick={(e) => { e.stopPropagation(); setDeliveryModal(b); }} title="Показать получателей">
                           {b.success}/{b.total}
                         </button>

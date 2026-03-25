@@ -1256,15 +1256,19 @@ input[type="checkbox"]:checked {
 
 /* ─── Delivery button ─── */
 .bc-delivery-btn {
-  background: none;
-  border: none;
-  color: var(--color-orange);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  text-decoration: underline;
-  font-size: inherit;
-  padding: 0 0 0 4px;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
 }
-.bc-delivery-btn:hover { opacity: 0.8; }
+.bc-delivery-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
 
 /* ─── Delivery Modal ─── */
 .bc-delivery-overlay {
