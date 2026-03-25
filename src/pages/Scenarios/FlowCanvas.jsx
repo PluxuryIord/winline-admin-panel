@@ -24,15 +24,11 @@ export default function FlowCanvas({
   screens, activeScreen, onSelectNode, onMoveNode,
   onDuplicate, onDeleteBlock, searchQuery, setSearchQuery,
   hoveredNode, setHoveredNode, onStartTest,
+  bendOffsets, onBendChange,
 }) {
   const containerRef = useRef(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [bendOffsets, setBendOffsets] = useState({});
-
-  const handleBendChange = useCallback((key, bend) => {
-    setBendOffsets(prev => ({ ...prev, [key]: bend }));
-  }, []);
   const [activeFilter, setActiveFilter] = useState(null);
   const [highlightedNode, setHighlightedNode] = useState(null);
 
@@ -283,7 +279,7 @@ export default function FlowCanvas({
 
       {/* SVG arrows layer */}
       <svg className="flow-arrows-svg" style={{ transform, transformOrigin: '0 0' }}>
-        <FlowArrows screens={screens} activeScreen={activeScreen} hoveredNode={hoveredNode} bendOffsets={bendOffsets} onBendChange={handleBendChange} zoom={zoom} />
+        <FlowArrows screens={screens} activeScreen={activeScreen} hoveredNode={hoveredNode} bendOffsets={bendOffsets || {}} onBendChange={onBendChange} zoom={zoom} />
       </svg>
 
       <div

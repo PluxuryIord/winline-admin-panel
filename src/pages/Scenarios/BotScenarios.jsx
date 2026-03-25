@@ -540,6 +540,14 @@ export default function BotScenarios() {
         hoveredNode={hoveredNode}
         setHoveredNode={setHoveredNode}
         onStartTest={() => {}}
+        bendOffsets={scenarios.bendOffsets || {}}
+        onBendChange={(key, bend) => {
+          setScenarios(prev => {
+            const updated = { ...prev, bendOffsets: { ...(prev.bendOffsets || {}), [key]: bend } };
+            api.put('/api/scenarios', updated).catch(() => {});
+            return updated;
+          });
+        }}
       />
 
       {/* Add new block button */}
