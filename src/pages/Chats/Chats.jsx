@@ -6,6 +6,18 @@ import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
 
+/** Strip HTML tags for preview, keep text only */
+function stripTgHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
 function formatTime(iso) {
   const d = new Date(iso);
   const now = new Date();
@@ -128,7 +140,7 @@ export default function Chats() {
                 </span>
                 {msg && (
                   <span className="chat-item-last">
-                    {msg.from === 'admin' ? 'Вы: ' : ''}{msg.text}
+                    {msg.from === 'admin' ? 'Вы: ' : ''}{stripTgHtml(msg.text)}
                   </span>
                 )}
               </div>
