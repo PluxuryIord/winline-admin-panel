@@ -1253,3 +1253,113 @@ input[type="checkbox"]:checked {
   color: rgba(255, 255, 255, 0.3);
   font-size: 0.85rem;
 }
+
+/* ─── Delivery button ─── */
+.bc-delivery-btn {
+  background: none;
+  border: none;
+  color: var(--color-orange);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0 0 0 4px;
+}
+.bc-delivery-btn:hover { opacity: 0.8; }
+
+/* ─── Delivery Modal ─── */
+.bc-delivery-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bc-delivery-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  width: 420px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+.bc-delivery-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bc-delivery-modal-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #fff;
+}
+.bc-delivery-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+.bc-delivery-summary {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bc-delivery-ok {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #22c55e;
+  font-size: 0.85rem;
+}
+.bc-delivery-fail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+.bc-delivery-list {
+  overflow-y: auto;
+  padding: 8px 12px;
+  max-height: 50vh;
+}
+.bc-delivery-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.bc-delivery-item--ok { color: rgba(255, 255, 255, 0.7); }
+.bc-delivery-item--fail { color: #ef4444; }
+.bc-delivery-icon { flex-shrink: 0; }
+.bc-delivery-user-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+.bc-delivery-error {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.bc-delivery-empty {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ─── History text formatting ─── */
+.bc-title-cell a { color: var(--color-orange); }
+.bc-title-cell code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.85em;
+}

@@ -9,6 +9,29 @@ import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import './Broadcasts.css';
 
+/** Strip HTML for preview text */
+function stripTgHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
+/** Sanitize TG HTML for safe rendering */
+function renderTgHtml(html) {
+  if (!html) return '';
+  let s = html;
+  s = s.replace(/\n/g, '<br>');
+  s = s.replace(/<tg-emoji\s+emoji-id="(\d+)">[^<]*<\/tg-emoji>/g,
+    (_, id) => `<img src="/emoji/${id}.webp" style="width:18px;height:18px;vertical-align:middle;display:inline" />`);
+  s = s.replace(/<(?!\/?(?:b|i|em|strong|a|code|br|img)\b)[^>]*>/gi, '');
+  return s;
+}
+
 const STATUS_LABELS = {
   published: 'Доставлена',
   partial: 'Частично',
@@ -866,6 +889,7 @@ export default function Broadcasts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteModal, setDeleteModal] = useState(null);
+  const [deliveryModal, setDeliveryModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
 
   const fetchBroadcasts = useCallback(async () => {
@@ -978,7 +1002,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span>{b.media ? `[${b.media.originalName}] ` : ''}{b.text}</span>
+                    <span dangerouslySetInnerHTML={{ __html: (b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '') }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
@@ -989,7 +1013,11 @@ export default function Broadcasts() {
                       {b.status === 'failed' && <XCircle size={12} />}
                       {b.status === 'partial' && <AlertCircle size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
-                      {b.total > 1 && ` ${b.success}/${b.total}`}
+                      {b.total > 1 && (
+                        <button className="bc-delivery-btn" onClick={(e) => { e.stopPropagation(); setDeliveryModal(b); }} title="Показать получателей">
+                          {b.success}/{b.total}
+                        </button>
+                      )}
                     </span>
                   </td>
                   <td className="bc-date">
@@ -1017,6 +1045,33 @@ export default function Broadcasts() {
           onConfirm={handleDeleteBroadcast}
           onCancel={() => setDeleteModal(null)}
         />
+      )}
+
+      {deliveryModal && (
+        <div className="bc-delivery-overlay" onClick={() => setDeliveryModal(null)}>
+          <div className="bc-delivery-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-delivery-modal-header">
+              <h3>Получатели рассылки</h3>
+              <button className="bc-delivery-close" onClick={() => setDeliveryModal(null)}><X size={18} /></button>
+            </div>
+            <div className="bc-delivery-summary">
+              <span className="bc-delivery-ok"><CheckCircle size={14} /> Доставлено: {deliveryModal.success}</span>
+              <span className="bc-delivery-fail"><XCircle size={14} /> Ошибки: {deliveryModal.failed}</span>
+            </div>
+            <div className="bc-delivery-list">
+              {(deliveryModal.results || []).map((r, i) => (
+                <div key={i} className={`bc-delivery-item ${r.ok ? 'bc-delivery-item--ok' : 'bc-delivery-item--fail'}`}>
+                  <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}</span>
+                  <span className="bc-delivery-user-id">{r.chatId}</span>
+                  {r.error && <span className="bc-delivery-error">{r.error}</span>}
+                </div>
+              ))}
+              {(!deliveryModal.results || deliveryModal.results.length === 0) && (
+                <div className="bc-delivery-empty">Нет детальных данных</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
