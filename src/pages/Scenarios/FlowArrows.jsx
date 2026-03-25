@@ -169,20 +169,21 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
           <circle cx={tx} cy={ty} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
-          {/* Draggable control point — visible on hover */}
-          {(hovered === key || dragging === key) && (
-            <circle
-              className="arrow-bendpoint"
-              cx={mid.x}
-              cy={mid.y}
-              r={7}
-              fill="var(--color-orange)"
-              stroke="#fff"
-              strokeWidth={2}
-              style={{ cursor: 'grab' }}
-              onMouseDown={(e) => handleMouseDown(key, e)}
-            />
-          )}
+          {/* Draggable control point — always visible, bigger on hover */}
+          <circle
+            className="arrow-bendpoint"
+            cx={mid.x}
+            cy={mid.y}
+            r={(hovered === key || dragging === key) ? 8 : 4}
+            fill="var(--color-orange)"
+            stroke={(hovered === key || dragging === key) ? '#fff' : 'none'}
+            strokeWidth={2}
+            opacity={(hovered === key || dragging === key) ? 1 : 0.4}
+            style={{ cursor: 'grab', transition: 'r 0.15s, opacity 0.15s' }}
+            onMouseDown={(e) => handleMouseDown(key, e)}
+            onMouseEnter={() => setHovered(key)}
+            onMouseLeave={() => { if (!dragging) setHovered(null); }}
+          />
         </g>
       ))}
     </g>
