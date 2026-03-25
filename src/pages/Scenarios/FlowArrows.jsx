@@ -142,11 +142,12 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
         <g key={key}>
           {/* Invisible thick path for easy hover/click */}
           <path
+            className="arrow-hitarea"
             d={d}
             fill="none"
             stroke="transparent"
             strokeWidth={16}
-            style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+            style={{ cursor: 'pointer' }}
             onMouseEnter={() => setHovered(key)}
             onMouseLeave={() => { if (!dragging) setHovered(null); }}
           />
@@ -171,13 +172,14 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
           {/* Draggable control point — visible on hover */}
           {(hovered === key || dragging === key) && (
             <circle
+              className="arrow-bendpoint"
               cx={mid.x}
               cy={mid.y}
               r={7}
               fill="var(--color-orange)"
               stroke="#fff"
               strokeWidth={2}
-              style={{ cursor: 'grab', pointerEvents: 'all' }}
+              style={{ cursor: 'grab' }}
               onMouseDown={(e) => handleMouseDown(key, e)}
             />
           )}

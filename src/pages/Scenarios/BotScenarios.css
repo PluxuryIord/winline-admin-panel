@@ -63,8 +63,8 @@
   overflow: visible;
 }
 
-.flow-arrows-svg circle,
-.flow-arrows-svg path[style*="pointer-events"] {
+.flow-arrows-svg .arrow-hitarea,
+.flow-arrows-svg .arrow-bendpoint {
   pointer-events: all;
 }
 
