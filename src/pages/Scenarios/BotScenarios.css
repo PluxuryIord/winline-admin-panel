@@ -56,11 +56,16 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 20000px;
-  height: 20000px;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: 3;
   overflow: visible;
+}
+
+.flow-arrows-svg circle,
+.flow-arrows-svg path[style*="pointer-events"] {
+  pointer-events: all;
 }
 
 /* ─── Flow Node (bigger) ─── */

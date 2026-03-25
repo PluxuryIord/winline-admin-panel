@@ -1,6 +1,6 @@
+import { useState, useCallback } from 'react';
 import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
 
-// Get point on cubic bezier at t (0..1)
 function bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   const u = 1 - t;
   const x = u*u*u*sx + 3*u*u*t*cp1x + 3*u*t*t*cp2x + t*t*t*tx;
@@ -8,7 +8,6 @@ function bezierPoint(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   return { x, y };
 }
 
-// Get tangent angle on cubic bezier at t
 function bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, t) {
   const u = 1 - t;
   const dx = 3*u*u*(cp1x-sx) + 6*u*t*(cp2x-cp1x) + 3*t*t*(tx-cp2x);
@@ -21,9 +20,8 @@ function getPreviewHeight(screen) {
   const firstKey = Object.keys(msgs)[0];
   if (!firstKey || !msgs[firstKey].text) return 0;
   const text = msgs[firstKey].text.replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-  // Approximate: ~40 chars per line at font-size 0.7rem in 280px node, line-height ~14px
   const lines = Math.max(1, Math.ceil(text.length / 40));
-  return 14 + lines * 14; // padding + lines
+  return 14 + lines * 14;
 }
 
 function getNodeHeight(screen) {
@@ -32,7 +30,36 @@ function getNodeHeight(screen) {
   return NODE_HEADER_H + previewH + 8 + btnCount * BTN_ROW_H + 10;
 }
 
-export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
+export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOffsets, onBendChange, zoom }) {
+  const [dragging, setDragging] = useState(null);
+  const [hovered, setHovered] = useState(null);
+
+  const handleMouseDown = useCallback((key, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDragging(key);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startBend = bendOffsets?.[key] || { x: 0, y: 0 };
+    const z = zoom || 1;
+
+    const onMove = (ev) => {
+      const dx = (ev.clientX - startX) / z;
+      const dy = (ev.clientY - startY) / z;
+      onBendChange?.(key, { x: startBend.x + dx, y: startBend.y + dy });
+    };
+
+    const onUp = () => {
+      setDragging(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [bendOffsets, onBendChange, zoom]);
+
   const arrows = [];
 
   for (const [srcId, screen] of Object.entries(screens)) {
@@ -45,7 +72,6 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const btn = screen.buttons[btnKey];
       if (!btn?.targetScreen || !screens[btn.targetScreen]) return;
 
-      // Skip arrows from "back" buttons
       if (btn.label?.includes('Назад') || btn.label?.includes('Меню') && btnKey.includes('back')) return;
 
       const target = screens[btn.targetScreen];
@@ -53,11 +79,9 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const tgtY = target.y ?? 0;
       const tgtH = getNodeHeight(target);
 
-      // Button Y position (source) — account for preview text
       const srcPreviewH = getPreviewHeight(screen);
       const btnCenterY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnIdx * BTN_ROW_H + BTN_ROW_H / 2;
 
-      // Determine best direction based on relative position
       const dx = (tgtX + NODE_W / 2) - (srcX + NODE_W / 2);
       const dy = (tgtY + tgtH / 2) - btnCenterY;
       const absDx = Math.abs(dx);
@@ -66,56 +90,36 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       let sx, sy, tx, ty, cp1x, cp1y, cp2x, cp2y;
 
       if (absDx > absDy * 0.6) {
-        // Horizontal: right→left or left→right
         if (dx > 0) {
-          // Target is to the right
-          sx = srcX + NODE_W;
-          sy = btnCenterY;
-          tx = tgtX;
-          ty = tgtY + tgtH / 2;
+          sx = srcX + NODE_W; sy = btnCenterY;
+          tx = tgtX; ty = tgtY + tgtH / 2;
           const cpOff = Math.max(60, absDx * 0.4);
-          cp1x = sx + cpOff;
-          cp1y = sy;
-          cp2x = tx - cpOff;
-          cp2y = ty;
+          cp1x = sx + cpOff; cp1y = sy; cp2x = tx - cpOff; cp2y = ty;
         } else {
-          // Target is to the left
-          sx = srcX;
-          sy = btnCenterY;
-          tx = tgtX + NODE_W;
-          ty = tgtY + tgtH / 2;
+          sx = srcX; sy = btnCenterY;
+          tx = tgtX + NODE_W; ty = tgtY + tgtH / 2;
           const cpOff = Math.max(60, absDx * 0.4);
-          cp1x = sx - cpOff;
-          cp1y = sy;
-          cp2x = tx + cpOff;
-          cp2y = ty;
+          cp1x = sx - cpOff; cp1y = sy; cp2x = tx + cpOff; cp2y = ty;
         }
       } else {
-        // Vertical: bottom→top or top→bottom
         if (dy > 0) {
-          // Target is below
-          sx = srcX + NODE_W / 2;
-          sy = srcY + srcH;
-          tx = tgtX + NODE_W / 2;
-          ty = tgtY;
+          sx = srcX + NODE_W / 2; sy = srcY + srcH;
+          tx = tgtX + NODE_W / 2; ty = tgtY;
           const cpOff = Math.max(60, absDy * 0.4);
-          cp1x = sx;
-          cp1y = sy + cpOff;
-          cp2x = tx;
-          cp2y = ty - cpOff;
+          cp1x = sx; cp1y = sy + cpOff; cp2x = tx; cp2y = ty - cpOff;
         } else {
-          // Target is above
-          sx = srcX + NODE_W / 2;
-          sy = srcY;
-          tx = tgtX + NODE_W / 2;
-          ty = tgtY + tgtH;
+          sx = srcX + NODE_W / 2; sy = srcY;
+          tx = tgtX + NODE_W / 2; ty = tgtY + tgtH;
           const cpOff = Math.max(60, absDy * 0.4);
-          cp1x = sx;
-          cp1y = sy - cpOff;
-          cp2x = tx;
-          cp2y = ty + cpOff;
+          cp1x = sx; cp1y = sy - cpOff; cp2x = tx; cp2y = ty + cpOff;
         }
       }
+
+      // Apply bend offset
+      const arrowKey = `${srcId}-${btnKey}`;
+      const bend = bendOffsets?.[arrowKey] || { x: 0, y: 0 };
+      cp1x += bend.x; cp1y += bend.y;
+      cp2x += bend.x; cp2y += bend.y;
 
       const isHighlightedActive = srcId === activeScreen || btn.targetScreen === activeScreen;
       const isHighlightedHover = hoveredNode && (srcId === hoveredNode || btn.targetScreen === hoveredNode);
@@ -125,10 +129,9 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
       const angle = bezierAngle(sx, sy, cp1x, cp1y, cp2x, cp2y, tx, ty, 0.5);
 
       arrows.push({
-        key: `${srcId}-${btnKey}`,
+        key: arrowKey,
         d: `M ${sx},${sy} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${tx},${ty}`,
-        highlighted,
-        mid, angle, sx, sy, tx, ty,
+        highlighted, mid, angle, sx, sy, tx, ty,
       });
     });
   }
@@ -137,21 +140,47 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode }) {
     <g>
       {arrows.map(({ key, d, highlighted, mid, angle, sx, sy, tx, ty }) => (
         <g key={key}>
+          {/* Invisible thick path for easy hover/click */}
+          <path
+            d={d}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={16}
+            style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+            onMouseEnter={() => setHovered(key)}
+            onMouseLeave={() => { if (!dragging) setHovered(null); }}
+          />
+          {/* Visible path */}
           <path
             d={d}
             fill="none"
             stroke={highlighted ? 'rgba(255,126,0,0.8)' : 'rgba(255,126,0,0.3)'}
             strokeWidth={highlighted ? 3 : 2.5}
           />
+          {/* Arrow head */}
           <polygon
             points="-8,-6 8,0 -8,6"
             fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(255,126,0,0.5)'}
             transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
           />
+          {/* Start/end dots */}
           <circle cx={sx} cy={sy} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
           <circle cx={tx} cy={ty} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
+          {/* Draggable control point — visible on hover */}
+          {(hovered === key || dragging === key) && (
+            <circle
+              cx={mid.x}
+              cy={mid.y}
+              r={7}
+              fill="var(--color-orange)"
+              stroke="#fff"
+              strokeWidth={2}
+              style={{ cursor: 'grab', pointerEvents: 'all' }}
+              onMouseDown={(e) => handleMouseDown(key, e)}
+            />
+          )}
         </g>
       ))}
     </g>
