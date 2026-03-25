@@ -97,7 +97,7 @@ export default function FlowCanvas({
       const contentH = maxY - minY || 1;
       const scaleX = (rect.width - padding * 2) / contentW;
       const scaleY = (rect.height - padding * 2) / contentH;
-      const newZoom = Math.min(1.5, Math.max(0.3, Math.min(scaleX, scaleY)));
+      const newZoom = Math.min(1.5, Math.max(0.1, Math.min(scaleX, scaleY)));
 
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
@@ -147,7 +147,7 @@ export default function FlowCanvas({
     const delta = e.deltaY > 0 ? -0.08 : 0.08;
 
     setZoom(prevZoom => {
-      const newZoom = Math.min(2, Math.max(0.3, prevZoom + delta));
+      const newZoom = Math.min(2, Math.max(0.1, prevZoom + delta));
       const scale = newZoom / prevZoom;
 
       // Adjust offset so the point under cursor stays fixed
