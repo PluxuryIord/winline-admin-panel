@@ -1344,9 +1344,20 @@ input[type="checkbox"]:checked {
 .bc-delivery-item--ok { color: rgba(255, 255, 255, 0.7); }
 .bc-delivery-item--fail { color: #ef4444; }
 .bc-delivery-icon { flex-shrink: 0; }
+.bc-delivery-user-name {
+  font-weight: 500;
+  color: #fff;
+}
+.bc-delivery-username {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  margin-left: 4px;
+}
 .bc-delivery-user-id {
   font-family: monospace;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin-left: 4px;
 }
 .bc-delivery-error {
   color: rgba(255, 255, 255, 0.4);

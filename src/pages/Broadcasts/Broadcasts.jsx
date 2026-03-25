@@ -1062,7 +1062,9 @@ export default function Broadcasts() {
               {(deliveryModal.results || []).map((r, i) => (
                 <div key={i} className={`bc-delivery-item ${r.ok ? 'bc-delivery-item--ok' : 'bc-delivery-item--fail'}`}>
                   <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}</span>
-                  <span className="bc-delivery-user-id">{r.chatId}</span>
+                  <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
+                  {r.username && <span className="bc-delivery-username">@{r.username}</span>}
+                  {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
                   {r.error && <span className="bc-delivery-error">{r.error}</span>}
                 </div>
               ))}

@@ -405,7 +405,7 @@ router.post('/users', async (req, res, next) => {
       }
     }
 
-    const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
+    const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
     if (!rows.length) {
       return res.json({ success: 0, total: 0, failed: 0, results: [], status: 'failed', error: 'Нет пользователей по заданным фильтрам' });
     }
@@ -427,7 +427,7 @@ router.post('/users', async (req, res, next) => {
     for (const row of rows) {
       try {
         const data = await sendToChat(row.user_id, text?.trim() || '', media, poll);
-        results.push({ chatId: row.user_id, ok: data.ok, error: data.description || null });
+        results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: data.ok, error: data.description || null });
         if (data.ok) {
           successCount++;
           // Save broadcast message to user's chat
@@ -458,7 +458,7 @@ router.post('/users', async (req, res, next) => {
           }
         }
       } catch (err) {
-        results.push({ chatId: row.user_id, ok: false, error: err.message });
+        results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: false, error: err.message });
       }
     }
 
