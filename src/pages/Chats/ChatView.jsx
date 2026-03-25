@@ -4,6 +4,20 @@ import { ArrowLeft, Send, X, Plus, Paperclip, FileText, ChevronDown } from 'luci
 import { api } from '../../utils/api.js';
 import './ChatView.css';
 
+/** Sanitize Telegram HTML for safe rendering: allow b, i, a, code, tg-emoji → img */
+function sanitizeTgHtml(html) {
+  if (!html) return '';
+  let s = html;
+  // Convert \n to <br>
+  s = s.replace(/\n/g, '<br>');
+  // Convert tg-emoji to img
+  s = s.replace(/<tg-emoji\s+emoji-id="(\d+)">[^<]*<\/tg-emoji>/g,
+    (_, id) => `<img src="/emoji/${id}.webp" class="chatview-tg-emoji" />`);
+  // Strip all tags except allowed
+  s = s.replace(/<(?!\/?(?:b|i|em|strong|a|code|br|img)\b)[^>]*>/gi, '');
+  return s;
+}
+
 function formatTime(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -337,7 +351,7 @@ export default function ChatView() {
                         </a>
                       );
                     })}
-                    {item.text && <span className="chatview-text">{item.text}</span>}
+                    {item.text && <span className="chatview-text" dangerouslySetInnerHTML={{ __html: sanitizeTgHtml(item.text) }} />}
                     <span className="chatview-meta">
                       <span className="chatview-time">{formatTime(item.time)}</span>
                     </span>

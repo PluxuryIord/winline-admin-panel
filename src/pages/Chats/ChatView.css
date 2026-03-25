@@ -481,8 +481,27 @@
 /* ===== ТЕКСТ И МЕТА ===== */
 .chatview-text {
   display: block;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.chatview-text a {
+  color: var(--color-orange);
+  text-decoration: underline;
+}
+
+.chatview-text code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.chatview-tg-emoji {
+  display: inline;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
 }
 
 .chatview-meta {
