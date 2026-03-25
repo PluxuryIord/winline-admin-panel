@@ -71,6 +71,7 @@ async function checkMediaColumn() {
 
 function safeJsonArray(val) {
   if (!val) return [];
+  if (Array.isArray(val)) return val; // mysql2 may auto-parse JSON columns
   try {
     const parsed = JSON.parse(val);
     return Array.isArray(parsed) ? parsed : [parsed];
@@ -80,7 +81,8 @@ function safeJsonArray(val) {
 }
 
 function safeJsonParse(val, fallback = []) {
-  if (!val) return fallback;
+  if (!val && val !== 0) return fallback;
+  if (typeof val === 'object') return val; // mysql2 may auto-parse JSON columns
   try { return JSON.parse(val); } catch { return fallback; }
 }
 
