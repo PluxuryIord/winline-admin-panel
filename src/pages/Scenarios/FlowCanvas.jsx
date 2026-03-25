@@ -302,6 +302,7 @@ export default function FlowCanvas({
             onDuplicate={onDuplicate}
             onDelete={onDeleteBlock}
             onHover={setHoveredNode}
+            zoom={zoom}
           />
         ))}
       </div>

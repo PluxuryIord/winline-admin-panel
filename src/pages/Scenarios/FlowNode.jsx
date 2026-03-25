@@ -40,7 +40,7 @@ export const NODE_PAD_BOTTOM = 10;
 
 export default function FlowNode({
   screenId, screen, position, isActive, isSearchMatch, isConnected, isHovered, isHighlighted,
-  onSelect, onMove, onDuplicate, onDelete, onHover,
+  onSelect, onMove, onDuplicate, onDelete, onHover, zoom,
 }) {
   const dragRef = useRef(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -62,8 +62,9 @@ export default function FlowNode({
     let moved = false;
 
     const onMouseMove = (ev) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
+      const z = zoom || 1;
+      const dx = (ev.clientX - startX) / z;
+      const dy = (ev.clientY - startY) / z;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
       if (moved) {
         onMove(screenId, { x: startPos.x + dx, y: startPos.y + dy });
@@ -78,7 +79,7 @@ export default function FlowNode({
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  }, [screenId, position, onSelect, onMove]);
+  }, [screenId, position, onSelect, onMove, zoom]);
 
   // Context menu (right click)
   const handleContextMenu = useCallback((e) => {
