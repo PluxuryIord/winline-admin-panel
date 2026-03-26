@@ -106,9 +106,31 @@ export default function Hostess() {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imgData.data, imgData.width, imgData.height, {
+
+      // Enhance contrast for colored QR on dark background
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        // Convert to grayscale using luminance (R/G/B weighted)
+        const gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+        // Threshold: anything above 80 → white, below → black
+        const val = gray > 80 ? 255 : 0;
+        d[i] = val; d[i+1] = val; d[i+2] = val;
+      }
+
+      // Try with enhanced image first
+      let code = jsQR(d, imgData.width, imgData.height, {
         inversionAttempts: 'attemptBoth',
       });
+
+      // Fallback: try original image without enhancement
+      if (!code) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        code = jsQR(origData.data, origData.width, origData.height, {
+          inversionAttempts: 'attemptBoth',
+        });
+      }
+
       if (code) { handleScan(code.data); return; }
     }
     rafRef.current = requestAnimationFrame(scanLoop);
