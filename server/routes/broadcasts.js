@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
+import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
@@ -8,13 +9,27 @@ import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
 
+function verifyBroadcastWebhook(req) {
+  if (!WEBHOOK_SECRET) return false;
+  const sig = req.headers['x-webhook-signature'];
+  if (sig) {
+    try {
+      const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+      return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+    } catch { return false; }
+  }
+  return req.headers['x-webhook-secret'] === WEBHOOK_SECRET;
+}
+
 // ===================== WEBHOOK (без JWT) =====================
 
 export const broadcastWebhookRouter = Router();
 
 broadcastWebhookRouter.post('/', async (req, res, next) => {
-  if (!WEBHOOK_SECRET || req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
-    return res.status(403).json({ error: 'Invalid webhook secret' });
+  if (!verifyBroadcastWebhook(req)) {
+    return res.status(403).json({ error: 'Invalid webhook secret or signature' });
   }
 
   try {
@@ -490,10 +505,10 @@ router.get('/users/count', async (req, res, next) => {
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
     let join = '';
-    if (req.query.tag && req.query.tag !== 'all') {
+    if (req.query.tag?.trim() && req.query.tag.trim() !== 'all') {
       join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
       where.push('t.tag = ?');
-      params.push(req.query.tag);
+      params.push(req.query.tag.trim());
     }
     const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
     res.json({ count });
@@ -506,10 +521,10 @@ router.get('/users/list', async (req, res, next) => {
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
     let join = '';
-    if (req.query.tag && req.query.tag !== 'all') {
+    if (req.query.tag?.trim() && req.query.tag.trim() !== 'all') {
       join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
       where.push('t.tag = ?');
-      params.push(req.query.tag);
+      params.push(req.query.tag.trim());
     }
     const [rows] = await dbPool.query(
       `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u ${join} WHERE ${where.join(' AND ')} LIMIT 100`,

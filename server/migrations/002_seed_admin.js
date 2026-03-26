@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 export default async function seedAdmin(pool) {
   const [rows] = await pool.query('SELECT COUNT(*) as count FROM wl_admin_users');
@@ -8,7 +9,8 @@ export default async function seedAdmin(pool) {
   }
 
   const username = 'admin';
-  const password = 'admin123';
+  // Generate strong random password
+  const password = crypto.randomBytes(12).toString('base64url').slice(0, 16);
   const hash = await bcrypt.hash(password, 10);
 
   await pool.query(
@@ -19,5 +21,5 @@ export default async function seedAdmin(pool) {
   console.log('[seed] ✓ Created admin user:');
   console.log(`  username: ${username}`);
   console.log(`  password: ${password}`);
-  console.log('  ⚠ ОБЯЗАТЕЛЬНО смените пароль после первого входа!');
+  console.log('  ⚠ Запишите пароль — он не будет показан повторно!');
 }

@@ -1,9 +1,24 @@
 import { Router } from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendMediaGroup } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
+
+function verifyWebhook(req) {
+  if (!WEBHOOK_SECRET) return false;
+  // 1. HMAC signature (preferred)
+  const sig = req.headers['x-webhook-signature'];
+  if (sig) {
+    const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+  }
+  // 2. Plain secret (backward compat — will be removed later)
+  return req.headers['x-webhook-secret'] === WEBHOOK_SECRET;
+}
 
 const router = Router();
 
@@ -71,8 +86,8 @@ router.get('/stream', (req, res) => {
 // ===================== WEBHOOK (отдельный роутер, без JWT) =====================
 
 async function handleWebhook(req, res, next) {
-  if (!WEBHOOK_SECRET || req.headers['x-webhook-secret'] !== WEBHOOK_SECRET) {
-    return res.status(403).json({ error: 'Invalid webhook secret' });
+  if (!verifyWebhook(req)) {
+    return res.status(403).json({ error: 'Invalid webhook secret or signature' });
   }
 
   try {
