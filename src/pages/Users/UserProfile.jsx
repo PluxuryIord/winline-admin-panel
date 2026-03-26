@@ -187,7 +187,6 @@ export default function UserProfile() {
 
   // Editable info field handlers
   const fieldMap = {
-    role: { label: 'Роль', dbField: 'role' },
     graph: { label: 'График', dbField: 'graph' },
     phone: { label: 'Телефон', dbField: 'phone_number' },
   };
@@ -232,7 +231,6 @@ export default function UserProfile() {
     const lines = [
       `Пользователь: ${fullName}`,
       `Telegram: ${user.telegram}`,
-      `Роль: ${user.role}`,
       `График: ${user.graph}`,
       `Дата регистрации: ${user.registrationDate}`,
       `Забанен: ${user.banned ? 'Да' : 'Нет'}`,
