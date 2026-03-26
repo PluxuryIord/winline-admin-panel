@@ -317,9 +317,13 @@ export default function Users() {
               <ChevronDown size={14} className={`filter-chevron${showTagDropdown ? ' filter-chevron--open' : ''}`} />
             </button>
             {showTagDropdown && (
-              <div className="tag-filter-dropdown">
-                {allTags.length > 5 && (
-                  <div className="tag-filter-search-wrap">
+              <div className="tag-modal-overlay" onClick={() => setShowTagDropdown(false)}>
+                <div className="tag-modal" onClick={e => e.stopPropagation()}>
+                  <div className="tag-modal-header">
+                    <h3>Фильтр по тегам</h3>
+                    <button className="tag-modal-close" onClick={() => setShowTagDropdown(false)}><X size={18} /></button>
+                  </div>
+                  <div className="tag-modal-search">
                     <input
                       className="tag-filter-search"
                       placeholder="Поиск тегов..."
@@ -328,37 +332,43 @@ export default function Users() {
                       autoFocus
                     />
                   </div>
-                )}
-                <div
-                  className={`tag-filter-item${filterTags.length === 0 ? ' tag-filter-item--active' : ''}`}
-                  onClick={() => { setFilterTags([]); setShowTagDropdown(false); }}
-                >
-                  Все теги
-                </div>
-                {allTags
-                  .filter(tag => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
-                  .map(tag => (
-                  <div
-                    key={tag}
-                    className={`tag-filter-item${filterTags.includes(tag) ? ' tag-filter-item--active' : ''}`}
-                    onClick={() => {
-                      setFilterTags(prev =>
-                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                      );
-                    }}
-                  >
-                    <span className="tag-filter-item-check">{filterTags.includes(tag) ? '✓' : ''}</span>
-                    <span className="tag-filter-item-text">{tag}</span>
-                    <div className="tag-filter-actions">
-                      <button className="tag-action-btn" onClick={(e) => openRenameModal(tag, e)} title="Переименовать">
-                        <Pencil size={12} />
-                      </button>
-                      <button className="tag-action-btn tag-action-delete" onClick={(e) => openDeleteModal(tag, e)} title="Удалить у всех">
-                        <Trash2 size={12} />
-                      </button>
+                  <div className="tag-modal-list">
+                    <div
+                      className={`tag-filter-item${filterTags.length === 0 ? ' tag-filter-item--active' : ''}`}
+                      onClick={() => setFilterTags([])}
+                    >
+                      Все теги
                     </div>
+                    {allTags
+                      .filter(tag => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                      .map(tag => (
+                      <div
+                        key={tag}
+                        className={`tag-filter-item${filterTags.includes(tag) ? ' tag-filter-item--active' : ''}`}
+                        onClick={() => {
+                          setFilterTags(prev =>
+                            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                          );
+                        }}
+                      >
+                        <span className="tag-filter-item-check">{filterTags.includes(tag) ? '✓' : ''}</span>
+                        <span className="tag-filter-item-text">{tag}</span>
+                        <div className="tag-filter-actions">
+                          <button className="tag-action-btn" onClick={(e) => openRenameModal(tag, e)} title="Переименовать">
+                            <Pencil size={12} />
+                          </button>
+                          <button className="tag-action-btn tag-action-delete" onClick={(e) => openDeleteModal(tag, e)} title="Удалить у всех">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <div className="tag-modal-footer">
+                    <span className="tag-modal-count">{filterTags.length > 0 ? `Выбрано: ${filterTags.length}` : 'Все пользователи'}</span>
+                    <button className="tag-modal-apply" onClick={() => setShowTagDropdown(false)}>Применить</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
