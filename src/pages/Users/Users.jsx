@@ -193,14 +193,14 @@ export default function Users() {
   };
 
   const handleTagClick = (tag) => {
-    setFilterTag(prev => prev === tag ? 'all' : tag);
+    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
   const hasActiveFilters = filterTags.length > 0 || search;
 
   const resetFilters = () => {
     setSearch('');
-    setFilterTag('all');
+    setFilterTags([]);
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
 
