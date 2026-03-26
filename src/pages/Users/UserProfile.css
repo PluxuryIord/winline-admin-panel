@@ -185,6 +185,25 @@
   background-color: rgba(255, 126, 0, 0.18);
 }
 
+.profile-tag--editing {
+  padding: 0;
+  background: rgba(255, 126, 0, 0.2);
+  border-color: var(--color-orange);
+}
+
+.profile-tag-edit-input {
+  background: transparent;
+  border: none;
+  color: var(--color-orange);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  outline: none;
+  width: auto;
+  min-width: 60px;
+  max-width: 200px;
+}
+
 .spinner {
   animation: spin 1s linear infinite;
 }

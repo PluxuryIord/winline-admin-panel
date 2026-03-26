@@ -26,6 +26,8 @@ export default function UserProfile() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [allTags, setAllTags] = useState([]);
+  const [editingTag, setEditingTag] = useState(null); // { original: 'old', value: 'new' }
+  const editTagRef = useRef(null);
 
   // Editable fields
   const [editingField, setEditingField] = useState(null);
@@ -152,6 +154,23 @@ export default function UserProfile() {
     setNewTagInput('');
   };
 
+  const handleEditTag = (tag) => {
+    setEditingTag({ original: tag, value: tag });
+    setTimeout(() => editTagRef.current?.focus(), 50);
+  };
+
+  const handleSaveEditTag = () => {
+    if (!editingTag) return;
+    const trimmed = editingTag.value.trim();
+    if (trimmed && trimmed !== editingTag.original) {
+      const newTags = tags.map(t => t === editingTag.original ? trimmed : t);
+      saveTags(newTags);
+    }
+    setEditingTag(null);
+  };
+
+  const handleCancelEditTag = () => setEditingTag(null);
+
   const handleSaveComment = () => {
     setIsEditingComment(false);
     saveComment(comment);
@@ -275,12 +294,28 @@ export default function UserProfile() {
             {/* Теги */}
             <div className="profile-tags-row">
               {tags.map(tag => (
-                <span key={tag} className="profile-tag">
-                  {tag}
-                  <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
-                    <X size={12} />
-                  </button>
-                </span>
+                editingTag && editingTag.original === tag ? (
+                  <span key={tag} className="profile-tag profile-tag--editing">
+                    <input
+                      ref={editTagRef}
+                      className="profile-tag-edit-input"
+                      value={editingTag.value}
+                      onChange={e => setEditingTag({ ...editingTag, value: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSaveEditTag();
+                        if (e.key === 'Escape') handleCancelEditTag();
+                      }}
+                      onBlur={handleSaveEditTag}
+                    />
+                  </span>
+                ) : (
+                  <span key={tag} className="profile-tag" onDoubleClick={() => handleEditTag(tag)} title="Двойной клик для редактирования">
+                    {tag}
+                    <button className="profile-tag-x" onClick={() => handleRemoveTag(tag)}>
+                      <X size={12} />
+                    </button>
+                  </span>
+                )
               ))}
               {user.banned && (
                 <span className="profile-tag profile-tag--banned">Забанен</span>
