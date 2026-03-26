@@ -19,7 +19,8 @@ export default function Users() {
   const searchRef = useRef(null);
 
   // Фильтры
-  const [filterTag, setFilterTag] = useState('all');
+  const [filterTags, setFilterTags] = useState([]);  // [] = all
+  const [tagSearch, setTagSearch] = useState('');
 
   // Сортировка
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
@@ -131,7 +132,7 @@ export default function Users() {
       if (data.ok) {
         loadTags();
         fetchUsers(0, debouncedSearch);
-        if (filterTag === tagModal.tag) setFilterTag(tagModal.newName.trim());
+        if (filterTags.includes(tagModal.tag)) setFilterTags(filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t));
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
     setTagModalSaving(false);
@@ -157,7 +158,7 @@ export default function Users() {
       if (data.ok) {
         loadTags();
         fetchUsers(0, debouncedSearch);
-        if (filterTag === deleteTagModal) setFilterTag('all');
+        if (filterTags.includes(deleteTagModal)) setFilterTags(filterTags.filter(t => t !== deleteTagModal));
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
     setDeleteTagSaving(false);
@@ -168,8 +169,8 @@ export default function Users() {
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
-    if (filterTag !== 'all') {
-      result = result.filter(u => (u.tags || []).includes(filterTag));
+    if (filterTags.length > 0) {
+      result = result.filter(u => filterTags.some(ft => (u.tags || []).includes(ft)));
     }
 
     if (sortConfig.key) {
@@ -181,7 +182,7 @@ export default function Users() {
     }
 
     return result;
-  }, [users, filterTag, sortConfig]);
+  }, [users, filterTags, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -195,7 +196,7 @@ export default function Users() {
     setFilterTag(prev => prev === tag ? 'all' : tag);
   };
 
-  const hasActiveFilters = filterTag !== 'all' || search;
+  const hasActiveFilters = filterTags.length > 0 || search;
 
   const resetFilters = () => {
     setSearch('');
@@ -309,26 +310,44 @@ export default function Users() {
         <div className="filters-row">
           <div className="tag-filter-wrapper" ref={tagFilterRef}>
             <button
-              className={`filter-select${filterTag !== 'all' ? ' filter-select--active' : ''}`}
-              onClick={() => setShowTagDropdown(!showTagDropdown)}
+              className={`filter-select${filterTags.length > 0 ? ' filter-select--active' : ''}`}
+              onClick={() => { setShowTagDropdown(!showTagDropdown); setTagSearch(''); }}
             >
-              {filterTag === 'all' ? 'Все теги' : filterTag}
+              {filterTags.length === 0 ? 'Все теги' : filterTags.length === 1 ? filterTags[0] : `${filterTags.length} тегов`}
               <ChevronDown size={14} className={`filter-chevron${showTagDropdown ? ' filter-chevron--open' : ''}`} />
             </button>
             {showTagDropdown && (
               <div className="tag-filter-dropdown">
+                {allTags.length > 5 && (
+                  <div className="tag-filter-search-wrap">
+                    <input
+                      className="tag-filter-search"
+                      placeholder="Поиск тегов..."
+                      value={tagSearch}
+                      onChange={e => setTagSearch(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                )}
                 <div
-                  className={`tag-filter-item${filterTag === 'all' ? ' tag-filter-item--active' : ''}`}
-                  onClick={() => { setFilterTag('all'); setShowTagDropdown(false); }}
+                  className={`tag-filter-item${filterTags.length === 0 ? ' tag-filter-item--active' : ''}`}
+                  onClick={() => { setFilterTags([]); setShowTagDropdown(false); }}
                 >
                   Все теги
                 </div>
-                {allTags.map(tag => (
+                {allTags
+                  .filter(tag => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                  .map(tag => (
                   <div
                     key={tag}
-                    className={`tag-filter-item${filterTag === tag ? ' tag-filter-item--active' : ''}`}
-                    onClick={() => { setFilterTag(tag); setShowTagDropdown(false); }}
+                    className={`tag-filter-item${filterTags.includes(tag) ? ' tag-filter-item--active' : ''}`}
+                    onClick={() => {
+                      setFilterTags(prev =>
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                      );
+                    }}
                   >
+                    <span className="tag-filter-item-check">{filterTags.includes(tag) ? '✓' : ''}</span>
                     <span className="tag-filter-item-text">{tag}</span>
                     <div className="tag-filter-actions">
                       <button className="tag-action-btn" onClick={(e) => openRenameModal(tag, e)} title="Переименовать">
@@ -394,7 +413,7 @@ export default function Users() {
                     {(user.tags || []).map(tag => (
                       <span
                         key={tag}
-                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}`}
+                        className={`tag-badge${filterTags.includes(tag) ? ' tag-active' : ''}`}
                         onClick={() => handleTagClick(tag)}
                       >
                         {tag}

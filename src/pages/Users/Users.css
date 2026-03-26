@@ -156,6 +156,34 @@
   font-weight: 600;
 }
 
+.tag-filter-search-wrap {
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
+}
+
+.tag-filter-search {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-white);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.tag-filter-search:focus {
+  border-color: var(--color-orange);
+}
+
+.tag-filter-item-check {
+  width: 18px;
+  font-size: 0.8rem;
+  color: var(--color-orange);
+  flex-shrink: 0;
+}
+
 .tag-filter-item-text {
   flex: 1;
   overflow: hidden;
