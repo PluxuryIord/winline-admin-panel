@@ -121,17 +121,23 @@ export async function tgSendPoll(chatId, question, options, opts = {}) {
     chat_id: chatId,
     question,
     options: options.map(text => ({ text })),
-    is_anonymous: opts.is_anonymous !== false,
+    is_anonymous: opts.is_anonymous === true,  // default: NOT anonymous (видны результаты)
   };
   if (opts.type) body.type = opts.type;
   if (opts.type === 'quiz' && opts.correct_option_id != null) {
     body.correct_option_id = opts.correct_option_id;
   }
 
+  console.log('[tgSendPoll] Sending:', JSON.stringify(body, null, 2));
+
   const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPoll`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return r.json();
+  const result = await r.json();
+  if (!result.ok) {
+    console.error('[tgSendPoll] Error:', JSON.stringify(result));
+  }
+  return result;
 }
