@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
-  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye
+  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye,
+  Save, Clock, Calendar, Play, Edit3, FileBox
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -42,6 +43,7 @@ const SECTIONS = [
   { id: 'channels', label: 'Каналы', icon: Hash },
   { id: 'users', label: 'Пользователи', icon: Users },
   { id: 'groups', label: 'Группы', icon: MessageCircle },
+  { id: 'drafts', label: 'Черновики', icon: FileBox },
 ];
 
 const COMPOSE_MODES = [
@@ -142,10 +144,12 @@ function MediaAttach({ media, onChange }) {
 }
 
 /* ═══ Блок составления сообщения (текст / опрос / викторина) ═══ */
-function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend }) {
+function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, onSaveDraft, savingDraft, targetType, getTargetFilter, initialDraft }) {
   const [mode, setMode] = useState('text');
   const [text, setText] = useState('');
   const [media, setMedia] = useState(null);
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
 
   // Poll state
   const [question, setQuestion] = useState('');
@@ -155,6 +159,28 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
   const [quizQuestion, setQuizQuestion] = useState('');
   const [quizOptions, setQuizOptions] = useState(['', '']);
   const [correctIndex, setCorrectIndex] = useState(0);
+
+  // Load initial draft data when editing
+  useEffect(() => {
+    if (initialDraft) {
+      if (initialDraft.poll) {
+        if (initialDraft.poll.type === 'quiz') {
+          setMode('quiz');
+          setQuizQuestion(initialDraft.poll.question || '');
+          setQuizOptions(initialDraft.poll.options?.length ? initialDraft.poll.options : ['', '']);
+          setCorrectIndex(initialDraft.poll.correctIndex || 0);
+        } else {
+          setMode('poll');
+          setQuestion(initialDraft.poll.question || '');
+          setPollOptions(initialDraft.poll.options?.length ? initialDraft.poll.options : ['', '']);
+        }
+      } else {
+        setMode('text');
+        setText(initialDraft.text || '');
+        setMedia(initialDraft.media || null);
+      }
+    }
+  }, [initialDraft]);
 
   const addPollOption = () => setPollOptions(prev => [...prev, '']);
   const removePollOption = (i) => setPollOptions(prev => prev.filter((_, idx) => idx !== i));
@@ -178,6 +204,22 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
       return !!quizQuestion.trim() && opts.length >= 2 && correctIndex < opts.length;
     }
     return false;
+  };
+
+  const getComposeBody = () => {
+    if (mode === 'text') {
+      const body = {};
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
+      return body;
+    } else if (mode === 'poll') {
+      const opts = pollOptions.filter(o => o.trim());
+      return { poll: { question: question.trim(), options: opts, type: 'regular' } };
+    } else if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      return { poll: { question: quizQuestion.trim(), options: opts, type: 'quiz', correctIndex } };
+    }
+    return null;
   };
 
   const handleSend = () => {
@@ -319,12 +361,73 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
         </div>
       )}
 
+      {/* Schedule toggle */}
+      <div className="bc-schedule-toggle">
+        <button
+          className={`bc-schedule-btn ${!scheduleMode ? 'bc-schedule-btn--active' : ''}`}
+          onClick={() => setScheduleMode(false)}
+        >
+          <Send size={13} /> Отправить сейчас
+        </button>
+        <button
+          className={`bc-schedule-btn ${scheduleMode ? 'bc-schedule-btn--active' : ''}`}
+          onClick={() => setScheduleMode(true)}
+        >
+          <Clock size={13} /> Запланировать
+        </button>
+      </div>
+
+      {scheduleMode && (
+        <div className="bc-schedule-picker">
+          <Calendar size={14} className="bc-schedule-icon" />
+          <input
+            type="datetime-local"
+            className="bc-schedule-input"
+            value={scheduledAt}
+            onChange={e => setScheduledAt(e.target.value)}
+            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+          />
+        </div>
+      )}
+
       <div className="bc-compose-footer">
         <span className="bc-compose-hint">{hintText}</span>
-        <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
-          {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-          {sending ? 'Отправка...' : 'Отправить'}
-        </button>
+        <div className="bc-compose-actions">
+          {onSaveDraft && (
+            <button
+              className="bc-draft-save-btn"
+              disabled={savingDraft || !isValid()}
+              onClick={() => {
+                const body = getComposeBody();
+                if (body) onSaveDraft(body);
+              }}
+            >
+              {savingDraft ? <Loader size={14} className="spin" /> : <Save size={14} />}
+              {savingDraft ? 'Сохранение...' : 'Сохранить черновик'}
+            </button>
+          )}
+          {scheduleMode ? (
+            <button
+              className="broadcasts-create-btn bc-schedule-send-btn"
+              disabled={sending || !(canSend && isValid()) || !scheduledAt}
+              onClick={() => {
+                const body = getComposeBody();
+                if (body && onSaveDraft) {
+                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: scheduledAt }, () => {
+                    setText(''); setMedia(null); setQuestion(''); setPollOptions(['', '']); setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0); setScheduleMode(false); setScheduledAt('');
+                  });
+                }
+              }}
+            >
+              <Clock size={16} /> Запланировать
+            </button>
+          ) : (
+            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
+              {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+              {sending ? 'Отправка...' : 'Отправить'}
+            </button>
+          )}
+        </div>
       </div>
       {sendResult && (
         <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
@@ -434,7 +537,7 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange }) {
   );
 }
 
-function ChannelsTab({ onSendResult }) {
+function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [sending, setSending] = useState(false);
@@ -677,6 +780,10 @@ function ChannelsTab({ onSendResult }) {
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
+        targetType="channels"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'channels', targetFilter: { channelIds: selectedChannels } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
       />
 
       {addModal && (
@@ -692,7 +799,7 @@ function ChannelsTab({ onSendResult }) {
 }
 
 /* ═══ Вкладка «Пользователи» ═══ */
-function UsersTab({ onSendResult }) {
+function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
 
@@ -887,13 +994,17 @@ function UsersTab({ onSendResult }) {
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
+        targetType="users"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters: selectedTags.length > 0 ? { tags: selectedTags } : {} } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
       />
     </>
   );
 }
 
 /* ═══ Вкладка «Группы» ═══ */
-function GroupsTab({ onSendResult }) {
+function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [groups, setGroups] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [sending, setSending] = useState(false);
@@ -1134,6 +1245,10 @@ function GroupsTab({ onSendResult }) {
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
+        targetType="groups"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'groups', targetFilter: { groupIds: selectedGroups } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
       />
 
       {addModal && (
@@ -1142,6 +1257,161 @@ function GroupsTab({ onSendResult }) {
           placeholder="Chat ID группы (например -1001234567890)"
           onConfirm={handleAddGroup}
           onCancel={() => setAddModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Вкладка «Черновики» ═══ */
+function DraftsTab({ onSendResult, onEditDraft }) {
+  const [drafts, setDrafts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sendingId, setSendingId] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [confirmSend, setConfirmSend] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await api.get('/api/broadcasts/drafts');
+      setDrafts(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadDrafts(); }, [loadDrafts]);
+
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    try {
+      await api.delete(`/api/broadcasts/drafts/${deleteModal}`);
+      setDrafts(prev => prev.filter(d => d.id !== deleteModal));
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setDeleteModal(null);
+  };
+
+  const handleSend = async (draft) => {
+    setSendingId(draft.id);
+    try {
+      const res = await api.post(`/api/broadcasts/drafts/${draft.id}/send`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Ошибка отправки');
+      } else {
+        onSendResult?.(data);
+        setDrafts(prev => prev.filter(d => d.id !== draft.id));
+      }
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setSendingId(null);
+    setConfirmSend(null);
+  };
+
+  const handleCancelSchedule = async (scheduleId, draftId) => {
+    setCancellingId(scheduleId);
+    try {
+      await api.delete(`/api/broadcasts/scheduled/${scheduleId}`);
+      setDrafts(prev => prev.map(d => d.id === draftId ? { ...d, scheduledAt: null, scheduleId: null, scheduleStatus: null } : d));
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setCancellingId(null);
+  };
+
+  const TARGET_LABELS = { channels: 'Каналы', groups: 'Группы', users: 'Пользователи' };
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 32 }}><Loader size={24} className="spin" style={{ color: 'var(--color-orange)' }} /></div>;
+  }
+
+  return (
+    <>
+      {drafts.length === 0 ? (
+        <div className="bc-channels-empty">
+          Черновиков нет. Создайте черновик из вкладки Каналы, Группы или Пользователи.
+        </div>
+      ) : (
+        <div className="bc-drafts-list">
+          {drafts.map(d => (
+            <div key={d.id} className="bc-draft-card">
+              <div className="bc-draft-header">
+                <span className="bc-draft-name">{d.name || 'Без названия'}</span>
+                <span className="bc-draft-target">{TARGET_LABELS[d.targetType] || d.targetType}</span>
+                {d.scheduledAt && d.scheduleStatus === 'pending' && (
+                  <span className="bc-draft-scheduled-badge">
+                    <Clock size={12} />
+                    {new Date(d.scheduledAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}{' '}
+                    {new Date(d.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <div className="bc-draft-preview">
+                {d.poll ? (
+                  <span>[{d.poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] {d.poll.question}</span>
+                ) : (
+                  <span dangerouslySetInnerHTML={{ __html: renderTgHtml((d.text || '').substring(0, 120)) }} />
+                )}
+              </div>
+              <div className="bc-draft-footer">
+                <span className="bc-draft-date">
+                  {new Date(d.updatedAt).toLocaleDateString('ru-RU')}{' '}
+                  {new Date(d.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <div className="bc-draft-actions">
+                  {d.scheduleId && d.scheduleStatus === 'pending' && (
+                    <button
+                      className="bc-draft-action-btn bc-draft-cancel-btn"
+                      onClick={() => handleCancelSchedule(d.scheduleId, d.id)}
+                      disabled={cancellingId === d.scheduleId}
+                      title="Отменить расписание"
+                    >
+                      {cancellingId === d.scheduleId ? <Loader size={13} className="spin" /> : <X size={13} />}
+                      Отменить
+                    </button>
+                  )}
+                  <button
+                    className="bc-draft-action-btn bc-draft-edit-btn"
+                    onClick={() => onEditDraft?.(d)}
+                    title="Редактировать"
+                  >
+                    <Edit3 size={13} /> Редактировать
+                  </button>
+                  <button
+                    className="bc-draft-action-btn bc-draft-send-btn"
+                    onClick={() => setConfirmSend(d)}
+                    disabled={sendingId === d.id}
+                    title="Отправить сейчас"
+                  >
+                    {sendingId === d.id ? <Loader size={13} className="spin" /> : <Play size={13} />}
+                    Отправить
+                  </button>
+                  <button
+                    className="bc-draft-action-btn bc-draft-delete-btn"
+                    onClick={() => setDeleteModal(d.id)}
+                    title="Удалить"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {deleteModal && (
+        <PromptModal
+          title="Удалить черновик?"
+          isConfirm
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteModal(null)}
+        />
+      )}
+
+      {confirmSend && (
+        <PromptModal
+          title={`Отправить «${confirmSend.name}»?`}
+          isConfirm
+          onConfirm={() => handleSend(confirmSend)}
+          onCancel={() => setConfirmSend(null)}
         />
       )}
     </>
@@ -1172,6 +1442,8 @@ export default function Broadcasts() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [deliveryModal, setDeliveryModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1194,6 +1466,54 @@ export default function Broadcasts() {
     await api.delete(`/api/broadcasts/${deleteModal}`);
     setBroadcasts(prev => prev.filter(b => b.id !== deleteModal));
     setDeleteModal(null);
+  };
+
+  const handleSaveDraft = async (body, resetCb) => {
+    setSavingDraft(true);
+    try {
+      const isSchedule = body._schedule;
+      const scheduledAt = body._scheduledAt;
+      const { _schedule, _scheduledAt, ...cleanBody } = body;
+
+      const draftPayload = {
+        name: cleanBody.text ? stripTgHtml(cleanBody.text).substring(0, 60) : (cleanBody.poll?.question?.substring(0, 60) || 'Без названия'),
+        text: cleanBody.text || null,
+        media: cleanBody.media || null,
+        poll: cleanBody.poll || null,
+        targetType: cleanBody.targetType || 'channels',
+        targetFilter: cleanBody.targetFilter || null,
+      };
+
+      let draftId;
+      if (editingDraft) {
+        await api.put(`/api/broadcasts/drafts/${editingDraft.id}`, draftPayload);
+        draftId = editingDraft.id;
+        setEditingDraft(null);
+      } else {
+        const res = await api.post('/api/broadcasts/drafts', draftPayload);
+        const data = await res.json();
+        draftId = data.id;
+      }
+
+      if (isSchedule && scheduledAt && draftId) {
+        await api.post(`/api/broadcasts/drafts/${draftId}/schedule`, { scheduledAt: new Date(scheduledAt).toISOString() });
+      }
+
+      if (resetCb) resetCb();
+      // Briefly show success
+      alert(isSchedule ? 'Рассылка запланирована!' : 'Черновик сохранён!');
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    }
+    setSavingDraft(false);
+  };
+
+  const handleEditDraft = (draft) => {
+    setEditingDraft(draft);
+    // Switch to the appropriate tab
+    const targetSection = draft.targetType || 'channels';
+    setOpenSection(targetSection);
+    setMounted(prev => ({ ...prev, [targetSection]: true }));
   };
 
   const filtered = broadcasts.filter(b =>
@@ -1238,9 +1558,10 @@ export default function Broadcasts() {
                 <div className="bc-accordion-body-inner">
                   {mounted[s.id] && (
                     <>
-                      {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} />}
-                      {s.id === 'users' && <UsersTab onSendResult={handleSendResult} />}
-                      {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} />}
+                      {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'channels' ? editingDraft : null} />}
+                      {s.id === 'users' && <UsersTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'users' ? editingDraft : null} />}
+                      {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'groups' ? editingDraft : null} />}
+                      {s.id === 'drafts' && <DraftsTab onSendResult={handleSendResult} onEditDraft={handleEditDraft} />}
                     </>
                   )}
                 </div>

@@ -608,6 +608,346 @@ router.get('/channel-tags', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ===================== ЧЕРНОВИКИ И ЗАПЛАНИРОВАННЫЕ =====================
+
+// Ensure drafts & scheduled tables exist
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_broadcast_drafts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) DEFAULT 'Без названия',
+      text TEXT,
+      media_json TEXT,
+      poll_json TEXT,
+      target_type ENUM('channels','groups','users') DEFAULT 'channels',
+      target_filter JSON,
+      scheduled_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_scheduled_broadcasts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      draft_id INT,
+      scheduled_at DATETIME NOT NULL,
+      status ENUM('pending','sent','cancelled') DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_status_scheduled (status, scheduled_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[drafts] Failed to create tables:', err.message);
+  }
+})();
+
+// GET /api/broadcasts/drafts — список черновиков
+router.get('/drafts', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      `SELECT d.*, s.id AS schedule_id, s.scheduled_at AS schedule_time, s.status AS schedule_status
+       FROM wl_admin_broadcast_drafts d
+       LEFT JOIN wl_admin_scheduled_broadcasts s ON s.draft_id = d.id AND s.status = 'pending'
+       ORDER BY d.updated_at DESC`
+    );
+    res.json(rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      text: r.text,
+      media: safeJsonParse(r.media_json, null),
+      poll: safeJsonParse(r.poll_json, null),
+      targetType: r.target_type,
+      targetFilter: safeJsonParse(r.target_filter, null),
+      scheduledAt: r.schedule_time || r.scheduled_at || null,
+      scheduleId: r.schedule_id || null,
+      scheduleStatus: r.schedule_status || null,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    })));
+  } catch (err) { next(err); }
+});
+
+// POST /api/broadcasts/drafts — создать черновик
+router.post('/drafts', async (req, res, next) => {
+  try {
+    const { name, text, media, poll, targetType, targetFilter } = req.body;
+    const [result] = await dbPool.query(
+      `INSERT INTO wl_admin_broadcast_drafts (name, text, media_json, poll_json, target_type, target_filter)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        name || 'Без названия',
+        text || null,
+        media ? JSON.stringify(media) : null,
+        poll ? JSON.stringify(poll) : null,
+        targetType || 'channels',
+        targetFilter ? JSON.stringify(targetFilter) : null,
+      ]
+    );
+    res.status(201).json({ id: result.insertId, name: name || 'Без названия' });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/broadcasts/drafts/:id — обновить черновик
+router.put('/drafts/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, text, media, poll, targetType, targetFilter } = req.body;
+    const [result] = await dbPool.query(
+      `UPDATE wl_admin_broadcast_drafts SET name = ?, text = ?, media_json = ?, poll_json = ?, target_type = ?, target_filter = ?
+       WHERE id = ?`,
+      [
+        name || 'Без названия',
+        text || null,
+        media ? JSON.stringify(media) : null,
+        poll ? JSON.stringify(poll) : null,
+        targetType || 'channels',
+        targetFilter ? JSON.stringify(targetFilter) : null,
+        id,
+      ]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/broadcasts/drafts/:id — удалить черновик
+router.delete('/drafts/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    // Also cancel any pending schedules
+    await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'cancelled' WHERE draft_id = ? AND status = 'pending'`, [id]);
+    const [result] = await dbPool.query('DELETE FROM wl_admin_broadcast_drafts WHERE id = ?', [id]);
+    if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/broadcasts/drafts/:id/send — отправить черновик
+router.post('/drafts/:id/send', async (req, res, next) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: 'BOT_TOKEN не настроен' });
+  try {
+    const id = Number(req.params.id);
+    const [rows] = await dbPool.query('SELECT * FROM wl_admin_broadcast_drafts WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Черновик не найден' });
+    const draft = rows[0];
+    const text = draft.text || '';
+    const media = safeJsonParse(draft.media_json, null);
+    const poll = safeJsonParse(draft.poll_json, null);
+    const targetFilter = safeJsonParse(draft.target_filter, null);
+
+    let record;
+    if (draft.target_type === 'channels') {
+      const channelIds = targetFilter?.channelIds || [];
+      if (!channelIds.length) return res.status(400).json({ error: 'Нет каналов для отправки' });
+      const results = [];
+      for (const chatId of channelIds) {
+        try { const d = await sendToChat(chatId, text.trim() || '', media, poll); results.push({ chatId, ok: d.ok, error: d.description || null }); }
+        catch (e) { results.push({ chatId, ok: false, error: e.message }); }
+      }
+      const success = results.filter(r => r.ok).length;
+      const [channels] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
+      const channelNames = channelIds.map(cid => { const ch = channels.find(c => String(c.chat_id) === String(cid)); return ch?.title || cid; });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media });
+    } else if (draft.target_type === 'groups') {
+      const groupIds = targetFilter?.groupIds || [];
+      if (!groupIds.length) return res.status(400).json({ error: 'Нет групп для отправки' });
+      const results = [];
+      for (const chatId of groupIds) {
+        try { const d = await sendToChat(chatId, text.trim() || '', media, poll); results.push({ chatId, ok: d.ok, error: d.description || null }); }
+        catch (e) { results.push({ chatId, ok: false, error: e.message }); }
+      }
+      const success = results.filter(r => r.ok).length;
+      const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
+      const groupNames = groupIds.map(gid => { const g = groups.find(gr => String(gr.chat_id) === String(gid)); return g?.title || gid; });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
+    } else if (draft.target_type === 'users') {
+      const filters = targetFilter?.filters || {};
+      let where = ['u.user_id IS NOT NULL'];
+      const params = [];
+      let joins = '';
+      const tagsArr = Array.isArray(filters.tags) ? filters.tags : [];
+      if (tagsArr.length > 0) {
+        tagsArr.forEach((tag, i) => {
+          const alias = `t${i}`;
+          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
+          params.push(tag);
+        });
+      }
+      const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
+      const results = [];
+      for (const row of users) {
+        try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll); results.push({ chatId: row.user_id, ok: d.ok, error: d.description || null }); }
+        catch (e) { results.push({ chatId: row.user_id, ok: false, error: e.message }); }
+      }
+      const success = results.filter(r => r.ok).length;
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media });
+    } else {
+      return res.status(400).json({ error: 'Неизвестный тип цели' });
+    }
+
+    // Delete draft after successful send
+    await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'sent' WHERE draft_id = ? AND status = 'pending'`, [id]);
+    await dbPool.query('DELETE FROM wl_admin_broadcast_drafts WHERE id = ?', [id]);
+
+    res.json(record);
+  } catch (err) { next(err); }
+});
+
+// POST /api/broadcasts/drafts/:id/schedule — запланировать отправку
+router.post('/drafts/:id/schedule', async (req, res, next) => {
+  try {
+    const draftId = Number(req.params.id);
+    const { scheduledAt } = req.body;
+    if (!scheduledAt) return res.status(400).json({ error: 'scheduledAt is required' });
+
+    const schedDate = new Date(scheduledAt);
+    if (isNaN(schedDate.getTime()) || schedDate <= new Date()) {
+      return res.status(400).json({ error: 'Дата должна быть в будущем' });
+    }
+
+    // Check draft exists
+    const [drafts] = await dbPool.query('SELECT id FROM wl_admin_broadcast_drafts WHERE id = ?', [draftId]);
+    if (!drafts.length) return res.status(404).json({ error: 'Черновик не найден' });
+
+    // Cancel any existing pending schedules for this draft
+    await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'cancelled' WHERE draft_id = ? AND status = 'pending'`, [draftId]);
+
+    // Update draft scheduled_at
+    await dbPool.query('UPDATE wl_admin_broadcast_drafts SET scheduled_at = ? WHERE id = ?', [schedDate, draftId]);
+
+    // Create scheduled entry
+    const [result] = await dbPool.query(
+      'INSERT INTO wl_admin_scheduled_broadcasts (draft_id, scheduled_at) VALUES (?, ?)',
+      [draftId, schedDate]
+    );
+
+    res.status(201).json({ id: result.insertId, draftId, scheduledAt: schedDate.toISOString() });
+  } catch (err) { next(err); }
+});
+
+// GET /api/broadcasts/scheduled — список запланированных
+router.get('/scheduled', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      `SELECT s.*, d.name, d.text, d.target_type
+       FROM wl_admin_scheduled_broadcasts s
+       JOIN wl_admin_broadcast_drafts d ON d.id = s.draft_id
+       WHERE s.status = 'pending'
+       ORDER BY s.scheduled_at ASC`
+    );
+    res.json(rows.map(r => ({
+      id: r.id,
+      draftId: r.draft_id,
+      name: r.name,
+      text: r.text,
+      targetType: r.target_type,
+      scheduledAt: r.scheduled_at,
+      status: r.status,
+    })));
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/broadcasts/scheduled/:id — отменить запланированную
+router.delete('/scheduled/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [result] = await dbPool.query(
+      `UPDATE wl_admin_scheduled_broadcasts SET status = 'cancelled' WHERE id = ? AND status = 'pending'`,
+      [id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Not found or already sent' });
+    // Clear scheduled_at from draft
+    const [sched] = await dbPool.query('SELECT draft_id FROM wl_admin_scheduled_broadcasts WHERE id = ?', [id]);
+    if (sched.length) {
+      await dbPool.query('UPDATE wl_admin_broadcast_drafts SET scheduled_at = NULL WHERE id = ?', [sched[0].draft_id]);
+    }
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// ===================== ПЛАНИРОВЩИК =====================
+
+// Check for pending scheduled broadcasts every 30 seconds
+setInterval(async () => {
+  try {
+    const [pending] = await dbPool.query(
+      `SELECT s.id, s.draft_id FROM wl_admin_scheduled_broadcasts s
+       WHERE s.status = 'pending' AND s.scheduled_at <= NOW()`
+    );
+    for (const sched of pending) {
+      try {
+        console.log(`[scheduler] Sending scheduled broadcast #${sched.id} (draft #${sched.draft_id})`);
+        const [drafts] = await dbPool.query('SELECT * FROM wl_admin_broadcast_drafts WHERE id = ?', [sched.draft_id]);
+        if (!drafts.length) {
+          await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'cancelled' WHERE id = ?`, [sched.id]);
+          continue;
+        }
+        const draft = drafts[0];
+        const text = draft.text || '';
+        const media = safeJsonParse(draft.media_json, null);
+        const poll = safeJsonParse(draft.poll_json, null);
+        const targetFilter = safeJsonParse(draft.target_filter, null);
+
+        if (draft.target_type === 'channels') {
+          const channelIds = targetFilter?.channelIds || [];
+          if (channelIds.length) {
+            const results = [];
+            for (const chatId of channelIds) {
+              try { const d = await sendToChat(chatId, text.trim() || '', media, poll); results.push({ chatId, ok: d.ok }); }
+              catch (e) { results.push({ chatId, ok: false, error: e.message }); }
+            }
+            const success = results.filter(r => r.ok).length;
+            const [channels] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
+            const channelNames = channelIds.map(id => { const ch = channels.find(c => String(c.chat_id) === String(id)); return ch?.title || id; });
+            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media });
+          }
+        } else if (draft.target_type === 'groups') {
+          const groupIds = targetFilter?.groupIds || [];
+          if (groupIds.length) {
+            const results = [];
+            for (const chatId of groupIds) {
+              try { const d = await sendToChat(chatId, text.trim() || '', media, poll); results.push({ chatId, ok: d.ok }); }
+              catch (e) { results.push({ chatId, ok: false, error: e.message }); }
+            }
+            const success = results.filter(r => r.ok).length;
+            const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
+            const groupNames = groupIds.map(id => { const g = groups.find(gr => String(gr.chat_id) === String(id)); return g?.title || id; });
+            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
+          }
+        } else if (draft.target_type === 'users') {
+          const filters = targetFilter?.filters || {};
+          let where = ['u.user_id IS NOT NULL'];
+          const params = [];
+          let joins = '';
+          const tagsArr = Array.isArray(filters.tags) ? filters.tags : [];
+          if (tagsArr.length > 0) {
+            tagsArr.forEach((tag, i) => {
+              const alias = `t${i}`;
+              joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
+              params.push(tag);
+            });
+          }
+          const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
+          const results = [];
+          for (const row of users) {
+            try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll); results.push({ chatId: row.user_id, ok: d.ok }); }
+            catch (e) { results.push({ chatId: row.user_id, ok: false, error: e.message }); }
+          }
+          const success = results.filter(r => r.ok).length;
+          await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media });
+        }
+
+        // Mark as sent and delete draft
+        await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'sent' WHERE id = ?`, [sched.id]);
+        await dbPool.query('DELETE FROM wl_admin_broadcast_drafts WHERE id = ?', [sched.draft_id]);
+        console.log(`[scheduler] Broadcast #${sched.id} sent successfully`);
+      } catch (err) {
+        console.error(`[scheduler] Failed to send broadcast #${sched.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    // Silent fail for scheduler
+  }
+}, 30000);
+
 // ===================== ХЕЛПЕР =====================
 
 async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media }, conn) {
