@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
-  Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye,
+  Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye, ImageIcon,
 } from 'lucide-react';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
+import { api } from '../../utils/api';
 
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
@@ -23,10 +24,13 @@ const LOCKED_CONNECTIONS = new Set([
 
 export default function NodeEditorPanel({
   screenId, editData, allScreens, isCustom,
-  onUpdateMessage, onUpdateButtonLabel, onUpdateButtonAction,
+  onUpdateMessage, onUpdateMessageMedia, onUpdateButtonLabel, onUpdateButtonAction,
   onUpdateButtonTarget, onMoveButton, onReorderButtons, onAddButton, onDeleteButton,
   onDeleteScreen, onClose, onSave, dirty, saving, saved,
 }) {
+
+  const [uploadingMedia, setUploadingMedia] = useState(null);
+  const fileInputRefs = useRef({});
 
   if (!editData) return null;
 
@@ -87,6 +91,31 @@ export default function NodeEditorPanel({
   // ─── Get combined message text for preview ─────────────────────────────────
   const previewText = messageKeys.map(key => editData.messages[key]?.text || '').join('\n\n');
 
+  const handleMediaUpload = async (key, file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setUploadingMedia(key);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const res = await api.post('/api/upload', { data: reader.result });
+          const data = await res.json();
+          if (data.url) {
+            onUpdateMessageMedia(key, { url: data.url, type: 'photo' });
+          }
+        } catch (e) {
+          console.error('Upload failed:', e);
+        } finally {
+          setUploadingMedia(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (e) {
+      console.error('Read failed:', e);
+      setUploadingMedia(null);
+    }
+  };
+
   return (
     <div className="node-editor-panel">
       <div className="node-editor-header">
@@ -137,6 +166,43 @@ export default function NodeEditorPanel({
                   onChange={val => onUpdateMessage(key, val)}
                   placeholder="Текст сообщения..."
                 />
+                <div className="sc-media-section">
+                  {msg.media?.url ? (
+                    <div className="sc-media-preview">
+                      <img src={msg.media.url} alt="media" />
+                      <button
+                        className="sc-media-remove-btn"
+                        onClick={() => onUpdateMessageMedia(key, null)}
+                        title="Удалить фото"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        ref={el => { fileInputRefs.current[key] = el; }}
+                        onChange={e => {
+                          handleMediaUpload(key, e.target.files[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        className="sc-media-upload-btn"
+                        onClick={() => fileInputRefs.current[key]?.click()}
+                        disabled={uploadingMedia === key}
+                      >
+                        {uploadingMedia === key
+                          ? <><Loader size={14} className="sc-spinner" /> Загрузка...</>
+                          : <><ImageIcon size={14} /> Прикрепить фото</>
+                        }
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })}

@@ -287,6 +287,18 @@ export default function BotScenarios() {
     setSaved(false);
   };
 
+  // Update message media (photo)
+  const updateMessageMedia = (key, media) => {
+    setEditData(prev => {
+      const next = { ...prev, messages: { ...prev.messages } };
+      next.messages[key] = { ...next.messages[key], media: media || undefined };
+      if (!media) delete next.messages[key].media;
+      return next;
+    });
+    setDirty(true);
+    setSaved(false);
+  };
+
   // Edit button label
   const updateButtonLabel = (key, label) => {
     setEditData(prev => {
@@ -664,6 +676,7 @@ export default function BotScenarios() {
           allScreens={scenarios.screens}
           isCustom={!SYSTEM_SCREENS.has(activeScreen)}
           onUpdateMessage={updateMessage}
+          onUpdateMessageMedia={updateMessageMedia}
           onUpdateButtonLabel={updateButtonLabel}
           onUpdateButtonAction={updateButtonAction}
           onUpdateButtonTarget={updateButtonTarget}
