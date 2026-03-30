@@ -411,16 +411,20 @@ router.post('/users', async (req, res, next) => {
 
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
-    let join = '';
+    let joins = '';
     if (filters) {
-      if (filters.tag && filters.tag !== 'all') {
-        join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
-        where.push('t.tag = ?');
-        params.push(filters.tag);
+      // Support both filters.tags (array) and legacy filters.tag (string)
+      const tagsArr = Array.isArray(filters.tags) ? filters.tags : (filters.tag && filters.tag !== 'all' ? [filters.tag] : []);
+      if (tagsArr.length > 0) {
+        tagsArr.forEach((tag, i) => {
+          const alias = `t${i}`;
+          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
+          params.push(tag);
+        });
       }
     }
 
-    const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
+    const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
     if (!rows.length) {
       return res.json({ success: 0, total: 0, failed: 0, results: [], status: 'failed', error: 'Нет пользователей по заданным фильтрам' });
     }
@@ -504,13 +508,20 @@ router.get('/users/count', async (req, res, next) => {
   try {
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
-    let join = '';
-    if (req.query.tag?.trim() && req.query.tag.trim() !== 'all') {
-      join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
-      where.push('t.tag = ?');
-      params.push(req.query.tag.trim());
+    let joins = '';
+    // Support comma-separated tags (AND logic)
+    const tagsParam = req.query.tags?.trim() || req.query.tag?.trim();
+    if (tagsParam && tagsParam !== 'all') {
+      const tagsArr = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      if (tagsArr.length > 0) {
+        tagsArr.forEach((tag, i) => {
+          const alias = `t${i}`;
+          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
+          params.push(tag);
+        });
+      }
     }
-    const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u ${join} WHERE ${where.join(' AND ')}`, params);
+    const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
     res.json({ count });
   } catch (err) { next(err); }
 });
@@ -520,14 +531,20 @@ router.get('/users/list', async (req, res, next) => {
   try {
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
-    let join = '';
-    if (req.query.tag?.trim() && req.query.tag.trim() !== 'all') {
-      join = 'INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id';
-      where.push('t.tag = ?');
-      params.push(req.query.tag.trim());
+    let joins = '';
+    const tagsParam = req.query.tags?.trim() || req.query.tag?.trim();
+    if (tagsParam && tagsParam !== 'all') {
+      const tagsArr = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      if (tagsArr.length > 0) {
+        tagsArr.forEach((tag, i) => {
+          const alias = `t${i}`;
+          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
+          params.push(tag);
+        });
+      }
     }
     const [rows] = await dbPool.query(
-      `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u ${join} WHERE ${where.join(' AND ')} LIMIT 100`,
+      `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u${joins} WHERE ${where.join(' AND ')} LIMIT 100`,
       params
     );
     res.json(rows);
@@ -539,6 +556,55 @@ router.get('/users/tags', async (req, res, next) => {
   try {
     const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
     res.json(rows.map(r => r.tag).sort());
+  } catch (err) { next(err); }
+});
+
+// ===================== ТЕГИ КАНАЛОВ/ГРУПП =====================
+
+// Ensure channel tags table exists
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_channel_tags (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      chat_id VARCHAR(100) NOT NULL,
+      tag VARCHAR(255) NOT NULL,
+      UNIQUE KEY uq_chat_tag (chat_id, tag)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[channel-tags] Failed to create table:', err.message);
+  }
+})();
+
+// Get tags for a specific channel/group
+router.get('/channels/:chatId/tags', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT tag FROM wl_admin_channel_tags WHERE chat_id = ? ORDER BY tag',
+      [String(req.params.chatId)]
+    );
+    res.json(rows.map(r => r.tag));
+  } catch (err) { next(err); }
+});
+
+// Save tags for a specific channel/group (replace all)
+router.put('/channels/:chatId/tags', async (req, res, next) => {
+  try {
+    const chatId = String(req.params.chatId);
+    const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(t => t && typeof t === 'string') : [];
+    await dbPool.query('DELETE FROM wl_admin_channel_tags WHERE chat_id = ?', [chatId]);
+    if (tags.length > 0) {
+      const values = tags.map(t => [chatId, t.trim()]);
+      await dbPool.query('INSERT IGNORE INTO wl_admin_channel_tags (chat_id, tag) VALUES ?', [values]);
+    }
+    res.json({ ok: true, tags });
+  } catch (err) { next(err); }
+});
+
+// Get all unique channel tags
+router.get('/channel-tags', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query('SELECT DISTINCT tag FROM wl_admin_channel_tags ORDER BY tag');
+    res.json(rows.map(r => r.tag));
   } catch (err) { next(err); }
 });
 

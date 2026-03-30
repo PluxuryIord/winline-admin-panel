@@ -336,6 +336,104 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend })
 }
 
 /* ═══ Вкладка «Каналы» ═══ */
+function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange }) {
+  const [tags, setTags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDD, setShowDD] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const ddRef = useRef(null);
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/channels/${encodeURIComponent(chatId)}/tags`)
+      .then(r => r.json())
+      .then(data => { setTags(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [chatId]);
+
+  useEffect(() => {
+    const handler = (e) => { if (ddRef.current && !ddRef.current.contains(e.target)) setShowDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const saveTags = async (newTags) => {
+    setTags(newTags);
+    try {
+      await api.put(`/api/broadcasts/channels/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
+      onTagsChange?.();
+    } catch { /* ignore */ }
+  };
+
+  const toggleTag = (tag) => {
+    const newTags = tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag];
+    saveTags(newTags);
+  };
+
+  const removeTag = (tag) => {
+    saveTags(tags.filter(t => t !== tag));
+  };
+
+  const addNewTag = () => {
+    const t = tagSearch.trim();
+    if (t && !tags.includes(t)) {
+      saveTags([...tags, t]);
+    }
+    setTagSearch('');
+  };
+
+  if (loading) return null;
+
+  const filteredSuggestions = allChannelTags
+    .filter(t => !tags.includes(t))
+    .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()));
+
+  return (
+    <div className="bc-ch-tags" ref={ddRef}>
+      {tags.map(t => (
+        <span key={t} className="bc-ch-tag-chip">
+          {t}
+          <button className="bc-chip-remove" onClick={(e) => { e.stopPropagation(); removeTag(t); }}><X size={10} /></button>
+        </span>
+      ))}
+      <button className="bc-ch-tag-add" onClick={(e) => { e.stopPropagation(); setShowDD(!showDD); }} title="Добавить тег">
+        <Plus size={12} />
+      </button>
+      {showDD && (
+        <div className="bc-ch-tag-dropdown">
+          <div className="bc-tag-search-wrap">
+            <Search size={12} className="bc-tag-search-icon" />
+            <input
+              className="bc-tag-search-input"
+              type="text"
+              placeholder="Поиск или новый тег..."
+              value={tagSearch}
+              onChange={e => setTagSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { addNewTag(); } }}
+              autoFocus
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div className="bc-tag-options-list">
+            {filteredSuggestions.map(t => (
+              <div key={t} className="bc-tag-option" onClick={(e) => { e.stopPropagation(); toggleTag(t); }}>
+                {t}
+              </div>
+            ))}
+            {tagSearch.trim() && !allChannelTags.includes(tagSearch.trim()) && !tags.includes(tagSearch.trim()) && (
+              <div className="bc-tag-option bc-tag-option--create" onClick={(e) => { e.stopPropagation(); addNewTag(); }}>
+                <Plus size={12} /> Создать «{tagSearch.trim()}»
+              </div>
+            )}
+            {filteredSuggestions.length === 0 && !tagSearch.trim() && (
+              <div className="bc-tag-option bc-tag-option--empty">Введите название тега</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChannelsTab({ onSendResult }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -345,14 +443,52 @@ function ChannelsTab({ onSendResult }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
-  const loadChannels = useCallback(() => {
-    api.get('/api/broadcasts/channels').then(r => r.json()).then(setChannels).catch(() => {});
+  // Channel tags
+  const [allChannelTags, setAllChannelTags] = useState([]);
+  const [filterChannelTag, setFilterChannelTag] = useState('');
+  const [channelTagsMap, setChannelTagsMap] = useState({});
+  const [showChTagDD, setShowChTagDD] = useState(false);
+  const [chTagSearch, setChTagSearch] = useState('');
+  const chTagRef = useRef(null);
+
+  const loadAllChannelTags = useCallback(() => {
+    api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllChannelTags).catch(() => {});
   }, []);
+
+  const loadChannelTagsMap = useCallback(async (chList) => {
+    const map = {};
+    await Promise.all(chList.map(async (ch) => {
+      try {
+        const res = await api.get(`/api/broadcasts/channels/${encodeURIComponent(ch.chatId)}/tags`);
+        map[ch.chatId] = await res.json();
+      } catch { map[ch.chatId] = []; }
+    }));
+    setChannelTagsMap(map);
+  }, []);
+
+  const loadChannels = useCallback(() => {
+    api.get('/api/broadcasts/channels').then(r => r.json()).then(data => {
+      setChannels(data);
+      loadChannelTagsMap(data);
+    }).catch(() => {});
+  }, [loadChannelTagsMap]);
+
   const loadArchive = useCallback(() => {
     api.get('/api/broadcasts/channels/archive').then(r => r.json()).then(setArchived).catch(() => {});
   }, []);
 
-  useEffect(() => { loadChannels(); }, [loadChannels]);
+  useEffect(() => { loadChannels(); loadAllChannelTags(); }, [loadChannels, loadAllChannelTags]);
+
+  useEffect(() => {
+    const handler = (e) => { if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleTagsChange = () => {
+    loadAllChannelTags();
+    loadChannels();
+  };
 
   const handleArchive = async (id) => {
     try {
@@ -388,6 +524,10 @@ function ChannelsTab({ onSendResult }) {
     setChannels(prev => prev.filter(c => c.id !== id));
   };
 
+  const filteredChannels = filterChannelTag
+    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).includes(filterChannelTag))
+    : channels;
+
   const toggleChannel = (chatId) => {
     setSelectedChannels(prev =>
       prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
@@ -396,7 +536,7 @@ function ChannelsTab({ onSendResult }) {
 
   const selectAll = () => {
     setSelectedChannels(prev =>
-      prev.length === channels.length ? [] : channels.map(c => c.chatId)
+      prev.length === filteredChannels.length ? [] : filteredChannels.map(c => c.chatId)
     );
   };
 
@@ -428,6 +568,44 @@ function ChannelsTab({ onSendResult }) {
         <div className="bc-section-header">
           <h3 className="bc-section-title">Каналы</h3>
           <div className="bc-header-actions">
+            {allChannelTags.length > 0 && (
+              <div className="bc-tag-filter" ref={chTagRef}>
+                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
+                  <Filter size={13} />
+                  <span>{filterChannelTag || 'Все теги'}</span>
+                  <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
+                </button>
+                {showChTagDD && (
+                  <div className="bc-tag-dropdown">
+                    {allChannelTags.length > 5 && (
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={chTagSearch}
+                          onChange={e => setChTagSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                    <div className="bc-tag-options-list">
+                      <div className={`bc-tag-option ${!filterChannelTag ? 'active' : ''}`} onClick={() => { setFilterChannelTag(''); setShowChTagDD(false); setChTagSearch(''); }}>
+                        Все теги
+                      </div>
+                      {allChannelTags
+                        .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
+                        .map(t => (
+                          <div key={t} className={`bc-tag-option ${filterChannelTag === t ? 'active' : ''}`} onClick={() => { setFilterChannelTag(t); setShowChTagDD(false); setChTagSearch(''); }}>
+                            {t}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
@@ -446,17 +624,18 @@ function ChannelsTab({ onSendResult }) {
         ) : (
           <div className="bc-list-view">
             <label className="bc-list-item bc-list-item--all">
-              <input type="checkbox" checked={selectedChannels.length === channels.length && channels.length > 0} onChange={selectAll} />
-              <span>Все каналы ({channels.length})</span>
+              <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
+              <span>{filterChannelTag ? `Каналы с тегом «${filterChannelTag}» (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
-            {channels.map(ch => (
-              <div key={ch.id} className="bc-list-item">
+            {filteredChannels.map(ch => (
+              <div key={ch.id} className="bc-list-item bc-list-item--with-tags">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{ch.title}</span>
                   <span className="bc-list-id">{ch.chatId}</span>
                 </label>
+                <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
                 <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
                   <Archive size={14} />
                 </button>
@@ -519,7 +698,7 @@ function UsersTab({ onSendResult }) {
 
   // Фильтры
   const [tags, setTags] = useState([]);
-  const [filterTag, setFilterTag] = useState('all');
+  const [selectedTags, setSelectedTags] = useState([]);
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
@@ -532,21 +711,29 @@ function UsersTab({ onSendResult }) {
   useEffect(() => {
     setCountLoading(true);
     const params = new URLSearchParams();
-    if (filterTag !== 'all') params.set('tag', filterTag);
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
 
     api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [filterTag]);
+  }, [selectedTags]);
+
+  const toggleTag = (tag) => {
+    setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const removeTag = (tag) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag));
+  };
 
   const handleSend = async (composeBody, resetCompose) => {
     setSending(true);
     setSendResult(null);
     try {
       const filters = {};
-      if (filterTag !== 'all') filters.tag = filterTag;
+      if (selectedTags.length > 0) filters.tags = selectedTags;
 
       const body = { filters, ...composeBody };
 
@@ -580,7 +767,7 @@ function UsersTab({ onSendResult }) {
     setRecipientsLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterTag !== 'all') params.set('tag', filterTag);
+      if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
       const res = await api.get(`/api/broadcasts/users/list?${params}`);
       const data = await res.json();
       setRecipientsList(data);
@@ -604,7 +791,7 @@ function UsersTab({ onSendResult }) {
         <div className="bc-tag-filter" ref={tagRef}>
           <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
             <Tag size={14} />
-            <span>{filterTag === 'all' ? 'Все теги' : filterTag}</span>
+            <span>{selectedTags.length === 0 ? 'Все теги' : `Тегов: ${selectedTags.length}`}</span>
             <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
           </button>
           {showTagDD && (
@@ -625,16 +812,17 @@ function UsersTab({ onSendResult }) {
               )}
               <div className="bc-tag-options-list">
                 {(!tagSearch.trim()) && (
-                  <div className={`bc-tag-option ${filterTag === 'all' ? 'active' : ''}`} onClick={() => { setFilterTag('all'); setShowTagDD(false); setTagSearch(''); }}>
+                  <div className={`bc-tag-option ${selectedTags.length === 0 ? 'active' : ''}`} onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
                     Все теги
                   </div>
                 )}
                 {tags
                   .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
                   .map(t => (
-                    <div key={t} className={`bc-tag-option ${filterTag === t ? 'active' : ''}`} onClick={() => { setFilterTag(t); setShowTagDD(false); setTagSearch(''); }}>
-                      {t}
-                    </div>
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleTag(t); }}>
+                      <input type="checkbox" checked={selectedTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                      <span>{t}</span>
+                    </label>
                   ))}
                 {tagSearch.trim() && tags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).length === 0 && (
                   <div className="bc-tag-option bc-tag-option--empty">Ничего не найдено</div>
@@ -643,6 +831,18 @@ function UsersTab({ onSendResult }) {
             </div>
           )}
         </div>
+
+        {selectedTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {selectedTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => removeTag(t)}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setSelectedTags([])}>Сбросить</button>
+          </div>
+        )}
 
         <div className="bc-user-count">
           <Users size={15} />
@@ -702,14 +902,52 @@ function GroupsTab({ onSendResult }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
-  const loadGroups = useCallback(() => {
-    api.get('/api/broadcasts/groups').then(r => r.json()).then(setGroups).catch(() => {});
+  // Group tags (reuses same channel_tags table)
+  const [allGroupTags, setAllGroupTags] = useState([]);
+  const [filterGroupTag, setFilterGroupTag] = useState('');
+  const [groupTagsMap, setGroupTagsMap] = useState({});
+  const [showGrTagDD, setShowGrTagDD] = useState(false);
+  const [grTagSearch, setGrTagSearch] = useState('');
+  const grTagRef = useRef(null);
+
+  const loadAllGroupTags = useCallback(() => {
+    api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
   }, []);
+
+  const loadGroupTagsMap = useCallback(async (grList) => {
+    const map = {};
+    await Promise.all(grList.map(async (g) => {
+      try {
+        const res = await api.get(`/api/broadcasts/channels/${encodeURIComponent(g.chatId)}/tags`);
+        map[g.chatId] = await res.json();
+      } catch { map[g.chatId] = []; }
+    }));
+    setGroupTagsMap(map);
+  }, []);
+
+  const loadGroups = useCallback(() => {
+    api.get('/api/broadcasts/groups').then(r => r.json()).then(data => {
+      setGroups(data);
+      loadGroupTagsMap(data);
+    }).catch(() => {});
+  }, [loadGroupTagsMap]);
+
   const loadArchive = useCallback(() => {
     api.get('/api/broadcasts/groups/archive').then(r => r.json()).then(setArchived).catch(() => {});
   }, []);
 
-  useEffect(() => { loadGroups(); }, [loadGroups]);
+  useEffect(() => { loadGroups(); loadAllGroupTags(); }, [loadGroups, loadAllGroupTags]);
+
+  useEffect(() => {
+    const handler = (e) => { if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleTagsChange = () => {
+    loadAllGroupTags();
+    loadGroups();
+  };
 
   const handleArchive = async (id) => {
     try {
@@ -745,6 +983,10 @@ function GroupsTab({ onSendResult }) {
     setGroups(prev => prev.filter(g => g.id !== id));
   };
 
+  const filteredGroups = filterGroupTag
+    ? groups.filter(g => (groupTagsMap[g.chatId] || []).includes(filterGroupTag))
+    : groups;
+
   const toggleGroup = (chatId) => {
     setSelectedGroups(prev =>
       prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
@@ -753,7 +995,7 @@ function GroupsTab({ onSendResult }) {
 
   const selectAll = () => {
     setSelectedGroups(prev =>
-      prev.length === groups.length ? [] : groups.map(g => g.chatId)
+      prev.length === filteredGroups.length ? [] : filteredGroups.map(g => g.chatId)
     );
   };
 
@@ -785,6 +1027,44 @@ function GroupsTab({ onSendResult }) {
         <div className="bc-section-header">
           <h3 className="bc-section-title">Группы / чаты</h3>
           <div className="bc-header-actions">
+            {allGroupTags.length > 0 && (
+              <div className="bc-tag-filter" ref={grTagRef}>
+                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
+                  <Filter size={13} />
+                  <span>{filterGroupTag || 'Все теги'}</span>
+                  <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
+                </button>
+                {showGrTagDD && (
+                  <div className="bc-tag-dropdown">
+                    {allGroupTags.length > 5 && (
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={grTagSearch}
+                          onChange={e => setGrTagSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                    <div className="bc-tag-options-list">
+                      <div className={`bc-tag-option ${!filterGroupTag ? 'active' : ''}`} onClick={() => { setFilterGroupTag(''); setShowGrTagDD(false); setGrTagSearch(''); }}>
+                        Все теги
+                      </div>
+                      {allGroupTags
+                        .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
+                        .map(t => (
+                          <div key={t} className={`bc-tag-option ${filterGroupTag === t ? 'active' : ''}`} onClick={() => { setFilterGroupTag(t); setShowGrTagDD(false); setGrTagSearch(''); }}>
+                            {t}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
@@ -802,17 +1082,18 @@ function GroupsTab({ onSendResult }) {
         ) : (
           <div className="bc-list-view">
             <label className="bc-list-item bc-list-item--all">
-              <input type="checkbox" checked={selectedGroups.length === groups.length && groups.length > 0} onChange={selectAll} />
-              <span>Все группы ({groups.length})</span>
+              <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
+              <span>{filterGroupTag ? `Группы с тегом «${filterGroupTag}» (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
-            {groups.map(g => (
-              <div key={g.id} className="bc-list-item">
+            {filteredGroups.map(g => (
+              <div key={g.id} className="bc-list-item bc-list-item--with-tags">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{g.title}</span>
                   <span className="bc-list-id">{g.chatId}</span>
                 </label>
+                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} />
                 <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
                   <Archive size={14} />
                 </button>

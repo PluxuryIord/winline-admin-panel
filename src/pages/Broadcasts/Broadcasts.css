@@ -1378,3 +1378,183 @@ input[type="checkbox"]:checked {
   border-radius: 3px;
   font-size: 0.85em;
 }
+
+/* ===== MULTI-TAG CHIPS (Users) ===== */
+
+.bc-selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.bc-selected-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 10px;
+  border-radius: 14px;
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.bc-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.bc-chip-remove:hover {
+  background: rgba(255, 80, 80, 0.3);
+  color: #ff6b6b;
+}
+
+.bc-clear-tags-btn {
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.bc-clear-tags-btn:hover {
+  color: var(--color-orange);
+}
+
+/* Tag option with checkbox */
+.bc-tag-option--checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.bc-tag-checkbox {
+  accent-color: var(--color-orange);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ===== CHANNEL/GROUP TAGS ===== */
+
+.bc-list-item--with-tags {
+  flex-wrap: wrap;
+}
+
+.bc-ch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0 2px 28px;
+  position: relative;
+}
+
+.bc-ch-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 126, 0, 0.12);
+  color: var(--color-orange);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.bc-ch-tag-chip .bc-chip-remove {
+  width: 14px;
+  height: 14px;
+}
+
+.bc-ch-tag-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.bc-ch-tag-add:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+  background: rgba(255, 126, 0, 0.08);
+}
+
+.bc-ch-tag-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 28px;
+  min-width: 180px;
+  max-height: 240px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 110;
+  padding: 4px;
+}
+
+.bc-ch-tag-dropdown .bc-tag-search-wrap {
+  padding: 4px 6px;
+}
+
+.bc-ch-tag-dropdown .bc-tag-options-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bc-ch-tag-dropdown .bc-tag-option {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  border-radius: 6px;
+}
+
+.bc-tag-option--create {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-orange) !important;
+  font-weight: 500;
+}
+
+.bc-tag-option--create:hover {
+  background: rgba(255, 126, 0, 0.1) !important;
+}
+
+/* Small filter button variant for channel/group headers */
+.bc-tag-filter-btn--small {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}
