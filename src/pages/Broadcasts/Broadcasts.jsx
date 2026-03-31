@@ -1444,6 +1444,7 @@ export default function Broadcasts() {
   const [visibleCount, setVisibleCount] = useState(20);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
+  const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1500,10 +1501,12 @@ export default function Broadcasts() {
       }
 
       if (resetCb) resetCb();
-      // Briefly show success
-      alert(isSchedule ? 'Рассылка запланирована!' : 'Черновик сохранён!');
+      const msg = isSchedule ? '⏰ Рассылка запланирована!' : '✅ Черновик сохранён!';
+      setToast({ message: msg, type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
-      alert('Ошибка: ' + e.message);
+      setToast({ message: 'Ошибка: ' + e.message, type: 'error' });
+      setTimeout(() => setToast(null), 4000);
     }
     setSavingDraft(false);
   };
@@ -1541,6 +1544,13 @@ export default function Broadcasts() {
 
   return (
     <div className="broadcasts-container">
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`bc-toast bc-toast--${toast.type}`} onClick={() => setToast(null)}>
+          {toast.message}
+        </div>
+      )}
 
       {/* Аккордеон секций */}
       {SECTIONS.map(s => {

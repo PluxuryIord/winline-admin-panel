@@ -1836,3 +1836,31 @@ input[type="checkbox"]:checked {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ─── Toast ─── */
+.bc-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  z-index: 9999;
+  cursor: pointer;
+  animation: bc-toast-in 0.3s ease;
+}
+.bc-toast--success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.bc-toast--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+@keyframes bc-toast-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
