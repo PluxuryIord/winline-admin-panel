@@ -10,21 +10,7 @@ process.on('unhandledRejection', (reason) => {
   console.error('[FATAL] unhandledRejection:', reason);
 });
 
-// --- Убиваем зомби-процесс на порту перед стартом (фикс EADDRINUSE) ---
-try {
-  const pids = execSync(`lsof -t -i:${API_PORT} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
-  if (pids) {
-    const pidList = pids.split('\n').filter(p => p && Number(p) !== process.pid);
-    if (pidList.length) {
-      console.log(`[startup] Killing stale processes on port ${API_PORT}: ${pidList.join(', ')}`);
-      pidList.forEach(pid => {
-        try { process.kill(Number(pid), 'SIGKILL'); } catch {}
-      });
-      // Даём ОС освободить порт
-      execSync('sleep 0.5');
-    }
-  }
-} catch {}
+// Port cleanup removed — systemd manages process lifecycle
 
 console.log('[env] NODE_ENV:', process.env.NODE_ENV);
 console.log('[env] node:', process.version);
