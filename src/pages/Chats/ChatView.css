@@ -1042,6 +1042,26 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* ===== ОШИБКА ДОСТАВКИ ===== */
+.msg-error {
+  font-size: 0.75rem;
+  padding: 2px 0;
+  max-width: 55%;
+}
+
+.msg-error--blocked {
+  color: #ff4d4f;
+}
+
+.msg-error--warning {
+  color: #faad14;
+}
+
+.chatview-msg--admin .msg-error {
+  text-align: right;
+  margin-left: auto;
+}
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
   .chatview-container {

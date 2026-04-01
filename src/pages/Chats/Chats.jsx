@@ -138,6 +138,7 @@ export default function Chats() {
               <div className="chat-item-info">
                 <span className="chat-item-name">
                   {chatName}
+                  {chat.banned && <span className="chat-blocked-badge" title="Заблокировал бота" />}
                 </span>
                 {msg && (
                   <span className="chat-item-last">

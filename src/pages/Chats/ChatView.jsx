@@ -236,10 +236,15 @@ export default function ChatView() {
       }
       const res = await api.post(`/api/chats/${id}/messages`, body);
       const newMsg = await res.json();
+      // Preserve tgError on the message object for display
+      const msgWithError = { ...newMsg };
+      if (newMsg.tgError) {
+        msgWithError.tgError = newMsg.tgError;
+      }
       setChat(prev => {
         if (!prev) return prev;
-        if (prev.messages.some(m => m.id === newMsg.id)) return prev;
-        return { ...prev, messages: [...prev.messages, newMsg] };
+        if (prev.messages.some(m => m.id === msgWithError.id)) return prev;
+        return { ...prev, messages: [...prev.messages, msgWithError] };
       });
       setInput('');
       setMediaList([]);
@@ -356,6 +361,13 @@ export default function ChatView() {
                       <span className="chatview-time">{formatTime(item.time)}</span>
                     </span>
                   </div>
+                  {item.tgError && (
+                    <div className={`msg-error ${item.tgError.includes('blocked') || item.tgError.includes('Forbidden') ? 'msg-error--blocked' : 'msg-error--warning'}`}>
+                      {item.tgError.includes('blocked') || item.tgError.includes('Forbidden')
+                        ? 'Пользователь заблокировал бота'
+                        : `Не доставлено: ${item.tgError}`}
+                    </div>
+                  )}
                 </div>
               );
             })}

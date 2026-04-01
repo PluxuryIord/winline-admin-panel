@@ -9,6 +9,15 @@ import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 const router = Router();
 
+async function markBlockedIfNeeded(userId, errorText) {
+  if (errorText && (errorText.includes('blocked by the user') || errorText.includes('Forbidden'))) {
+    try {
+      await dbPool.query('UPDATE users SET banned = 1 WHERE user_id = ?', [userId]);
+      console.log(`[blocked] User ${userId} marked as banned (blocked bot)`);
+    } catch {}
+  }
+}
+
 function verifyBroadcastWebhook(req) {
   if (!WEBHOOK_SECRET) return false;
   const sig = req.headers['x-webhook-signature'];
@@ -447,6 +456,9 @@ router.post('/users', async (req, res, next) => {
       try {
         const data = await sendToChat(row.user_id, text?.trim() || '', media, poll);
         results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: data.ok, error: data.description || null });
+        if (!data.ok) {
+          await markBlockedIfNeeded(row.user_id, data.description || '');
+        }
         if (data.ok) {
           successCount++;
           // Save broadcast message to user's chat
@@ -478,6 +490,7 @@ router.post('/users', async (req, res, next) => {
         }
       } catch (err) {
         results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: false, error: err.message });
+        await markBlockedIfNeeded(row.user_id, err.message);
       }
     }
 

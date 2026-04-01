@@ -22,6 +22,15 @@ function verifyWebhook(req) {
 
 const router = Router();
 
+async function markBlockedIfNeeded(userId, errorText) {
+  if (errorText && (errorText.includes('blocked by the user') || errorText.includes('Forbidden'))) {
+    try {
+      await dbPool.query('UPDATE users SET banned = 1 WHERE user_id = ?', [userId]);
+      console.log(`[blocked] User ${userId} marked as banned (blocked bot)`);
+    } catch {}
+  }
+}
+
 // ===================== MEDIA HELPERS =====================
 const MEDIA_PREFIX = '__media__:';
 
@@ -188,7 +197,8 @@ router.get('/', async (req, res, next) => {
   try {
     const [chats] = await dbPool.query(`
       SELECT c.id, c.user_id AS userId, c.created_at,
-        u.full_name AS fullName, u.username AS telegram
+        u.full_name AS fullName, u.username AS telegram,
+        COALESCE(u.banned, 0) AS banned
       FROM wl_admin_chats c
       LEFT JOIN users u ON u.user_id = c.user_id
       ORDER BY c.created_at DESC
@@ -212,6 +222,7 @@ router.get('/', async (req, res, next) => {
       userId: c.userId,
       fullName: c.fullName || null,
       telegram: c.telegram || null,
+      banned: !!c.banned,
       messages: messagesMap[c.id] || [],
     })));
   } catch (err) { next(err); }
@@ -316,6 +327,10 @@ router.post('/:id/messages', async (req, res, next) => {
       }
     } catch (err) {
       tgError = err.message;
+    }
+
+    if (tgError) {
+      await markBlockedIfNeeded(userId, tgError);
     }
 
     // SSE push
