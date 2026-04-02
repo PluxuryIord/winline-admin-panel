@@ -147,60 +147,6 @@ router.delete('/tags/bulk-delete', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/users/tags/bulk — массовое добавление/удаление тегов
-router.post('/tags/bulk', async (req, res, next) => {
-  try {
-    const { action, tag, userIds, filter } = req.body;
-    // action: 'add' | 'remove'
-    // tag: string — тег
-    // userIds: number[] — конкретные юзеры (если выбраны вручную)
-    // filter: { search, tags, mode } — если применяем ко всем отфильтрованным
-    if (!tag || !action) return res.status(400).json({ error: 'tag and action required' });
-
-    let targetIds = [];
-    if (userIds && userIds.length > 0) {
-      targetIds = userIds.map(Number);
-    } else if (filter) {
-      // Собираем юзеров по фильтру
-      let where = ['u.user_id IS NOT NULL'];
-      let params = [];
-      let joins = '';
-      if (filter.search) {
-        where.push("(u.full_name LIKE ? OR u.username LIKE ? OR u.rl_full_name LIKE ?)");
-        const s = `%${filter.search}%`;
-        params.push(s, s, s);
-      }
-      if (filter.tags && filter.tags.length > 0) {
-        joins += ` INNER JOIN wl_admin_user_tags ft ON ft.user_id = u.user_id AND ft.tag IN (${filter.tags.map(() => '?').join(',')})`;
-        params.push(...filter.tags);
-      }
-      const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
-      targetIds = rows.map(r => r.user_id);
-    } else {
-      // Все пользователи
-      const [rows] = await dbPool.query('SELECT user_id FROM users');
-      targetIds = rows.map(r => r.user_id);
-    }
-
-    if (!targetIds.length) return res.json({ ok: true, affected: 0 });
-
-    let affected = 0;
-    if (action === 'add') {
-      const values = targetIds.map(uid => [uid, tag.trim()]);
-      const [result] = await dbPool.query('INSERT IGNORE INTO wl_admin_user_tags (user_id, tag) VALUES ?', [values]);
-      affected = result.affectedRows;
-    } else if (action === 'remove') {
-      const [result] = await dbPool.query(
-        `DELETE FROM wl_admin_user_tags WHERE tag = ? AND user_id IN (${targetIds.map(() => '?').join(',')})`,
-        [tag.trim(), ...targetIds]
-      );
-      affected = result.affectedRows;
-    }
-
-    res.json({ ok: true, affected, total: targetIds.length });
-  } catch (err) { next(err); }
-});
-
 // GET /api/users/:id
 router.get('/:id', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });

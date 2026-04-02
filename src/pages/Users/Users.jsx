@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2, Tags, Plus, Minus } from 'lucide-react';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './Users.css';
 
@@ -163,58 +163,6 @@ export default function Users() {
     } catch (err) { alert('Ошибка: ' + err.message); }
     setDeleteTagSaving(false);
     setDeleteTagModal(null);
-  };
-
-  // Массовое управление тегами
-  const [selectedUsers, setSelectedUsers] = useState(new Set());
-  const [bulkTagModal, setBulkTagModal] = useState(null); // { action: 'add'|'remove' }
-  const [bulkTag, setBulkTag] = useState('');
-  const [bulkTagSaving, setBulkTagSaving] = useState(false);
-  const [bulkMode, setBulkMode] = useState(false); // режим выбора
-
-  const toggleSelectUser = (id) => {
-    setSelectedUsers(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const selectAllFiltered = () => {
-    const ids = filteredAndSortedUsers.map(u => u.id);
-    setSelectedUsers(new Set(ids));
-  };
-
-  const deselectAll = () => setSelectedUsers(new Set());
-
-  const handleBulkTagSubmit = async () => {
-    if (!bulkTag.trim() || !bulkTagModal) return;
-    setBulkTagSaving(true);
-    try {
-      const body = {
-        action: bulkTagModal.action,
-        tag: bulkTag.trim(),
-      };
-      if (selectedUsers.size > 0) {
-        body.userIds = [...selectedUsers];
-      } else {
-        body.filter = {
-          search: debouncedSearch || undefined,
-          tags: filterTags.length > 0 ? filterTags : undefined,
-        };
-      }
-      const res = await api.post('/api/users/tags/bulk', body);
-      const data = await res.json();
-      if (data.ok) {
-        loadTags();
-        fetchUsers(0, debouncedSearch);
-        setBulkTagModal(null);
-        setBulkTag('');
-        setSelectedUsers(new Set());
-        setBulkMode(false);
-      }
-    } catch (err) { alert('Ошибка: ' + err.message); }
-    setBulkTagSaving(false);
   };
 
   // Фильтрация и сортировка (клиентская, по загруженным)
@@ -434,31 +382,6 @@ export default function Users() {
             {sortConfig.key === 'registrationDate' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
           </button>
 
-          <button
-            className={`btn-control${bulkMode ? ' primary' : ''}`}
-            onClick={() => { setBulkMode(!bulkMode); if (bulkMode) deselectAll(); }}
-          >
-            <Tags size={16} />
-            {bulkMode ? 'Отменить выбор' : 'Массовые теги'}
-          </button>
-
-          {bulkMode && (
-            <>
-              <button className="btn-control" onClick={selectAllFiltered} title="Выбрать всех отфильтрованных">
-                Выбрать всех ({filteredAndSortedUsers.length})
-              </button>
-              {selectedUsers.size > 0 && (
-                <span style={{ color: '#f7931a', fontSize: 13 }}>Выбрано: {selectedUsers.size}</span>
-              )}
-              <button className="btn-control primary" onClick={() => { setBulkTagModal({ action: 'add' }); setBulkTag(''); }} disabled={!bulkMode}>
-                <Plus size={14} /> Добавить тег
-              </button>
-              <button className="btn-control danger" onClick={() => { setBulkTagModal({ action: 'remove' }); setBulkTag(''); }} disabled={!bulkMode}>
-                <Minus size={14} /> Удалить тег
-              </button>
-            </>
-          )}
-
           {hasActiveFilters && (
             <button className="btn-reset-filters" onClick={resetFilters}>
               <X size={14} />
@@ -482,15 +405,6 @@ export default function Users() {
             {filteredAndSortedUsers.map(user => (
               <tr key={user.id} className={user.banned ? 'row-banned' : ''}>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {bulkMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.has(user.id)}
-                      onChange={() => toggleSelectUser(user.id)}
-                      className="user-bulk-checkbox"
-                    />
-                  )}
                   <Link to={`/users/${user.id}`} className="user-cell-link">
                     <div className="user-cell">
                       <div className="user-avatar">
@@ -502,7 +416,6 @@ export default function Users() {
                       </div>
                     </div>
                   </Link>
-                  </div>
                 </td>
 
                 <td>
@@ -575,60 +488,6 @@ export default function Users() {
                 disabled={tagModalSaving || !tagModal.newName.trim() || tagModal.newName.trim() === tagModal.tag}
               >
                 {tagModalSaving ? 'Сохранение...' : 'Переименовать'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модал массовых тегов */}
-      {bulkTagModal && (
-        <div className="tag-modal-overlay" onClick={() => setBulkTagModal(null)}>
-          <div className="tag-modal" onClick={e => e.stopPropagation()}>
-            <button className="tag-modal-close" onClick={() => setBulkTagModal(null)}><X size={18} /></button>
-            <h3>{bulkTagModal.action === 'add' ? 'Добавить тег' : 'Удалить тег'}</h3>
-            <p className="tag-modal-desc">
-              {selectedUsers.size > 0
-                ? `${bulkTagModal.action === 'add' ? 'Добавить' : 'Удалить'} тег у ${selectedUsers.size} выбранных пользователей`
-                : `${bulkTagModal.action === 'add' ? 'Добавить' : 'Удалить'} тег у всех ${filterTags.length > 0 || debouncedSearch ? 'отфильтрованных' : ''} пользователей`
-              }
-            </p>
-            <div className="tag-modal-field">
-              <label>{bulkTagModal.action === 'add' ? 'Новый тег' : 'Тег для удаления'}</label>
-              {bulkTagModal.action === 'remove' ? (
-                <select
-                  value={bulkTag}
-                  onChange={e => setBulkTag(e.target.value)}
-                  className="tag-bulk-select"
-                >
-                  <option value="">Выберите тег...</option>
-                  {allTags.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Введите название тега..."
-                    value={bulkTag}
-                    onChange={e => setBulkTag(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleBulkTagSubmit()}
-                    autoFocus
-                    list="bulk-tag-suggestions"
-                  />
-                  <datalist id="bulk-tag-suggestions">
-                    {allTags.map(t => <option key={t} value={t} />)}
-                  </datalist>
-                </>
-              )}
-            </div>
-            <div className="tag-modal-actions">
-              <button className="tag-modal-cancel" onClick={() => setBulkTagModal(null)}>Отмена</button>
-              <button
-                className={`tag-modal-submit${bulkTagModal.action === 'remove' ? ' tag-modal-danger' : ''}`}
-                onClick={handleBulkTagSubmit}
-                disabled={bulkTagSaving || !bulkTag.trim()}
-              >
-                {bulkTagSaving ? 'Применяю...' : bulkTagModal.action === 'add' ? 'Добавить' : 'Удалить'}
               </button>
             </div>
           </div>
