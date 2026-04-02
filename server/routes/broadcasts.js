@@ -35,6 +35,7 @@ function verifyBroadcastWebhook(req) {
 // ===================== WEBHOOK (без JWT) =====================
 
 export const broadcastWebhookRouter = Router();
+export const pollVoteRouter = Router();
 
 broadcastWebhookRouter.post('/', async (req, res, next) => {
   if (!verifyBroadcastWebhook(req)) {
@@ -1093,8 +1094,8 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
 
 // ===================== ОПРОСЫ: ГОЛОСОВАНИЕ И СТАТИСТИКА =====================
 
-// Webhook handler for poll votes (called by bot)
-router.post('/poll-vote', async (req, res) => {
+// Webhook handler for poll votes (called by bot) — public, no auth
+pollVoteRouter.post('/', async (req, res) => {
   try {
     const { poll_id, user_id, option_index } = req.body;
     if (!poll_id || user_id == null || option_index == null) return res.status(400).json({ error: 'Missing fields' });

@@ -13,7 +13,7 @@ import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import chatsRouter, { webhookRouter } from './routes/chats.js';
 import knowledgeRouter from './routes/knowledge.js';
-import broadcastsRouter, { broadcastWebhookRouter } from './routes/broadcasts.js';
+import broadcastsRouter, { broadcastWebhookRouter, pollVoteRouter } from './routes/broadcasts.js';
 import uploadRouter, { uploadsDir } from './routes/upload.js';
 import statusRouter from './routes/status.js';
 import analyticsRouter from './routes/analytics.js';
@@ -60,6 +60,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/chats/webhook', webhookRouter);
 app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
+app.use('/api/broadcasts/poll-vote', pollVoteRouter);
 
 // Публичный прокси фото KB (img src не может передать Bearer токен)
 import { knowledgePhotoProxy } from './routes/knowledge.js';
