@@ -968,20 +968,22 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         </div>
 
         {showRecipients && (
-          <div className="bc-recipients-popup">
-            <div className="bc-recipients-header">
-              <span>Получатели ({recipientsList.length}{userCount > 100 ? ` из ${userCount}` : ''})</span>
-              <button className="bc-recipients-close" onClick={() => setShowRecipients(false)}><X size={14} /></button>
-            </div>
-            <div className="bc-recipients-list">
-              {recipientsList.map(u => (
-                <div key={u.user_id} className="bc-recipient-row">
-                  <span className="bc-recipient-name">{u.full_name || '—'}</span>
-                  {u.username && <span className="bc-recipient-username">@{u.username}</span>}
-                  <span className="bc-recipient-id">{u.user_id}</span>
-                </div>
-              ))}
-              {recipientsList.length === 0 && <div className="bc-recipients-empty">Нет получателей</div>}
+          <div className="bc-recipients-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowRecipients(false); }}>
+            <div className="bc-recipients-modal">
+              <div className="bc-recipients-header">
+                <span>Получатели ({recipientsList.length}{userCount > 100 ? ` из ${userCount}` : ''})</span>
+                <button className="bc-recipients-close" onClick={() => setShowRecipients(false)}><X size={14} /></button>
+              </div>
+              <div className="bc-recipients-list">
+                {recipientsList.map(u => (
+                  <div key={u.user_id} className="bc-recipient-row">
+                    <span className="bc-recipient-name">{u.full_name || '—'}</span>
+                    {u.username && <span className="bc-recipient-username">@{u.username}</span>}
+                    <span className="bc-recipient-id">{u.user_id}</span>
+                  </div>
+                ))}
+                {recipientsList.length === 0 && <div className="bc-recipients-empty">Нет получателей</div>}
+              </div>
             </div>
           </div>
         )}
