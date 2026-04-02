@@ -648,6 +648,82 @@ input[type="checkbox"]:checked {
   border-color: rgba(255, 126, 0, 0.3);
 }
 
+/* ─── Poll Stats Modal ─── */
+.bc-action-stats {
+  color: rgba(100, 149, 237, 0.7);
+}
+.bc-action-stats:hover {
+  color: #6495ed;
+  background: rgba(100, 149, 237, 0.1);
+}
+
+.bc-poll-stats-modal {
+  max-width: 520px;
+}
+.bc-poll-question {
+  padding: 14px 18px 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+.bc-poll-total {
+  padding: 0 18px 12px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+.bc-poll-options {
+  padding: 0 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bc-poll-option {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bc-poll-option--correct {
+  border-color: rgba(52, 199, 89, 0.3);
+  background: rgba(52, 199, 89, 0.06);
+}
+.bc-poll-option-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.bc-poll-option-text {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bc-poll-correct-icon {
+  color: #34c759;
+}
+.bc-poll-option-count {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+.bc-poll-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bc-poll-bar-fill {
+  height: 100%;
+  background: var(--color-orange);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.bc-poll-option--correct .bc-poll-bar-fill {
+  background: #34c759;
+}
+
 /* ===== ТАБЫ ===== */
 /* ===== АККОРДЕОН ===== */
 .bc-accordion {

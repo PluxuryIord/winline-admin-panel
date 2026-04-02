@@ -1582,6 +1582,8 @@ export default function Broadcasts() {
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
   const [filterType, setFilterType] = useState(''); // channels|users|groups
   const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
+  const [pollStatsModal, setPollStatsModal] = useState(null); // { question, stats, totalVotes, ... }
+  const [pollStatsLoading, setPollStatsLoading] = useState(false);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1592,6 +1594,16 @@ export default function Broadcasts() {
   }, []);
 
   useEffect(() => { fetchBroadcasts(); }, [fetchBroadcasts]);
+
+  const loadPollStats = async (pollId) => {
+    setPollStatsLoading(true);
+    try {
+      const res = await api.get(`/api/broadcasts/poll/${pollId}/stats`);
+      const data = await res.json();
+      setPollStatsModal(data);
+    } catch { setPollStatsModal(null); }
+    setPollStatsLoading(false);
+  };
 
   const handleSendResult = (data) => {
     if (data && !data.error) {
@@ -1793,6 +1805,11 @@ export default function Broadcasts() {
                     {new Date(b.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="bc-actions">
+                    {b.pollId && (
+                      <button className="bc-action-btn bc-action-stats" title="Статистика опроса" onClick={() => loadPollStats(b.pollId)}>
+                        <BarChart2 size={14} />
+                      </button>
+                    )}
                     <button className="bc-action-btn bc-action-delete" title="Удалить из истории" onClick={() => setDeleteModal(b.id)}>
                       <Trash2 size={14} />
                     </button>
@@ -1839,6 +1856,35 @@ export default function Broadcasts() {
               {(!deliveryModal.results || deliveryModal.results.length === 0) && (
                 <div className="bc-delivery-empty">Нет детальных данных</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pollStatsModal && (
+        <div className="bc-delivery-overlay" onClick={() => setPollStatsModal(null)}>
+          <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-delivery-modal-header">
+              <h3>{pollStatsModal.type === 'quiz' ? '🧠 Викторина' : '📊 Опрос'}</h3>
+              <button className="bc-delivery-close" onClick={() => setPollStatsModal(null)}><X size={18} /></button>
+            </div>
+            <div className="bc-poll-question">{pollStatsModal.question}</div>
+            <div className="bc-poll-total">Всего голосов: <b>{pollStatsModal.totalVotes}</b></div>
+            <div className="bc-poll-options">
+              {(pollStatsModal.stats || []).map((s, i) => (
+                <div key={i} className={`bc-poll-option ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''}`}>
+                  <div className="bc-poll-option-header">
+                    <span className="bc-poll-option-text">
+                      {pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i && <Check size={14} className="bc-poll-correct-icon" />}
+                      {s.option}
+                    </span>
+                    <span className="bc-poll-option-count">{s.count} ({s.percent}%)</span>
+                  </div>
+                  <div className="bc-poll-bar">
+                    <div className="bc-poll-bar-fill" style={{ width: `${s.percent}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
