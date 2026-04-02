@@ -719,3 +719,30 @@
     max-width: 160px;
   }
 }
+
+/* Массовые теги */
+.filters-row { align-items: center; }
+.btn-control.danger {
+  background: rgba(255, 60, 60, 0.12);
+  color: #ff4444;
+  border-color: rgba(255, 60, 60, 0.25);
+}
+.btn-control.danger:hover {
+  background: rgba(255, 60, 60, 0.22);
+}
+.user-bulk-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #f7931a;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tag-bulk-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 14px;
+}
