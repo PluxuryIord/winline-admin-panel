@@ -373,12 +373,23 @@ router.post('/groups/send', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const withMedia = await checkMediaColumn();
-    // Check if poll_id column exists
-    let hasPollId = false;
-    try { const [cols2] = await dbPool.query("SHOW COLUMNS FROM wl_admin_broadcasts LIKE 'poll_id'"); hasPollId = cols2.length > 0; } catch {}
     const cols = 'id, text, type, channels_json, channel_ids_json, total, success, failed, results_json, ' +
-      (withMedia ? 'media_json, ' : '') + (hasPollId ? 'poll_id, ' : '') + 'status, created_at AS date';
+      (withMedia ? 'media_json, ' : '') + 'status, created_at AS date';
     const [rows] = await dbPool.query(`SELECT ${cols} FROM wl_admin_broadcasts ORDER BY created_at DESC LIMIT 200`);
+
+    // Get poll ids from wl_admin_polls by broadcast_id
+    const broadcastIds = rows.map(r => r.id);
+    let pollMap = {};
+    if (broadcastIds.length) {
+      try {
+        const [polls] = await dbPool.query(
+          `SELECT id, broadcast_id FROM wl_admin_polls WHERE broadcast_id IN (${broadcastIds.map(() => '?').join(',')})`,
+          broadcastIds
+        );
+        for (const p of polls) { pollMap[p.broadcast_id] = p.id; }
+      } catch {}
+    }
+
     const history = rows.map(r => ({
       id: r.id,
       text: r.text,
@@ -390,7 +401,7 @@ router.get('/', async (req, res, next) => {
       failed: r.failed,
       results: safeJsonParse(r.results_json, []),
       media: withMedia ? safeJsonParse(r.media_json, null) : null,
-      pollId: hasPollId ? r.poll_id : null,
+      pollId: pollMap[r.id] || null,
       date: r.date,
       status: r.status,
     }));
@@ -1064,7 +1075,6 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
   let cols = baseCols;
   let vals = [...baseVals];
   if (withMedia) { cols += ', media_json'; vals.push(media ? JSON.stringify(media) : null); }
-  if (pollId) { cols += ', poll_id'; vals.push(pollId); }
 
   const placeholders = vals.map(() => '?').join(', ');
   const sql = `INSERT INTO wl_admin_broadcasts (${cols}) VALUES (${placeholders})`;
