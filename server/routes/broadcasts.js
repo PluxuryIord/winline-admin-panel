@@ -337,7 +337,7 @@ router.get('/', async (req, res, next) => {
     const cols = 'id, text, type, channels_json, channel_ids_json, total, success, failed, results_json, ' +
       (withMedia ? 'media_json, ' : '') + 'status, created_at AS date';
     const [rows] = await dbPool.query(`SELECT ${cols} FROM wl_admin_broadcasts ORDER BY created_at DESC LIMIT 200`);
-    res.json(rows.map(r => ({
+    const history = rows.map(r => ({
       id: r.id,
       text: r.text,
       type: r.type || 'channels',
@@ -350,7 +350,29 @@ router.get('/', async (req, res, next) => {
       media: withMedia ? safeJsonParse(r.media_json, null) : null,
       date: r.date,
       status: r.status,
-    })));
+    }));
+
+    // Also fetch pending scheduled broadcasts
+    const [scheduled] = await dbPool.query(
+      `SELECT s.id AS schedule_id, s.scheduled_at, d.name, d.text, d.media_json, d.poll_json, d.target_type, d.target_filter
+       FROM wl_admin_scheduled_broadcasts s
+       JOIN wl_admin_broadcast_drafts d ON d.id = s.draft_id
+       WHERE s.status = 'pending'
+       ORDER BY s.scheduled_at ASC`
+    );
+    const scheduledItems = scheduled.map(s => ({
+      id: `sched_${s.schedule_id}`,
+      scheduleId: s.schedule_id,
+      text: s.text || (s.poll_json ? `[Опрос] ${safeJsonParse(s.poll_json, {}).question || ''}` : s.name),
+      type: s.target_type || 'channels',
+      channels: [],
+      total: 0, success: 0, failed: 0, results: [],
+      media: safeJsonParse(s.media_json, null),
+      date: s.scheduled_at,
+      status: 'scheduled',
+    }));
+
+    res.json([...scheduledItems, ...history]);
   } catch (err) { next(err); }
 });
 

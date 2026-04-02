@@ -37,6 +37,7 @@ const STATUS_LABELS = {
   published: 'Доставлена',
   partial: 'Частично',
   failed: 'Ошибка',
+  scheduled: 'Отложена',
 };
 
 const SECTIONS = [
@@ -56,6 +57,61 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* ═══ iOS-style Time Picker ═══ */
+function IosTimePicker({ value, onChange }) {
+  const [hours, minutes] = (value || '12:00').split(':').map(Number);
+  const hoursRef = useRef(null);
+  const minsRef = useRef(null);
+
+  const ITEM_H = 36;
+  const VISIBLE = 5;
+
+  const scrollToValue = (ref, val) => {
+    if (ref.current) {
+      ref.current.scrollTop = val * ITEM_H;
+    }
+  };
+
+  useEffect(() => {
+    scrollToValue(hoursRef, hours);
+    scrollToValue(minsRef, minutes);
+  }, []); // eslint-disable-line
+
+  const handleScroll = (ref, max, isHours) => {
+    const idx = Math.round(ref.current.scrollTop / ITEM_H);
+    const clamped = Math.max(0, Math.min(max, idx));
+    const h = isHours ? clamped : hours;
+    const m = isHours ? minutes : clamped;
+    onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  };
+
+  const renderColumn = (ref, count, val, isHours) => (
+    <div className="ios-tp-col" ref={ref}
+      onScroll={() => handleScroll(ref, count - 1, isHours)}
+      style={{ height: ITEM_H * VISIBLE }}
+    >
+      <div style={{ height: ITEM_H * 2 }} />
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''}`} style={{ height: ITEM_H }}
+          onClick={() => { scrollToValue(ref, i); }}
+        >
+          {String(i).padStart(2, '0')}
+        </div>
+      ))}
+      <div style={{ height: ITEM_H * 2 }} />
+    </div>
+  );
+
+  return (
+    <div className="ios-tp">
+      <div className="ios-tp-highlight" style={{ height: ITEM_H, top: ITEM_H * 2 }} />
+      {renderColumn(hoursRef, 24, hours, true)}
+      <span className="ios-tp-sep">:</span>
+      {renderColumn(minsRef, 60, minutes, false)}
+    </div>
+  );
 }
 
 /* ═══ Компонент прикрепления медиа ═══ */
@@ -378,14 +434,26 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
       </div>
 
       {scheduleMode && (
-        <div className="bc-schedule-picker">
-          <Calendar size={14} className="bc-schedule-icon" />
-          <input
-            type="datetime-local"
-            className="bc-schedule-input"
-            value={scheduledAt}
-            onChange={e => setScheduledAt(e.target.value)}
-            min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+        <div className="bc-schedule-picker-styled">
+          <div className="bc-schedule-date-section">
+            <Calendar size={14} />
+            <input
+              type="date"
+              className="bc-schedule-date-input"
+              value={scheduledAt ? scheduledAt.slice(0, 10) : ''}
+              onChange={e => {
+                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+                setScheduledAt(e.target.value + 'T' + time);
+              }}
+              min={new Date().toISOString().slice(0, 10)}
+            />
+          </div>
+          <IosTimePicker
+            value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
+            onChange={(time) => {
+              const date = scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+              setScheduledAt(date + 'T' + time);
+            }}
           />
         </div>
       )}
@@ -548,7 +616,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   // Channel tags
   const [allChannelTags, setAllChannelTags] = useState([]);
-  const [filterChannelTag, setFilterChannelTag] = useState('');
+  const [filterChannelTags, setFilterChannelTags] = useState([]);
   const [channelTagsMap, setChannelTagsMap] = useState({});
   const [showChTagDD, setShowChTagDD] = useState(false);
   const [chTagSearch, setChTagSearch] = useState('');
@@ -627,8 +695,12 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setChannels(prev => prev.filter(c => c.id !== id));
   };
 
-  const filteredChannels = filterChannelTag
-    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).includes(filterChannelTag))
+  const toggleChFilterTag = (tag) => {
+    setFilterChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const filteredChannels = filterChannelTags.length > 0
+    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t)))
     : channels;
 
   const toggleChannel = (chatId) => {
@@ -674,8 +746,8 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             {allChannelTags.length > 0 && (
               <div className="bc-tag-filter" ref={chTagRef}>
                 <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
-                  <Filter size={13} />
-                  <span>{filterChannelTag || 'Все теги'}</span>
+                  <Tag size={13} />
+                  <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
                   <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
                 </button>
                 {showChTagDD && (
@@ -694,15 +766,16 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                       </div>
                     )}
                     <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${!filterChannelTag ? 'active' : ''}`} onClick={() => { setFilterChannelTag(''); setShowChTagDD(false); setChTagSearch(''); }}>
+                      <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
                         Все теги
                       </div>
                       {allChannelTags
                         .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
                         .map(t => (
-                          <div key={t} className={`bc-tag-option ${filterChannelTag === t ? 'active' : ''}`} onClick={() => { setFilterChannelTag(t); setShowChTagDD(false); setChTagSearch(''); }}>
-                            {t}
-                          </div>
+                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleChFilterTag(t); }}>
+                            <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                            <span>{t}</span>
+                          </label>
                         ))}
                     </div>
                   </div>
@@ -719,6 +792,18 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         </div>
 
+        {filterChannelTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {filterChannelTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => setFilterChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setFilterChannelTags([])}>Сбросить</button>
+          </div>
+        )}
+
         {/* Active channels list */}
         {channels.length === 0 ? (
           <div className="bc-channels-empty">
@@ -728,7 +813,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <div className="bc-list-view">
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
-              <span>{filterChannelTag ? `Каналы с тегом «${filterChannelTag}» (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
+              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
             {filteredChannels.map(ch => (
               <div key={ch.id} className="bc-list-item bc-list-item--with-tags">
@@ -1048,7 +1133,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   // Group tags (reuses same channel_tags table)
   const [allGroupTags, setAllGroupTags] = useState([]);
-  const [filterGroupTag, setFilterGroupTag] = useState('');
+  const [filterGroupTags, setFilterGroupTags] = useState([]);
   const [groupTagsMap, setGroupTagsMap] = useState({});
   const [showGrTagDD, setShowGrTagDD] = useState(false);
   const [grTagSearch, setGrTagSearch] = useState('');
@@ -1127,8 +1212,12 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setGroups(prev => prev.filter(g => g.id !== id));
   };
 
-  const filteredGroups = filterGroupTag
-    ? groups.filter(g => (groupTagsMap[g.chatId] || []).includes(filterGroupTag))
+  const toggleGrFilterTag = (tag) => {
+    setFilterGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const filteredGroups = filterGroupTags.length > 0
+    ? groups.filter(g => (groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t)))
     : groups;
 
   const toggleGroup = (chatId) => {
@@ -1174,8 +1263,8 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             {allGroupTags.length > 0 && (
               <div className="bc-tag-filter" ref={grTagRef}>
                 <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
-                  <Filter size={13} />
-                  <span>{filterGroupTag || 'Все теги'}</span>
+                  <Tag size={13} />
+                  <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
                   <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
                 </button>
                 {showGrTagDD && (
@@ -1194,15 +1283,16 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                       </div>
                     )}
                     <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${!filterGroupTag ? 'active' : ''}`} onClick={() => { setFilterGroupTag(''); setShowGrTagDD(false); setGrTagSearch(''); }}>
+                      <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
                         Все теги
                       </div>
                       {allGroupTags
                         .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
                         .map(t => (
-                          <div key={t} className={`bc-tag-option ${filterGroupTag === t ? 'active' : ''}`} onClick={() => { setFilterGroupTag(t); setShowGrTagDD(false); setGrTagSearch(''); }}>
-                            {t}
-                          </div>
+                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleGrFilterTag(t); }}>
+                            <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                            <span>{t}</span>
+                          </label>
                         ))}
                     </div>
                   </div>
@@ -1219,6 +1309,18 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         </div>
 
+        {filterGroupTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {filterGroupTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => setFilterGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setFilterGroupTags([])}>Сбросить</button>
+          </div>
+        )}
+
         {groups.length === 0 ? (
           <div className="bc-channels-empty">
             Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
@@ -1227,7 +1329,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <div className="bc-list-view">
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
-              <span>{filterGroupTag ? `Группы с тегом «${filterGroupTag}» (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
+              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
             {filteredGroups.map(g => (
               <div key={g.id} className="bc-list-item bc-list-item--with-tags">
@@ -1478,6 +1580,8 @@ export default function Broadcasts() {
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
+  const [filterType, setFilterType] = useState(''); // channels|users|groups
+  const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1552,14 +1656,17 @@ export default function Broadcasts() {
     setMounted(prev => ({ ...prev, [targetSection]: true }));
   };
 
-  const filtered = broadcasts.filter(b =>
-    (b.text || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = broadcasts.filter(b => {
+    if (search && !(b.text || '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterType && b.type !== filterType) return false;
+    if (filterStatus && b.status !== filterStatus) return false;
+    return true;
+  });
 
   const paginatedFiltered = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
-  const TYPE_ICONS = { users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
+  const TYPE_ICONS = { channels: '📢', users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
   const [mounted, setMounted] = useState({ channels: true }); // track which sections have been opened
   const toggleSection = (id) => {
@@ -1629,6 +1736,21 @@ export default function Broadcasts() {
           </div>
         </div>
 
+        <div className="bc-history-filters">
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Тип:</span>
+            {[['', 'Все'], ['channels', 'Каналы'], ['groups', 'Группы'], ['users', 'Польз.']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterType === v ? 'active' : ''}`} onClick={() => { setFilterType(v); setVisibleCount(20); }}>{l}</button>
+            ))}
+          </div>
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Статус:</span>
+            {[['', 'Все'], ['published', 'Доставлена'], ['partial', 'Частично'], ['failed', 'Ошибка'], ['scheduled', 'Отложена']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterStatus === v ? 'active' : ''}`} onClick={() => { setFilterStatus(v); setVisibleCount(20); }}>{l}</button>
+            ))}
+          </div>
+        </div>
+
         <div className="broadcasts-table-wrap">
           <table className="broadcasts-table">
             <thead>
@@ -1657,6 +1779,7 @@ export default function Broadcasts() {
                       {b.status === 'published' && <CheckCircle size={12} />}
                       {b.status === 'failed' && <XCircle size={12} />}
                       {b.status === 'partial' && <AlertCircle size={12} />}
+                      {b.status === 'scheduled' && <Clock size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
                       {b.total > 0 && (
                         <button className="bc-delivery-btn" onClick={(e) => { e.stopPropagation(); setDeliveryModal(b); }} title="Показать получателей">
