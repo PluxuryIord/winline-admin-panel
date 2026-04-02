@@ -1,0 +1,130 @@
+import { Router } from 'express';
+import bcrypt from 'bcrypt';
+import dbPool from '../config/db.js';
+import requireAdmin from '../middleware/requireAdmin.js';
+
+const router = Router();
+
+router.use(requireAdmin);
+
+// GET /api/admin-users — list all users with profiles
+router.get('/', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(`
+      SELECT u.id, u.username, u.display_name,
+             COALESCE(p.role, 'editor') AS role,
+             COALESCE(p.is_active, 1) AS is_active,
+             p.created_at AS profile_created_at
+      FROM wl_admin_users u
+      LEFT JOIN wl_admin_user_profiles p ON p.user_id = u.id
+      ORDER BY u.id
+    `);
+    res.json(rows.map(r => ({
+      id: r.id,
+      username: r.username,
+      displayName: r.display_name,
+      role: r.role,
+      isActive: r.is_active,
+    })));
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin-users — create new user
+router.post('/', async (req, res, next) => {
+  try {
+    const { username, password, displayName, role } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username и password обязательны' });
+    }
+    const validRoles = ['admin', 'editor'];
+    const userRole = validRoles.includes(role) ? role : 'editor';
+
+    const hash = await bcrypt.hash(password, 10);
+    const [result] = await dbPool.query(
+      'INSERT INTO wl_admin_users (username, password_hash, display_name) VALUES (?, ?, ?)',
+      [username, hash, displayName || null]
+    );
+    const userId = result.insertId;
+
+    await dbPool.query(
+      'INSERT INTO wl_admin_user_profiles (user_id, role, display_name) VALUES (?, ?, ?)',
+      [userId, userRole, displayName || null]
+    );
+
+    res.status(201).json({ id: userId, username, displayName: displayName || null, role: userRole });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Пользователь с таким логином уже существует' });
+    }
+    next(err);
+  }
+});
+
+// PUT /api/admin-users/:id — update user
+router.put('/:id', async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    const { displayName, role, password } = req.body;
+    const validRoles = ['admin', 'editor'];
+
+    // Update display_name in wl_admin_users
+    if (displayName !== undefined) {
+      await dbPool.query('UPDATE wl_admin_users SET display_name = ? WHERE id = ?', [displayName, userId]);
+    }
+
+    // Update profile (upsert)
+    const updates = [];
+    const vals = [];
+    if (role !== undefined && validRoles.includes(role)) {
+      updates.push('role = ?');
+      vals.push(role);
+    }
+    if (displayName !== undefined) {
+      updates.push('display_name = ?');
+      vals.push(displayName);
+    }
+    if (updates.length) {
+      // Ensure profile exists
+      await dbPool.query(
+        'INSERT IGNORE INTO wl_admin_user_profiles (user_id) VALUES (?)',
+        [userId]
+      );
+      await dbPool.query(
+        `UPDATE wl_admin_user_profiles SET ${updates.join(', ')} WHERE user_id = ?`,
+        [...vals, userId]
+      );
+    }
+
+    // Reset password if provided
+    if (password) {
+      const hash = await bcrypt.hash(password, 10);
+      await dbPool.query('UPDATE wl_admin_users SET password_hash = ? WHERE id = ?', [hash, userId]);
+    }
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/admin-users/:id — soft delete
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Нельзя удалить самого себя' });
+    }
+
+    // Ensure profile exists then deactivate
+    await dbPool.query(
+      'INSERT IGNORE INTO wl_admin_user_profiles (user_id) VALUES (?)',
+      [userId]
+    );
+    await dbPool.query(
+      'UPDATE wl_admin_user_profiles SET is_active = 0 WHERE user_id = ?',
+      [userId]
+    );
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+export default router;

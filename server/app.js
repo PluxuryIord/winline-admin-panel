@@ -107,6 +107,12 @@ import scenariosRouter from './routes/scenarios.js';
 app.use('/api/scenarios', scenariosRouter);
 import emojisRouter from './routes/emojis.js';
 app.use('/api/emojis', emojisRouter);
+import adminUsersRouter from './routes/adminUsers.js';
+app.use('/api/admin-users', adminUsersRouter);
+import auditLogRouter from './routes/auditLog.js';
+import snapshotsRouter from './routes/snapshots.js';
+app.use('/api/audit-log', auditLogRouter);
+app.use('/api/snapshots', snapshotsRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {

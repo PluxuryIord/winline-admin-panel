@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
 import { BOT_API_URL } from '../config/env.js';
+import { logAudit } from '../services/auditLog.js';
+import { createDailySnapshot } from '../services/snapshots.js';
 
 const router = Router();
 
@@ -272,10 +274,13 @@ router.get('/', async (req, res, next) => {
 
 router.put('/', async (req, res, next) => {
   try {
-    const { dbId } = await loadScenarios();
+    const { dbId, data: oldData } = await loadScenarios();
     if (!dbId) return res.status(404).json({ error: 'Scenarios not seeded yet' });
     await saveScenarios(req.body, dbId);
     notifyBotReload();  // non-blocking
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'scenarios', null, 'full save', oldData, req.body);
+    createDailySnapshot('scenarios', req.user.id, userName);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -289,9 +294,13 @@ router.put('/screens/:screenId/messages/:messageKey', async (req, res, next) => 
     const screen = data.screens?.[req.params.screenId];
     if (!screen) return res.status(404).json({ error: 'Screen not found' });
     if (!screen.messages[req.params.messageKey]) return res.status(404).json({ error: 'Message not found' });
+    const oldText = screen.messages[req.params.messageKey].text;
     screen.messages[req.params.messageKey].text = req.body.text;
     await saveScenarios(data, dbId);
     notifyBotReload();
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'scenarios', `${req.params.screenId}/${req.params.messageKey}`, `message ${req.params.messageKey}`, { text: oldText }, { text: req.body.text });
+    createDailySnapshot('scenarios', req.user.id, userName);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -305,9 +314,13 @@ router.put('/screens/:screenId/buttons/:buttonKey', async (req, res, next) => {
     const screen = data.screens?.[req.params.screenId];
     if (!screen) return res.status(404).json({ error: 'Screen not found' });
     if (!screen.buttons[req.params.buttonKey]) return res.status(404).json({ error: 'Button not found' });
+    const oldLabel = screen.buttons[req.params.buttonKey].label;
     screen.buttons[req.params.buttonKey].label = req.body.label;
     await saveScenarios(data, dbId);
     notifyBotReload();
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'scenarios', `${req.params.screenId}/${req.params.buttonKey}`, `button ${req.params.buttonKey}`, { label: oldLabel }, { label: req.body.label });
+    createDailySnapshot('scenarios', req.user.id, userName);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

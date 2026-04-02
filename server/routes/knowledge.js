@@ -3,6 +3,8 @@ import multer from 'multer';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN, TG_ADMIN_CHAT_ID } from '../config/env.js';
 import { uploadToS3 } from '../services/s3.js';
+import { logAudit } from '../services/auditLog.js';
+import { createDailySnapshot } from '../services/snapshots.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -157,6 +159,10 @@ router.post('/', async (req, res, next) => {
     data._meta.titles[finalKey] = title.trim();
     await saveKB(data, dbId);
 
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'create', 'knowledge', finalKey, title.trim(), null, { key: finalKey, title: title.trim() });
+    createDailySnapshot('knowledge', req.user.id, userName);
+
     res.json({ ok: true, key: finalKey, title: title.trim() });
   } catch (err) { next(err); }
 });
@@ -260,8 +266,13 @@ router.put('/:key/title', async (req, res, next) => {
 
     if (!data._meta.titles[key]) return res.status(404).json({ error: `Article "${key}" not found` });
 
+    const oldTitle = data._meta.titles[key];
     data._meta.titles[key] = title.trim();
     await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'knowledge', key, title.trim(), { title: oldTitle }, { title: title.trim() });
+    createDailySnapshot('knowledge', req.user.id, userName);
 
     res.json({ ok: true, key, title: title.trim() });
   } catch (err) { next(err); }
@@ -278,8 +289,13 @@ router.put('/:key', async (req, res, next) => {
     if (!data) return res.status(404).json({ error: 'Knowledge base not found in DB' });
     if (data[key] === undefined) return res.status(404).json({ error: `Article "${key}" not found` });
 
+    const oldContent = data[key];
     data[key] = content;
     await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'knowledge', key, data._meta?.titles?.[key] || key, { content: oldContent }, { content });
+    createDailySnapshot('knowledge', req.user.id, userName);
 
     res.json({ ok: true, key, content });
   } catch (err) { next(err); }
@@ -294,6 +310,8 @@ router.delete('/:key', async (req, res, next) => {
     await ensureMeta(data, dbId);
 
     if (data[key] === undefined) return res.status(404).json({ error: `Article "${key}" not found` });
+
+    const oldArticle = { key, title: data._meta?.titles?.[key], content: data[key] };
 
     // Remove content
     delete data[key];
@@ -313,6 +331,10 @@ router.delete('/:key', async (req, res, next) => {
     delete data._meta.titles[key];
 
     await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'delete', 'knowledge', key, oldArticle.title || key, oldArticle, null);
+    createDailySnapshot('knowledge', req.user.id, userName);
 
     res.json({ ok: true, key, deleted: true });
   } catch (err) { next(err); }

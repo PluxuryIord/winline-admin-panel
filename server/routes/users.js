@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN } from '../config/env.js';
+import { logAudit } from '../services/auditLog.js';
 
 const router = Router();
 const COMMENT_PREFIX = '__comment__:';
@@ -172,6 +173,10 @@ router.put('/:id/tags', async (req, res, next) => {
     const { tags } = req.body;
     if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags must be an array' });
 
+    // Capture old tags for audit
+    const [oldRows] = await dbPool.query('SELECT tag FROM wl_admin_user_tags WHERE user_id = ? AND tag != ? AND tag NOT LIKE ?', [userId, EDITED_MARKER, `${COMMENT_PREFIX}%`]);
+    const oldTags = oldRows.map(r => r.tag);
+
     // Удаляем все старые теги
     await dbPool.query('DELETE FROM wl_admin_user_tags WHERE user_id = ?', [userId]);
 
@@ -183,6 +188,9 @@ router.put('/:id/tags', async (req, res, next) => {
       // Маркер что теги были отредактированы (пустые)
       await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES (?, ?)', [userId, EDITED_MARKER]);
     }
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'user_tags', String(userId), `user ${userId}`, { tags: oldTags }, { tags });
 
     res.json({ success: true, tags });
   } catch (err) { next(err); }

@@ -15,7 +15,13 @@ router.post('/login', async (req, res, next) => {
     }
 
     const [rows] = await dbPool.query(
-      'SELECT id, username, password_hash, display_name FROM wl_admin_users WHERE username = ?',
+      `SELECT u.id, u.username, u.password_hash, u.display_name,
+              COALESCE(p.role, 'editor') AS role,
+              COALESCE(p.is_active, 1) AS is_active,
+              p.display_name AS profile_display_name
+       FROM wl_admin_users u
+       LEFT JOIN wl_admin_user_profiles p ON p.user_id = u.id
+       WHERE u.username = ?`,
       [username]
     );
 
@@ -24,13 +30,31 @@ router.post('/login', async (req, res, next) => {
     }
 
     const user = rows[0];
+
+    if (!user.is_active) {
+      return res.status(403).json({ error: 'Учётная запись деактивирована' });
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
+    // Auto-create profile if missing
+    if (user.role === 'editor' && !user.profile_display_name && user.profile_display_name === undefined) {
+      // No profile row — create one
+      const autoRole = user.id === 1 ? 'admin' : 'editor';
+      await dbPool.query(
+        'INSERT IGNORE INTO wl_admin_user_profiles (user_id, role, display_name) VALUES (?, ?, ?)',
+        [user.id, autoRole, user.display_name]
+      ).catch(() => {});
+      user.role = autoRole;
+    }
+
+    const displayName = user.profile_display_name || user.display_name;
+
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.username, role: user.role, displayName },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -45,7 +69,7 @@ router.post('/login', async (req, res, next) => {
     });
 
     res.json({
-      user: { id: user.id, username: user.username, displayName: user.display_name },
+      user: { id: user.id, username: user.username, displayName, role: user.role },
     });
   } catch (err) { next(err); }
 });
@@ -65,13 +89,20 @@ router.get('/me', async (req, res, next) => {
     const payload = jwt.verify(token, JWT_SECRET);
 
     const [rows] = await dbPool.query(
-      'SELECT id, username, display_name FROM wl_admin_users WHERE id = ?',
+      `SELECT u.id, u.username, u.display_name,
+              COALESCE(p.role, 'editor') AS role,
+              COALESCE(p.is_active, 1) AS is_active,
+              p.display_name AS profile_display_name
+       FROM wl_admin_users u
+       LEFT JOIN wl_admin_user_profiles p ON p.user_id = u.id
+       WHERE u.id = ?`,
       [payload.id]
     );
     if (!rows.length) return res.status(401).json({ error: 'Пользователь не найден' });
 
     const u = rows[0];
-    res.json({ id: u.id, username: u.username, displayName: u.display_name });
+    const displayName = u.profile_display_name || u.display_name;
+    res.json({ id: u.id, username: u.username, displayName, role: u.role });
   } catch (err) {
     if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Невалидный или истёкший токен' });

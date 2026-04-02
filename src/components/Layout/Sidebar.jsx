@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import {
   Users, MessageSquare, Send, BookOpen,
-  Database, BarChart, Calendar, LogOut, X
+  Database, BarChart, Calendar, LogOut, X,
+  Shield, FileText, History
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
@@ -39,6 +40,28 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
             </div>
             {item.name}
             {item.path === '/chats' && hasUnread && <span className="menu-unread-dot" />}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="sidebar-divider" />
+      <div className="sidebar-section-label">Администрирование</div>
+      <nav className="menu menu-admin">
+        {[
+          ...(user?.role === 'admin' ? [{ name: 'Пользователи', path: '/admin-users', icon: <Shield size={18} /> }] : []),
+          { name: 'Журнал действий', path: '/audit-log', icon: <FileText size={18} /> },
+          { name: 'История версий', path: '/version-history', icon: <History size={18} /> },
+        ].map((item) => (
+          <NavLink
+            to={item.path}
+            key={item.path}
+            onClick={closeMobileMenu}
+            className={({ isActive }) => isActive ? "menu-item active" : "menu-item"}
+          >
+            <div className="icon-wrapper">
+              {item.icon}
+            </div>
+            {item.name}
           </NavLink>
         ))}
       </nav>

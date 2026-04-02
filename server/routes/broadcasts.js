@@ -6,6 +6,7 @@ import dbPool from '../config/db.js';
 import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
+import { logAudit } from '../services/auditLog.js';
 
 function isValidChatId(chatId) {
   const s = String(chatId);
@@ -730,11 +731,15 @@ router.put('/channels/:chatId/tags', async (req, res, next) => {
   try {
     const chatId = String(req.params.chatId);
     const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(t => t && typeof t === 'string') : [];
+    const [oldRows] = await dbPool.query('SELECT tag FROM wl_admin_channel_tags WHERE chat_id = ?', [chatId]);
+    const oldTags = oldRows.map(r => r.tag);
     await dbPool.query('DELETE FROM wl_admin_channel_tags WHERE chat_id = ?', [chatId]);
     if (tags.length > 0) {
       const values = tags.map(t => [chatId, t.trim()]);
       await dbPool.query('INSERT IGNORE INTO wl_admin_channel_tags (chat_id, tag) VALUES ?', [values]);
     }
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'channel_tags', chatId, `channel ${chatId}`, { tags: oldTags }, { tags });
     res.json({ ok: true, tags });
   } catch (err) { next(err); }
 });
@@ -780,11 +785,15 @@ router.put('/groups/:chatId/tags', async (req, res, next) => {
   try {
     const chatId = String(req.params.chatId);
     const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(t => t && typeof t === 'string') : [];
+    const [oldRows] = await dbPool.query('SELECT tag FROM wl_admin_group_tags WHERE chat_id = ?', [chatId]);
+    const oldTags = oldRows.map(r => r.tag);
     await dbPool.query('DELETE FROM wl_admin_group_tags WHERE chat_id = ?', [chatId]);
     if (tags.length > 0) {
       const values = tags.map(t => [chatId, t.trim()]);
       await dbPool.query('INSERT IGNORE INTO wl_admin_group_tags (chat_id, tag) VALUES ?', [values]);
     }
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'group_tags', chatId, `group ${chatId}`, { tags: oldTags }, { tags });
     res.json({ ok: true, tags });
   } catch (err) { next(err); }
 });

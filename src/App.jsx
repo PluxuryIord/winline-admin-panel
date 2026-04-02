@@ -14,6 +14,9 @@ import Chats from './pages/Chats/Chats.jsx';
 import ChatView from './pages/Chats/ChatView.jsx';
 import EventWork from './pages/EventWork/EventWork.jsx';
 import BotScenarios from './pages/Scenarios/BotScenarios.jsx';
+import AdminUsers from './pages/AdminUsers/AdminUsers.jsx';
+import AuditLog from './pages/AuditLog/AuditLog.jsx';
+import VersionHistory from './pages/VersionHistory/VersionHistory.jsx';
 
 import Broadcasts from './pages/Broadcasts/Broadcasts.jsx';
 import BroadcastNew from './pages/Broadcasts/BroadcastNew.jsx';
@@ -60,6 +63,9 @@ function App() {
           <Route path="knowledge" element={<KnowledgeBase />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="events" element={<EventWork />} />
+          <Route path="admin-users" element={<AdminUsers />} />
+          <Route path="audit-log" element={<AuditLog />} />
+          <Route path="version-history" element={<VersionHistory />} />
         </Route>
       </Routes>
   );

@@ -124,6 +124,26 @@
   50% { opacity: 0.4; }
 }
 
+/* --- РАЗДЕЛИТЕЛЬ И СЕКЦИЯ АДМИНИСТРИРОВАНИЯ --- */
+.sidebar-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 12px 0 8px;
+}
+
+.sidebar-section-label {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 16px 4px;
+}
+
+.menu-admin {
+  margin-bottom: 8px;
+}
+
 /* --- ПРОФИЛЬ АДМИНА --- */
 .admin-profile {
   /* margin-top: auto — это магия Flexbox. Она заставляет этот блок 
@@ -201,6 +221,38 @@
   background: rgba(18, 18, 30, 0.6);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.header-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-user-name {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.header-role-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.header-role-badge.role-admin {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+}
+.header-role-badge.role-editor {
+  background: rgba(100, 180, 255, 0.12);
+  color: #64b4ff;
 }
 
 .header-status {
