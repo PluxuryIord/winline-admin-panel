@@ -734,8 +734,6 @@ router.get('/channel-tags', async (req, res, next) => {
       INDEX idx_poll (poll_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 
-    // Ensure poll_id column exists in broadcasts table
-    try { await dbPool.query('ALTER TABLE wl_admin_broadcasts ADD COLUMN poll_id INT DEFAULT NULL'); } catch {}
   } catch (err) {
     console.error('[drafts] Failed to create tables:', err.message);
   }
@@ -1056,11 +1054,6 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
   const db = conn || dbPool;
   const status = success === total ? 'published' : (success > 0 ? 'partial' : 'failed');
   const withMedia = await checkMediaColumn();
-
-  // Ensure poll_id column exists
-  if (pollId) {
-    try { await db.query('ALTER TABLE wl_admin_broadcasts ADD COLUMN poll_id INT DEFAULT NULL'); } catch {}
-  }
 
   const baseCols = 'text, type, channels_json, channel_ids_json, total, success, failed, results_json, status';
   const baseVals = [
