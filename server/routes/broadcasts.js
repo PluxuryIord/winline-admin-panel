@@ -733,6 +733,9 @@ router.get('/channel-tags', async (req, res, next) => {
       UNIQUE KEY unique_vote (poll_id, user_id),
       INDEX idx_poll (poll_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    // Ensure poll_id column exists in broadcasts table
+    try { await dbPool.query('ALTER TABLE wl_admin_broadcasts ADD COLUMN poll_id INT DEFAULT NULL'); } catch {}
   } catch (err) {
     console.error('[drafts] Failed to create tables:', err.message);
   }
