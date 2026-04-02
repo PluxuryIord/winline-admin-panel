@@ -1,26 +1,59 @@
 import { useState, useEffect, useRef } from 'react';
-import DOMPurify from 'dompurify';
 import {
-  Folder, FileText, Plus, Edit3, Save, Trash2,
-  ChevronRight, ChevronDown, Loader, MoreHorizontal
+  FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2,
+  Plus, MoreHorizontal, Pencil
 } from 'lucide-react';
-import WysiwygEditor from './WysiwygEditor';
-import PromptModal from './PromptModal';
+import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 
 export default function KnowledgeBase() {
-  const [topics, setTopics] = useState([]);
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedFolders, setExpandedFolders] = useState([]);
-  const [activeItem, setActiveItem] = useState(null);
+  const [activeKey, setActiveKey] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
-  const [modal, setModal] = useState(null);
-  const [editingTitle, setEditingTitle] = useState(null); // { id, value, content }
-  const [openMenu, setOpenMenu] = useState(null); // id элемента с открытым меню
-  const [lightboxSrc, setLightboxSrc] = useState(null); // src открытой картинки
+  const [saving, setSaving] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Закрываем меню по клику снаружи
+  // Modals
+  const [createModal, setCreateModal] = useState(false);
+  const [createTitle, setCreateTitle] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const [deleteModal, setDeleteModal] = useState(null); // { key, title } or null
+  const [deleting, setDeleting] = useState(false);
+
+  const [renameModal, setRenameModal] = useState(null); // { key, title } or null
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
+  // Kebab menu
+  const [openMenu, setOpenMenu] = useState(null); // key of open menu
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  const fetchArticles = () => {
+    api.get('/api/knowledge')
+      .then(res => {
+        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        const list = data.articles || [];
+        setArticles(list);
+        if (list.length > 0 && !list.find(a => a.key === activeKey)) {
+          setActiveKey(list[0].key);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchArticles(); }, []);
+
+  // Close kebab menu on click outside
   useEffect(() => {
     if (!openMenu) return;
     const handler = () => setOpenMenu(null);
@@ -28,187 +61,176 @@ export default function KnowledgeBase() {
     return () => document.removeEventListener('click', handler);
   }, [openMenu]);
 
-  // Загрузка данных из API
-  useEffect(() => {
-    fetch('/api/knowledge')
-      .then(res => res.json())
-      .then(data => {
-        setTopics(data);
-        if (data.length > 0) {
-          setActiveItem({ type: 'topic', id: data[0].id, data: data[0] });
-          setExpandedFolders([data[0].id]);
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const active = articles.find(a => a.key === activeKey);
 
-  const toggleFolder = (id) => {
-    setExpandedFolders(prev =>
-      prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectTopic = (topic) => {
-    setActiveItem({ type: 'topic', id: topic.id, data: topic });
-    setIsEditing(false);
-    if (!expandedFolders.includes(topic.id)) {
-      setExpandedFolders(prev => [...prev, topic.id]);
-    }
-  };
-
-  const handleSelectSubtopic = (subtopic, parentTopic) => {
-    setActiveItem({ type: 'subtopic', id: subtopic.id, data: subtopic, parentTitle: parentTopic.title });
-    setIsEditing(false);
-  };
-
-  const handleEditClick = () => {
-    setEditContent(activeItem.data.content);
+  const handleEdit = () => {
+    if (!active) return;
+    setEditContent(active.content);
     setIsEditing(true);
   };
 
-  const handleSaveClick = async () => {
-    await fetch(`/api/knowledge/${activeItem.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: activeItem.data.title, content: editContent })
-    });
-    const updatedData = { ...activeItem.data, content: editContent };
-    setActiveItem(prev => ({ ...prev, data: updatedData }));
-    if (activeItem.type === 'topic') {
-      setTopics(prev => prev.map(t => t.id === activeItem.id ? { ...t, content: editContent } : t));
-    } else {
-      setTopics(prev => prev.map(t => ({
-        ...t,
-        subtopics: t.subtopics.map(s => s.id === activeItem.id ? { ...s, content: editContent } : s)
-      })));
+  const handleSave = async () => {
+    if (!active) return;
+    setSaving(true);
+    try {
+      const res = await api.put(`/api/knowledge/${active.key}`, { content: editContent });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      setArticles(prev => prev.map(a => a.key === active.key ? { ...a, content: editContent } : a));
+      setIsEditing(false);
+    } catch (err) {
+      alert('Ошибка сохранения: ' + err.message);
     }
+    setSaving(false);
+  };
+
+  const handleCancel = () => {
     setIsEditing(false);
+    setEditContent('');
   };
 
-  const handleAddTopic = () => {
-    setModal({
-      title: 'Название новой темы',
-      placeholder: 'Введите название...',
-      onConfirm: async (title) => {
-        setModal(null);
-        const res = await fetch('/api/knowledge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: '' })
-        });
-        const newTopic = await res.json();
-        const topicWithSubs = { ...newTopic, subtopics: [] };
-        setTopics(prev => [...prev, topicWithSubs]);
-        setActiveItem({ type: 'topic', id: newTopic.id, data: topicWithSubs });
+  /** Get photo display URL — prefer S3, fallback to proxy */
+  function getPhotoSrc(article) {
+    if (article.photoS3Url) return article.photoS3Url;
+    if (article.photoFileId) return `/api/knowledge/photo/${article.photoFileId}`;
+    return null;
+  }
+
+  /** Upload new photo for current article */
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !active?.photoKey) return;
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const token = getToken();
+      const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
+        method: 'POST',
+        body: formData,
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      const data = await res.json();
+      if (data.ok) {
+        setArticles(prev => prev.map(a => {
+          if (a.key !== active.key) return a;
+          return {
+            ...a,
+            photoFileId: data.fileId || a.photoFileId,
+            photoS3Url: data.s3Url || a.photoS3Url,
+          };
+        }));
+      } else {
+        alert('Ошибка загрузки: ' + (data.error || 'unknown'));
       }
-    });
+    } catch (err) {
+      alert('Ошибка загрузки: ' + err.message);
+    }
+    setUploadingPhoto(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleAddSubtopic = (parentId) => {
-    setModal({
-      title: 'Название подтемы',
-      placeholder: 'Введите название...',
-      onConfirm: async (title) => {
-        setModal(null);
-        const res = await fetch('/api/knowledge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: '', parent_id: parentId })
-        });
-        const newSub = await res.json();
-        setTopics(prev => prev.map(t =>
-          t.id === parentId ? { ...t, subtopics: [...t.subtopics, newSub] } : t
-        ));
-        if (!expandedFolders.includes(parentId)) {
-          setExpandedFolders(prev => [...prev, parentId]);
-        }
+  /** Delete photo from current article */
+  const handlePhotoDelete = async () => {
+    if (!active?.photoKey || !active?.photoFileId) return;
+    if (!confirm('Удалить фото из статьи?')) return;
+    try {
+      const res = await api.delete(`/api/knowledge/photo/${active.photoKey}`);
+      const result = await res.json();
+      if (result.ok) {
+        setArticles(prev => prev.map(a => {
+          if (a.key !== active.key) return a;
+          return { ...a, photoFileId: null, photoS3Url: null };
+        }));
       }
-    });
-  };
-
-  const handleRenameStart = (item) => {
-    setEditingTitle({ id: item.id, value: item.title, content: item.content || '' });
-  };
-
-  const handleRenameSave = async () => {
-    if (!editingTitle) return;
-    const { id, value, content } = editingTitle;
-    setEditingTitle(null);
-    if (!value.trim()) return;
-    await fetch(`/api/knowledge/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: value.trim(), content }),
-    });
-    setTopics(prev => prev.map(t => {
-      if (t.id === id) return { ...t, title: value.trim() };
-      return { ...t, subtopics: t.subtopics.map(s => s.id === id ? { ...s, title: value.trim() } : s) };
-    }));
-    if (activeItem?.id === id) {
-      setActiveItem(prev => ({ ...prev, data: { ...prev.data, title: value.trim() } }));
+    } catch (err) {
+      alert('Ошибка удаления: ' + err.message);
     }
   };
 
-  const handleRenameKeyDown = (e) => {
-    e.stopPropagation();
-    if (e.key === 'Enter') handleRenameSave();
-    if (e.key === 'Escape') setEditingTitle(null);
-  };
-
-  const handleDelete = (id, type, parentId) => {
-    const label = type === 'topic' ? 'тему и все подтемы' : 'подтему';
-    setModal({
-      title: `Удалить ${label}?`,
-      placeholder: null,
-      onConfirm: async () => {
-        setModal(null);
-        await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
-        if (type === 'topic') {
-          const updated = topics.filter(t => t.id !== id);
-          setTopics(updated);
-          if (activeItem?.id === id) {
-            setActiveItem(updated.length > 0 ? { type: 'topic', id: updated[0].id, data: updated[0] } : null);
-          }
-        } else {
-          setTopics(prev => prev.map(t => ({
-            ...t,
-            subtopics: t.subtopics.filter(s => s.id !== id)
-          })));
-          if (activeItem?.id === id) {
-            const parent = topics.find(t => t.id === parentId);
-            if (parent) setActiveItem({ type: 'topic', id: parent.id, data: parent });
-          }
-        }
+  /** Create new topic */
+  const handleCreate = async () => {
+    if (!createTitle.trim()) return;
+    setCreating(true);
+    try {
+      const res = await api.post('/api/knowledge', { title: createTitle.trim() });
+      const result = await res.json();
+      if (result.ok) {
+        setCreateModal(false);
+        setCreateTitle('');
+        fetchArticles();
+        setActiveKey(result.key);
         setIsEditing(false);
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
       }
-    });
+    } catch (err) {
+      alert('Ошибка создания: ' + err.message);
+    }
+    setCreating(false);
   };
 
-  // Кнопка ⋯ с выпадающим меню
-  const ItemMenu = ({ id, actions }) => (
-    <div className="kb-item-menu-wrapper" onClick={e => e.stopPropagation()}>
-      <button
-        className={`kb-item-menu-btn${openMenu === id ? ' open' : ''}`}
-        onClick={(e) => { e.stopPropagation(); setOpenMenu(prev => prev === id ? null : id); }}
-      >
-        <MoreHorizontal size={15} />
-      </button>
-      {openMenu === id && (
-        <div className="kb-item-menu-dropdown">
-          {actions.map(action => (
-            <button
-              key={action.label}
-              className={`kb-item-menu-item${action.danger ? ' danger' : ''}`}
-              onClick={() => { setOpenMenu(null); action.fn(); }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  /** Delete topic */
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/knowledge/${deleteModal.key}`);
+      const result = await res.json();
+      if (result.ok) {
+        setDeleteModal(null);
+        if (activeKey === deleteModal.key) setActiveKey(null);
+        setIsEditing(false);
+        fetchArticles();
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка удаления: ' + err.message);
+    }
+    setDeleting(false);
+  };
+
+  /** Rename topic */
+  const handleRename = async () => {
+    if (!renameModal || !renameTitle.trim()) return;
+    setRenaming(true);
+    try {
+      const res = await api.put(`/api/knowledge/${renameModal.key}/title`, { title: renameTitle.trim() });
+      const result = await res.json();
+      if (result.ok) {
+        setArticles(prev => prev.map(a =>
+          a.key === renameModal.key ? { ...a, title: renameTitle.trim() } : a
+        ));
+        setRenameModal(null);
+        setRenameTitle('');
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка переименования: ' + err.message);
+    }
+    setRenaming(false);
+  };
+
+  /** Telegram HTML → safe display HTML */
+  function tgHtmlToDisplay(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
+      .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
+      .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>')
+      .replace(/&lt;s&gt;/g, '<s>').replace(/&lt;\/s&gt;/g, '</s>')
+      .replace(/&lt;code&gt;/g, '<code>').replace(/&lt;\/code&gt;/g, '</code>')
+      .replace(/&lt;pre&gt;/g, '<pre>').replace(/&lt;\/pre&gt;/g, '</pre>')
+      .replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
+      .replace(/&lt;a href="([^"]*)"&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
+      .replace(/&lt;\/a&gt;/g, '</a>')
+      .replace(/\n/g, '<br>');
+  }
 
   if (loading) {
     return (
@@ -218,155 +240,257 @@ export default function KnowledgeBase() {
     );
   }
 
+  const photoSrc = active ? getPhotoSrc(active) : null;
+
   return (
     <div className="kb-container">
 
-      {/* ЛЕВАЯ КОЛОНКА */}
+      {/* LEFT SIDEBAR */}
       <div className="kb-sidebar">
         <div className="kb-sidebar-header">
-          <h3>Разделы Wiki</h3>
-          <button className="add-topic-btn" title="Создать новую тему" onClick={handleAddTopic}>
+          <h3><BookOpen size={18} /> База знаний</h3>
+          <button className="add-topic-btn" onClick={() => { setCreateModal(true); setCreateTitle(''); }} title="Добавить тему">
             <Plus size={18} />
           </button>
         </div>
 
         <div className="kb-topic-list">
-          {topics.map((topic) => {
-            const isFolderExpanded = expandedFolders.includes(topic.id);
-            const isTopicActive = activeItem?.type === 'topic' && activeItem?.id === topic.id;
+          {articles.map((article) => (
+            <div
+              key={article.key}
+              className={`kb-topic-item ${activeKey === article.key ? 'active' : ''}`}
+              onClick={() => { setActiveKey(article.key); setIsEditing(false); }}
+            >
+              <FileText size={16} />
+              <span style={{ flex: 1 }}>{article.title}</span>
+              {(article.photoFileId || article.photoS3Url) && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
 
-            return (
-              <div key={topic.id}>
-                <div
-                  className={`kb-topic-item ${isTopicActive ? 'active' : ''}`}
-                  onClick={() => handleSelectTopic(topic)}
+              {/* Kebab menu */}
+              <div className="kb-item-menu-wrapper" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className={`kb-item-menu-btn ${openMenu === article.key ? 'open' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (openMenu === article.key) {
+                      setOpenMenu(null);
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const spaceBelow = window.innerHeight - rect.bottom;
+                      setMenuPos({
+                        top: spaceBelow < 120 ? rect.top - 90 : rect.bottom + 4,
+                        left: Math.min(rect.right, window.innerWidth - 180),
+                      });
+                      setOpenMenu(article.key);
+                    }
+                  }}
                 >
-                  <span onClick={(e) => { e.stopPropagation(); toggleFolder(topic.id); }}>
-                    {isFolderExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </span>
-                  <Folder size={18} color={isTopicActive ? "#FF7E00" : "currentColor"} />
-                  {editingTitle?.id === topic.id ? (
-                    <input
-                      className="kb-title-input"
-                      value={editingTitle.value}
-                      onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
-                      onBlur={handleRenameSave}
-                      onKeyDown={handleRenameKeyDown}
-                      onClick={e => e.stopPropagation()}
-                      autoFocus
-                    />
-                  ) : (
-                    <span style={{ flex: 1 }}>{topic.title}</span>
-                  )}
-                  <ItemMenu
-                    id={topic.id}
-                    actions={[
-                      { label: 'Переименовать', fn: () => handleRenameStart(topic) },
-                      { label: 'Добавить подтему', fn: () => handleAddSubtopic(topic.id) },
-                      { label: 'Удалить', fn: () => handleDelete(topic.id, 'topic'), danger: true },
-                    ]}
-                  />
-                </div>
-
-                {isFolderExpanded && topic.subtopics.length > 0 && (
-                  <div className="kb-subtopics">
-                    {topic.subtopics.map(sub => {
-                      const isSubActive = activeItem?.type === 'subtopic' && activeItem?.id === sub.id;
-                      return (
-                        <div
-                          key={sub.id}
-                          className={`kb-subtopic-item ${isSubActive ? 'active' : ''}`}
-                          onClick={() => handleSelectSubtopic(sub, topic)}
-                        >
-                          <FileText size={14} />
-                          {editingTitle?.id === sub.id ? (
-                            <input
-                              className="kb-title-input"
-                              value={editingTitle.value}
-                              onChange={e => setEditingTitle(prev => ({ ...prev, value: e.target.value }))}
-                              onBlur={handleRenameSave}
-                              onKeyDown={handleRenameKeyDown}
-                              onClick={e => e.stopPropagation()}
-                              autoFocus
-                            />
-                          ) : (
-                            <span style={{ flex: 1 }}>{sub.title}</span>
-                          )}
-                          <ItemMenu
-                            id={sub.id}
-                            actions={[
-                              { label: 'Переименовать', fn: () => handleRenameStart(sub) },
-                              { label: 'Удалить', fn: () => handleDelete(sub.id, 'subtopic', topic.id), danger: true },
-                            ]}
-                          />
-                        </div>
-                      );
-                    })}
+                  <MoreHorizontal size={16} />
+                </button>
+                {openMenu === article.key && (
+                  <div className="kb-item-menu-dropdown" style={{ top: menuPos.top, left: menuPos.left }}>
+                    <button
+                      className="kb-item-menu-item"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        setRenameModal({ key: article.key, title: article.title });
+                        setRenameTitle(article.title);
+                      }}
+                    >
+                      <Pencil size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                      Переименовать
+                    </button>
+                    <button
+                      className="kb-item-menu-item danger"
+                      onClick={() => {
+                        setOpenMenu(null);
+                        setDeleteModal({ key: article.key, title: article.title });
+                      }}
+                    >
+                      <Trash2 size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                      Удалить
+                    </button>
                   </div>
                 )}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ПРАВАЯ КОЛОНКА */}
+      {/* RIGHT CONTENT */}
       <div className="kb-content">
-        {activeItem ? (
+        {active ? (
           <>
             <div className="kb-content-header">
-              <div className="kb-breadcrumbs">
-                База знаний {activeItem.type === 'subtopic' && <> <ChevronRight size={12} /> {activeItem.parentTitle} </>}
-              </div>
+              <div className="kb-breadcrumbs">База знаний</div>
               <div className="kb-header-row">
-                <h2>{activeItem.data.title}</h2>
+                <h2>{active.title}</h2>
                 {!isEditing ? (
-                  <button className="kb-edit-btn" onClick={handleEditClick}>
+                  <button className="kb-edit-btn" onClick={handleEdit}>
                     <Edit3 size={18} /> Редактировать
                   </button>
                 ) : (
-                  <button className="kb-edit-btn kb-save-btn" onClick={handleSaveClick}>
-                    <Save size={18} /> Сохранить
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="kb-edit-btn" onClick={handleCancel}>
+                      <X size={18} /> Отмена
+                    </button>
+                    <button className="kb-edit-btn kb-save-btn" onClick={handleSave} disabled={saving}>
+                      {saving ? <Loader size={18} className="spin" /> : <Save size={18} />}
+                      {saving ? 'Сохранение...' : 'Сохранить'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
 
+            {/* Photo section */}
+            {active.photoKey && (
+              <div className="kb-article-photo">
+                {photoSrc ? (
+                  <div className="kb-photo-wrapper">
+                    <img
+                      src={photoSrc}
+                      alt=""
+                      onClick={(e) => !isEditing && setLightboxSrc(e.target.src)}
+                      style={{ cursor: isEditing ? 'default' : 'pointer', maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                    />
+                    {isEditing && (
+                      <div className="kb-photo-actions">
+                        <label className="kb-photo-action-btn">
+                          <Upload size={14} /> Заменить
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handlePhotoUpload}
+                          />
+                        </label>
+                        <button className="kb-photo-action-btn kb-photo-delete-btn" onClick={handlePhotoDelete}>
+                          <Trash2 size={14} /> Удалить
+                        </button>
+                      </div>
+                    )}
+                    {uploadingPhoto && (
+                      <div className="kb-photo-uploading">
+                        <Loader size={20} className="spin" /> Загрузка...
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  isEditing && (
+                    <label className="kb-photo-upload-empty">
+                      <Upload size={24} />
+                      <span>Загрузить фото</span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handlePhotoUpload}
+                      />
+                      {uploadingPhoto && (
+                        <div className="kb-photo-uploading">
+                          <Loader size={20} className="spin" /> Загрузка...
+                        </div>
+                      )}
+                    </label>
+                  )
+                )}
+              </div>
+            )}
+
             {!isEditing ? (
               <div
                 className="kb-article html-content"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(activeItem.data.content) }}
-                onClick={(e) => { if (e.target.tagName === 'IMG') setLightboxSrc(e.target.src); }}
+                dangerouslySetInnerHTML={{ __html: tgHtmlToDisplay(active.content) }}
               />
             ) : (
-              <WysiwygEditor
-                key={activeItem.id}
-                initialContent={activeItem.data.content}
-                onContentChange={setEditContent}
-              />
+              <div className="kb-editor-area">
+                <TgHtmlEditor
+                  value={editContent}
+                  onChange={setEditContent}
+                  minRows={15}
+                  placeholder="Содержимое статьи..."
+                />
+              </div>
             )}
           </>
         ) : (
           <div className="kb-empty">
-            <p>Выберите тему или создайте новую</p>
+            <p>Выберите статью из списка слева</p>
           </div>
         )}
       </div>
 
+      {/* Lightbox */}
       {lightboxSrc && (
         <div className="kb-lightbox" onClick={() => setLightboxSrc(null)}>
           <img src={lightboxSrc} alt="" className="kb-lightbox-img" />
         </div>
       )}
 
-      {modal && (
-        <PromptModal
-          title={modal.title}
-          placeholder={modal.placeholder}
-          isConfirm={!modal.placeholder}
-          onConfirm={modal.onConfirm}
-          onCancel={() => setModal(null)}
-        />
+      {/* Create topic modal */}
+      {createModal && (
+        <div className="prompt-overlay" onClick={() => setCreateModal(false)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Новая тема</div>
+            <input
+              className="prompt-input"
+              placeholder="Название темы"
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              autoFocus
+            />
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setCreateModal(false)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-ok" onClick={handleCreate} disabled={creating || !createTitle.trim()}>
+                {creating ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete topic modal */}
+      {deleteModal && (
+        <div className="prompt-overlay" onClick={() => setDeleteModal(null)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Удалить тему</div>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', margin: 0 }}>
+              Тема <b>"{deleteModal.title}"</b> будет удалена вместе с фото. Это действие нельзя отменить.
+            </p>
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setDeleteModal(null)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Удаление...' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename topic modal */}
+      {renameModal && (
+        <div className="prompt-overlay" onClick={() => setRenameModal(null)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Переименовать тему</div>
+            <input
+              className="prompt-input"
+              value={renameTitle}
+              onChange={(e) => setRenameTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              autoFocus
+            />
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setRenameModal(null)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-ok" onClick={handleRename} disabled={renaming || !renameTitle.trim()}>
+                {renaming ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

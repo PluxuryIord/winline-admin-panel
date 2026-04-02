@@ -1,7 +1,7 @@
 .kb-container {
   display: flex;
   gap: 24px;
-  height: calc(100vh - 134px); /* Высота экрана минус шапка и паддинги рабочего поля */
+  min-height: calc(100vh - 134px); /* Минимальная высота, но страница может расти */
   margin-right: 50px; /* <--- Добавили отступ справа */
 }
 
@@ -27,6 +27,9 @@
 .kb-sidebar-header h3 {
   font-size: 1.1rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .add-topic-btn {
@@ -112,11 +115,11 @@
 .kb-content {
   flex: 1;
   background-color: var(--color-panel);
-  border-radius: 16px; /* Вернули скругление всех 4 углов */
-  border: 1px solid rgba(255, 255, 255, 0.05); /* Вернули рамку */
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: visible; /* Скроллится вся страница, а не блок */
 }
 
 .kb-content-header {
@@ -169,11 +172,8 @@
 /* Тело статьи */
 .kb-article {
   padding: 32px;
-  overflow-y: auto;
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.6;
-  flex: 1;         /* ЗАСТАВЛЯЕМ БЛОК ЗАНЯТЬ ВСЮ ВЫСОТУ */
-  min-height: 0;   /* КРИТИЧЕСКИ ВАЖНО ДЛЯ СКРОЛЛА ВО FLEXBOX */
 }
 
 /* Фейковый редактор для презентации */
@@ -184,6 +184,57 @@
   gap: 16px;
   flex: 1;         /* ЗАСТАВЛЯЕМ БЛОК ЗАНЯТЬ ВСЮ ВЫСОТУ */
   min-height: 0;   /* КРИТИЧЕСКИ ВАЖНО ДЛЯ СКРОЛЛА ВО FLEXBOX */
+}
+
+/* Textarea-редактор для Telegram HTML */
+.kb-editor-area {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.kb-editor-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-editor-hint {
+  flex: 1;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  line-height: 1.5;
+}
+
+.kb-textarea {
+  flex: 1;
+  resize: none;
+  background: var(--color-black);
+  color: var(--color-white);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  tab-size: 2;
+  overflow-y: auto;
+}
+
+.kb-textarea:focus {
+  outline: none;
+  border-color: var(--color-orange);
+}
+
+.kb-article-photo {
+  padding: 0 32px;
 }
 
 .editor-toolbar {
@@ -286,14 +337,12 @@
 }
 
 .kb-item-menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
+  position: fixed;
   background: #1e1e2e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 6px;
-  z-index: 100;
+  z-index: 1000;
   min-width: 168px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: flex;
@@ -686,4 +735,71 @@
     transform: scale(1) translateY(0);
     filter: blur(0px);
   }
+}
+
+/* ===== Photo management ===== */
+.kb-photo-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.kb-photo-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.kb-photo-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.kb-photo-action-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.kb-photo-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.kb-photo-uploading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--color-orange);
+  font-size: 13px;
+}
+
+.kb-photo-upload-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 200px;
+  height: 140px;
+  border: 2px dashed rgba(255,255,255,0.15);
+  border-radius: 12px;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+.kb-photo-upload-empty:hover {
+  border-color: var(--color-orange);
+  color: var(--color-orange);
+  background: rgba(255,160,0,0.04);
 }

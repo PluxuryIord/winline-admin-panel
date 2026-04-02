@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, List, LayoutGrid } from 'lucide-react';
-import { usersData } from '../../data/usersData';
+import { api } from '../../utils/api.js';
+import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import './Chats.css';
+
+/** Strip HTML tags for preview, keep text only */
+function stripTgHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/\n/g, ' ')
+    .trim();
+}
 
 function formatTime(iso) {
   const d = new Date(iso);
@@ -16,17 +29,54 @@ function formatTime(iso) {
 export default function Chats() {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'columns'
-  const [deleteModal, setDeleteModal] = useState(null); // { chatId, userName }
+  const [users, setUsers] = useState([]);
+  const [viewMode, setViewMode] = useState('list');
+  const [deleteModal, setDeleteModal] = useState(null);
+  const { unreadChats } = useUnread();
 
   useEffect(() => {
-    fetch('/api/chats')
-      .then(r => r.json())
-      .then(setChats)
-      .catch(() => {});
+    api.get('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
+    api.get('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
   }, []);
 
-  const getUser = (userId) => usersData.find(u => u.id === userId);
+  // SSE — реалтайм обновление списка чатов
+  useEffect(() => {
+    const token = localStorage.getItem('wl_admin_token');
+    const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
+    const es = new EventSource(url);
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'new_message') {
+          setChats(prev => {
+            const idx = prev.findIndex(c => c.id === data.chatId);
+            if (idx >= 0) {
+              // Обновляем существующий чат — добавляем сообщение
+              const updated = [...prev];
+              const chat = { ...updated[idx] };
+              if (!chat.messages.some(m => m.id === data.message.id)) {
+                chat.messages = [...chat.messages, data.message];
+              }
+              updated.splice(idx, 1);
+              return [chat, ...updated]; // Наверх
+            } else {
+              // Новый чат
+              return [{
+                id: data.chatId,
+                userId: data.userId,
+                messages: [data.message],
+              }, ...prev];
+            }
+          });
+        }
+      } catch {}
+    };
+
+    return () => es.close();
+  }, []);
+
+  const getUser = (userId) => users.find(u => u.id === userId);
 
   const handleDelete = (e, chatId, userName) => {
     e.stopPropagation();
@@ -36,11 +86,18 @@ export default function Chats() {
   const confirmDelete = async () => {
     const { chatId } = deleteModal;
     setDeleteModal(null);
-    await fetch(`/api/chats/${chatId}`, { method: 'DELETE' });
+    await api.delete(`/api/chats/${chatId}`);
     setChats(prev => prev.filter(c => c.id !== chatId));
   };
 
   const lastMsg = (chat) => chat.messages.at(-1);
+
+  // Sort by last message time (newest first)
+  const sortedChats = [...chats].sort((a, b) => {
+    const timeA = lastMsg(a)?.time ? new Date(lastMsg(a).time).getTime() : 0;
+    const timeB = lastMsg(b)?.time ? new Date(lastMsg(b).time).getTime() : 0;
+    return timeB - timeA;
+  });
 
   return (
     <div className="chats-container">
@@ -65,25 +122,27 @@ export default function Chats() {
         {chats.length === 0 && (
           <p className="chats-empty">Чатов пока нет</p>
         )}
-        {chats.map(chat => {
+        {sortedChats.map(chat => {
           const user = getUser(chat.userId);
+          const chatName = chat.fullName || (user ? user.fullName : null) || `Пользователь #${chat.userId}`;
           const msg = lastMsg(chat);
           return (
             <div
               key={chat.id}
-              className="chat-item"
+              className={`chat-item${unreadChats.has(chat.id) ? ' chat-item--unread' : ''}`}
               onClick={() => navigate(`/chats/${chat.id}`)}
             >
               <div className="chat-item-avatar">
-                {user ? user.fullName.charAt(0) : '?'}
+                {chatName.charAt(0)}
               </div>
               <div className="chat-item-info">
                 <span className="chat-item-name">
-                  {user ? user.fullName : `Пользователь #${chat.userId}`}
+                  {chatName}
+                  {chat.banned && <span className="chat-blocked-badge" title="Заблокировал бота" />}
                 </span>
                 {msg && (
                   <span className="chat-item-last">
-                    {msg.from === 'admin' ? 'Вы: ' : ''}{msg.text}
+                    {msg.from === 'admin' ? 'Вы: ' : ''}{stripTgHtml(msg.text)}
                   </span>
                 )}
               </div>

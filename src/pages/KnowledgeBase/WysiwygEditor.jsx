@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Heading1, Heading2, Heading3,
 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import PromptModal from './PromptModal';
 
 export default function WysiwygEditor({ initialContent, onContentChange }) {
@@ -80,11 +81,7 @@ export default function WysiwygEditor({ initialContent, onContentChange }) {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: reader.result }),
-        });
+        const res = await api.upload('/api/upload', { data: reader.result });
         const { url, error } = await res.json();
         if (error) throw new Error(error);
         execCmd('insertImage', url);

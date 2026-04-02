@@ -1,76 +1,709 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
+  Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
+  BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye,
+  Save, Clock, Calendar, Play, Edit3, FileBox
+} from 'lucide-react';
+import { api } from '../../utils/api.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
+import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import './Broadcasts.css';
+
+/** Strip HTML for preview text */
+function stripTgHtml(html) {
+  if (!html) return '';
+  return html
+    .replace(/<tg-emoji[^>]*>[^<]*<\/tg-emoji>/g, '⭐')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/\n/g, ' ')
+    .trim();
+}
+
+/** Sanitize TG HTML for safe rendering */
+function renderTgHtml(html) {
+  if (!html) return '';
+  let s = html;
+  s = s.replace(/\n/g, '<br>');
+  s = s.replace(/<tg-emoji\s+emoji-id="(\d+)">[^<]*<\/tg-emoji>/g,
+    (_, id) => `<img src="/emoji/${id}.webp" style="width:18px;height:18px;vertical-align:middle;display:inline" />`);
+  s = s.replace(/<(?!\/?(?:b|i|em|strong|a|code|br|img)\b)[^>]*>/gi, '');
+  return s;
+}
 
 const STATUS_LABELS = {
   published: 'Доставлена',
   partial: 'Частично',
   failed: 'Ошибка',
+  scheduled: 'Отложена',
 };
 
-export default function Broadcasts() {
-  const [channels, setChannels] = useState([]);
-  const [broadcasts, setBroadcasts] = useState([]);
-  const [loading, setLoading] = useState(true);
+const SECTIONS = [
+  { id: 'channels', label: 'Каналы', icon: Hash },
+  { id: 'users', label: 'Пользователи', icon: Users },
+  { id: 'groups', label: 'Группы', icon: MessageCircle },
+  { id: 'drafts', label: 'Черновики', icon: FileBox },
+];
 
-  // Форма новой рассылки
+const COMPOSE_MODES = [
+  { id: 'text', label: 'Текст', icon: FileText },
+  { id: 'poll', label: 'Опрос', icon: BarChart2 },
+  { id: 'quiz', label: 'Викторина', icon: HelpCircle },
+];
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* ═══ iOS-style Time Picker ═══ */
+function IosTimePicker({ value, onChange }) {
+  const [hours, minutes] = (value || '12:00').split(':').map(Number);
+  const hoursRef = useRef(null);
+  const minsRef = useRef(null);
+
+  const ITEM_H = 36;
+  const VISIBLE = 5;
+
+  const scrollToValue = (ref, val) => {
+    if (ref.current) {
+      ref.current.scrollTop = val * ITEM_H;
+    }
+  };
+
+  useEffect(() => {
+    scrollToValue(hoursRef, hours);
+    scrollToValue(minsRef, minutes);
+  }, []); // eslint-disable-line
+
+  const handleScroll = (ref, max, isHours) => {
+    const idx = Math.round(ref.current.scrollTop / ITEM_H);
+    const clamped = Math.max(0, Math.min(max, idx));
+    const h = isHours ? clamped : hours;
+    const m = isHours ? minutes : clamped;
+    onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  };
+
+  const renderColumn = (ref, count, val, isHours) => (
+    <div className="ios-tp-col" ref={ref}
+      onScroll={() => handleScroll(ref, count - 1, isHours)}
+      style={{ height: ITEM_H * VISIBLE }}
+    >
+      <div style={{ height: ITEM_H * 2 }} />
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''}`} style={{ height: ITEM_H }}
+          onClick={() => { scrollToValue(ref, i); }}
+        >
+          {String(i).padStart(2, '0')}
+        </div>
+      ))}
+      <div style={{ height: ITEM_H * 2 }} />
+    </div>
+  );
+
+  return (
+    <div className="ios-tp">
+      <div className="ios-tp-highlight" style={{ height: ITEM_H, top: ITEM_H * 2 }} />
+      {renderColumn(hoursRef, 24, hours, true)}
+      <span className="ios-tp-sep">:</span>
+      {renderColumn(minsRef, 60, minutes, false)}
+    </div>
+  );
+}
+
+/* ═══ Компонент прикрепления медиа ═══ */
+function MediaAttach({ media, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = localStorage.getItem('wl_admin_token');
+      const res = await fetch('/api/broadcasts/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      let previewUrl = null;
+      if (data.mimeType.startsWith('image/')) {
+        previewUrl = data.url || URL.createObjectURL(file);
+      }
+
+      onChange({ ...data, previewUrl });
+    } catch (err) {
+      alert('Ошибка загрузки: ' + err.message);
+    }
+    setUploading(false);
+  };
+
+  const handleRemove = () => {
+    if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl);
+    onChange(null);
+  };
+
+  const MediaIcon = media?.mimeType?.startsWith('image/') ? Image
+    : media?.mimeType?.startsWith('video/') ? Film
+    : FileText;
+
+  return (
+    <div className="bc-media-attach">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt"
+        style={{ display: 'none' }}
+        onChange={handleFileSelect}
+      />
+
+      {!media ? (
+        <button
+          className="bc-media-btn"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? <Loader size={14} className="spin" /> : <Paperclip size={14} />}
+          {uploading ? 'Загрузка...' : 'Прикрепить файл'}
+        </button>
+      ) : (
+        <div className="bc-media-preview">
+          {media.previewUrl ? (
+            <img src={media.previewUrl} alt="" className="bc-media-thumb" />
+          ) : (
+            <div className="bc-media-icon">
+              <MediaIcon size={24} />
+            </div>
+          )}
+          <div className="bc-media-info">
+            <span className="bc-media-name">{media.originalName}</span>
+            <span className="bc-media-size">{formatSize(media.size)}</span>
+          </div>
+          <button className="bc-media-remove" onClick={handleRemove} title="Удалить вложение">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Блок составления сообщения (текст / опрос / викторина) ═══ */
+function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, onSaveDraft, savingDraft, targetType, getTargetFilter, initialDraft }) {
+  const [mode, setMode] = useState('text');
   const [text, setText] = useState('');
+  const [media, setMedia] = useState(null);
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+
+  // Poll state
+  const [question, setQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+
+  // Quiz state
+  const [quizQuestion, setQuizQuestion] = useState('');
+  const [quizOptions, setQuizOptions] = useState(['', '']);
+  const [correctIndex, setCorrectIndex] = useState(0);
+
+  // Load initial draft data when editing
+  useEffect(() => {
+    if (initialDraft) {
+      if (initialDraft.poll) {
+        if (initialDraft.poll.type === 'quiz') {
+          setMode('quiz');
+          setQuizQuestion(initialDraft.poll.question || '');
+          setQuizOptions(initialDraft.poll.options?.length ? initialDraft.poll.options : ['', '']);
+          setCorrectIndex(initialDraft.poll.correctIndex || 0);
+        } else {
+          setMode('poll');
+          setQuestion(initialDraft.poll.question || '');
+          setPollOptions(initialDraft.poll.options?.length ? initialDraft.poll.options : ['', '']);
+        }
+      } else {
+        setMode('text');
+        setText(initialDraft.text || '');
+        setMedia(initialDraft.media || null);
+      }
+    }
+  }, [initialDraft]);
+
+  const addPollOption = () => setPollOptions(prev => [...prev, '']);
+  const removePollOption = (i) => setPollOptions(prev => prev.filter((_, idx) => idx !== i));
+  const editPollOption = (i, val) => setPollOptions(prev => { const n = [...prev]; n[i] = val; return n; });
+
+  const addQuizOption = () => setQuizOptions(prev => [...prev, '']);
+  const removeQuizOption = (i) => {
+    setQuizOptions(prev => prev.filter((_, idx) => idx !== i));
+    if (correctIndex === i) setCorrectIndex(0);
+    else if (correctIndex > i) setCorrectIndex(prev => prev - 1);
+  };
+  const editQuizOption = (i, val) => setQuizOptions(prev => { const n = [...prev]; n[i] = val; return n; });
+
+  const isValid = () => {
+    if (mode === 'text') return !!(text.trim() || media);
+    if (mode === 'poll') {
+      return !!question.trim() && pollOptions.filter(o => o.trim()).length >= 2;
+    }
+    if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      return !!quizQuestion.trim() && opts.length >= 2 && correctIndex < opts.length;
+    }
+    return false;
+  };
+
+  const getComposeBody = () => {
+    if (mode === 'text') {
+      const body = {};
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
+      return body;
+    } else if (mode === 'poll') {
+      const opts = pollOptions.filter(o => o.trim());
+      return { poll: { question: question.trim(), options: opts, type: 'regular' } };
+    } else if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      return { poll: { question: quizQuestion.trim(), options: opts, type: 'quiz', correctIndex } };
+    }
+    return null;
+  };
+
+  const handleSend = () => {
+    if (mode === 'text') {
+      const body = {};
+      if (text.trim()) body.text = text.trim();
+      if (media) body.media = { filename: media.filename, url: media.url, originalName: media.originalName, mimeType: media.mimeType };
+      onSend(body, () => { setText(''); setMedia(null); });
+    } else if (mode === 'poll') {
+      const opts = pollOptions.filter(o => o.trim());
+      if (!question.trim()) { alert('Введите вопрос опроса!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      onSend({ poll: { question: question.trim(), options: opts, type: 'regular' } }, () => {
+        setQuestion(''); setPollOptions(['', '']);
+      });
+    } else if (mode === 'quiz') {
+      const opts = quizOptions.filter(o => o.trim());
+      if (!quizQuestion.trim()) { alert('Введите вопрос викторины!'); return; }
+      if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
+      if (correctIndex >= opts.length) { alert('Выберите правильный ответ!'); return; }
+      onSend({ poll: { question: quizQuestion.trim(), options: opts, type: 'quiz', correctIndex } }, () => {
+        setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0);
+      });
+    }
+  };
+
+  return (
+    <div className="bc-section">
+      <h3 className="bc-section-title">{title}</h3>
+
+      {/* Переключатель режима */}
+      <div className="bc-mode-tabs">
+        {COMPOSE_MODES.map(m => {
+          const MIcon = m.icon;
+          return (
+            <button
+              key={m.id}
+              className={`bc-mode-tab${mode === m.id ? ' bc-mode-tab--active' : ''}`}
+              onClick={() => setMode(m.id)}
+            >
+              <MIcon size={14} />
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Текстовый режим */}
+      {mode === 'text' && (
+        <>
+          <TgHtmlEditor
+            value={text}
+            onChange={setText}
+            placeholder="Текст сообщения..."
+            minRows={3}
+          />
+          <MediaAttach media={media} onChange={setMedia} />
+        </>
+      )}
+
+      {/* Опрос */}
+      {mode === 'poll' && (
+        <div className="bc-poll-editor">
+          <input
+            className="bc-poll-question"
+            type="text"
+            placeholder="Вопрос опроса..."
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+          />
+          <div className="bc-poll-options">
+            {pollOptions.map((opt, i) => (
+              <div key={i} className="bc-poll-option-row">
+                <span className="bc-poll-option-num">{i + 1}</span>
+                <input
+                  className="bc-poll-option-input"
+                  type="text"
+                  placeholder={`Вариант ${i + 1}`}
+                  value={opt}
+                  onChange={e => editPollOption(i, e.target.value)}
+                />
+                {pollOptions.length > 2 && (
+                  <button className="bc-poll-option-remove" onClick={() => removePollOption(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {pollOptions.length < 10 && (
+            <button className="bc-poll-add-btn" onClick={addPollOption}>
+              <Plus size={14} /> Добавить вариант
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Викторина */}
+      {mode === 'quiz' && (
+        <div className="bc-poll-editor">
+          <input
+            className="bc-poll-question"
+            type="text"
+            placeholder="Вопрос викторины..."
+            value={quizQuestion}
+            onChange={e => setQuizQuestion(e.target.value)}
+          />
+          <div className="bc-poll-hint">Нажмите на галочку, чтобы отметить правильный ответ</div>
+          <div className="bc-poll-options">
+            {quizOptions.map((opt, i) => (
+              <div key={i} className={`bc-poll-option-row${correctIndex === i ? ' bc-poll-option-row--correct' : ''}`}>
+                <button
+                  className={`bc-quiz-correct-btn${correctIndex === i ? ' bc-quiz-correct-btn--active' : ''}`}
+                  onClick={() => setCorrectIndex(i)}
+                  title="Правильный ответ"
+                >
+                  <Check size={12} />
+                </button>
+                <input
+                  className="bc-poll-option-input"
+                  type="text"
+                  placeholder={`Вариант ${i + 1}`}
+                  value={opt}
+                  onChange={e => editQuizOption(i, e.target.value)}
+                />
+                {quizOptions.length > 2 && (
+                  <button className="bc-poll-option-remove" onClick={() => removeQuizOption(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {quizOptions.length < 10 && (
+            <button className="bc-poll-add-btn" onClick={addQuizOption}>
+              <Plus size={14} /> Добавить вариант
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Schedule toggle */}
+      <div className="bc-schedule-toggle">
+        <button
+          className={`bc-schedule-btn ${!scheduleMode ? 'bc-schedule-btn--active' : ''}`}
+          onClick={() => setScheduleMode(false)}
+        >
+          <Send size={13} /> Отправить сейчас
+        </button>
+        <button
+          className={`bc-schedule-btn ${scheduleMode ? 'bc-schedule-btn--active' : ''}`}
+          onClick={() => setScheduleMode(true)}
+        >
+          <Clock size={13} /> Запланировать
+        </button>
+      </div>
+
+      {scheduleMode && (
+        <div className="bc-schedule-picker-styled">
+          <div className="bc-schedule-date-section">
+            <Calendar size={14} />
+            <input
+              type="date"
+              className="bc-schedule-date-input"
+              value={scheduledAt ? scheduledAt.slice(0, 10) : ''}
+              onChange={e => {
+                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+                setScheduledAt(e.target.value + 'T' + time);
+              }}
+              min={new Date().toISOString().slice(0, 10)}
+            />
+          </div>
+          <IosTimePicker
+            value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
+            onChange={(time) => {
+              const date = scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+              setScheduledAt(date + 'T' + time);
+            }}
+          />
+        </div>
+      )}
+
+      <div className="bc-compose-footer">
+        <span className="bc-compose-hint">{hintText}</span>
+        <div className="bc-compose-actions">
+          {onSaveDraft && (
+            <button
+              className="bc-draft-save-btn"
+              disabled={savingDraft || !isValid()}
+              onClick={() => {
+                const body = getComposeBody();
+                if (body) onSaveDraft(body);
+              }}
+            >
+              {savingDraft ? <Loader size={14} className="spin" /> : <Save size={14} />}
+              {savingDraft ? 'Сохранение...' : 'Сохранить черновик'}
+            </button>
+          )}
+          {scheduleMode ? (
+            <button
+              className="broadcasts-create-btn bc-schedule-send-btn"
+              disabled={sending || !(canSend && isValid()) || !scheduledAt}
+              onClick={() => {
+                const body = getComposeBody();
+                if (body && onSaveDraft) {
+                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: scheduledAt }, () => {
+                    setText(''); setMedia(null); setQuestion(''); setPollOptions(['', '']); setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0); setScheduleMode(false); setScheduledAt('');
+                  });
+                }
+              }}
+            >
+              <Clock size={16} /> Запланировать
+            </button>
+          ) : (
+            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
+              {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
+              {sending ? 'Отправка...' : 'Отправить'}
+            </button>
+          )}
+        </div>
+      </div>
+      {sendResult && (
+        <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
+          {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Вкладка «Каналы» ═══ */
+function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 'channels' }) {
+  const [tags, setTags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showDD, setShowDD] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const ddRef = useRef(null);
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`)
+      .then(r => r.json())
+      .then(data => { setTags(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [chatId, entityType]);
+
+  useEffect(() => {
+    const handler = (e) => { if (ddRef.current && !ddRef.current.contains(e.target)) setShowDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const saveTags = async (newTags) => {
+    setTags(newTags);
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
+      onTagsChange?.();
+    } catch { /* ignore */ }
+  };
+
+  const toggleTag = (tag) => {
+    const newTags = tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag];
+    saveTags(newTags);
+  };
+
+  const removeTag = (tag) => {
+    saveTags(tags.filter(t => t !== tag));
+  };
+
+  const addNewTag = () => {
+    const t = tagSearch.trim();
+    if (t && !tags.includes(t)) {
+      saveTags([...tags, t]);
+    }
+    setTagSearch('');
+  };
+
+  if (loading) return null;
+
+  const filteredSuggestions = allChannelTags
+    .filter(t => !tags.includes(t))
+    .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()));
+
+  return (
+    <div className="bc-ch-tags" ref={ddRef}>
+      {tags.map(t => (
+        <span key={t} className="bc-ch-tag-chip">
+          {t}
+          <button className="bc-chip-remove" onClick={(e) => { e.stopPropagation(); removeTag(t); }}><X size={10} /></button>
+        </span>
+      ))}
+      <button className="bc-ch-tag-add" onClick={(e) => { e.stopPropagation(); setShowDD(!showDD); }} title="Добавить тег">
+        <Plus size={12} />
+      </button>
+      {showDD && (
+        <div className="bc-ch-tag-dropdown">
+          <div className="bc-tag-search-wrap">
+            <Search size={12} className="bc-tag-search-icon" />
+            <input
+              className="bc-tag-search-input"
+              type="text"
+              placeholder="Поиск или новый тег..."
+              value={tagSearch}
+              onChange={e => setTagSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { addNewTag(); } }}
+              autoFocus
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div className="bc-tag-options-list">
+            {filteredSuggestions.map(t => (
+              <div key={t} className="bc-tag-option" onClick={(e) => { e.stopPropagation(); toggleTag(t); }}>
+                {t}
+              </div>
+            ))}
+            {tagSearch.trim() && !allChannelTags.includes(tagSearch.trim()) && !tags.includes(tagSearch.trim()) && (
+              <div className="bc-tag-option bc-tag-option--create" onClick={(e) => { e.stopPropagation(); addNewTag(); }}>
+                <Plus size={12} /> Создать «{tagSearch.trim()}»
+              </div>
+            )}
+            {filteredSuggestions.length === 0 && !tagSearch.trim() && (
+              <div className="bc-tag-option bc-tag-option--empty">Введите название тега</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
+  const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
+  const [addModal, setAddModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archived, setArchived] = useState([]);
 
-  // Модалки
-  const [addChannelModal, setAddChannelModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState(null);
+  // Channel tags
+  const [allChannelTags, setAllChannelTags] = useState([]);
+  const [filterChannelTags, setFilterChannelTags] = useState([]);
+  const [channelTagsMap, setChannelTagsMap] = useState({});
+  const [showChTagDD, setShowChTagDD] = useState(false);
+  const [chTagSearch, setChTagSearch] = useState('');
+  const chTagRef = useRef(null);
 
-  // Поиск
-  const [search, setSearch] = useState('');
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [chRes, brRes] = await Promise.all([
-        fetch('/api/broadcasts/channels'),
-        fetch('/api/broadcasts'),
-      ]);
-      setChannels(await chRes.json());
-      setBroadcasts(await brRes.json());
-    } catch { /* ignore */ }
-    setLoading(false);
+  const loadAllChannelTags = useCallback(() => {
+    api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllChannelTags).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const loadChannelTagsMap = useCallback(async (chList) => {
+    const map = {};
+    await Promise.all(chList.map(async (ch) => {
+      try {
+        const res = await api.get(`/api/broadcasts/channels/${encodeURIComponent(ch.chatId)}/tags`);
+        map[ch.chatId] = await res.json();
+      } catch { map[ch.chatId] = []; }
+    }));
+    setChannelTagsMap(map);
+  }, []);
 
-  // Добавить канал
+  const loadChannels = useCallback(() => {
+    api.get('/api/broadcasts/channels').then(r => r.json()).then(data => {
+      setChannels(data);
+      loadChannelTagsMap(data);
+    }).catch(() => {});
+  }, [loadChannelTagsMap]);
+
+  const loadArchive = useCallback(() => {
+    api.get('/api/broadcasts/channels/archive').then(r => r.json()).then(setArchived).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadChannels(); loadAllChannelTags(); }, [loadChannels, loadAllChannelTags]);
+
+  useEffect(() => {
+    const handler = (e) => { if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleTagsChange = () => {
+    loadAllChannelTags();
+    loadChannels();
+  };
+
+  const handleArchive = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/channels/${id}/archive`);
+      loadChannels();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/channels/restore/${id}`);
+      loadChannels();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
   const handleAddChannel = async (input) => {
-    setAddChannelModal(false);
+    setAddModal(false);
     const chatId = input.trim();
     if (!chatId) return;
-    // Если ввели @username — оставляем как есть, Telegram примет
     const title = chatId.startsWith('@') ? chatId : `Канал ${chatId}`;
     try {
-      const res = await fetch('/api/broadcasts/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId, title }),
-      });
+      const res = await api.post('/api/broadcasts/channels', { chatId, title });
       const ch = await res.json();
       if (!res.ok) return alert(ch.error);
       setChannels(prev => [...prev, ch]);
     } catch (err) { alert(err.message); }
   };
 
-  // Удалить канал
   const handleDeleteChannel = async (id) => {
-    await fetch(`/api/broadcasts/channels/${id}`, { method: 'DELETE' });
+    const res = await api.delete(`/api/broadcasts/channels/${id}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setChannels(prev => prev.filter(c => c.id !== id));
-    setSelectedChannels(prev => prev.filter(cid => {
-      const ch = channels.find(c => c.id === id);
-      return ch ? cid !== ch.chatId : true;
-    }));
   };
 
-  // Выбор/снятие канала
+  const toggleChFilterTag = (tag) => {
+    setFilterChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const filteredChannels = filterChannelTags.length > 0
+    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t)))
+    : channels;
+
   const toggleChannel = (chatId) => {
     setSelectedChannels(prev =>
       prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
@@ -78,32 +711,26 @@ export default function Broadcasts() {
   };
 
   const selectAll = () => {
-    if (selectedChannels.length === channels.length) {
-      setSelectedChannels([]);
-    } else {
-      setSelectedChannels(channels.map(c => c.chatId));
-    }
+    setSelectedChannels(prev =>
+      prev.length === filteredChannels.length ? [] : filteredChannels.map(c => c.chatId)
+    );
   };
 
-  // Отправить рассылку
-  const handleSend = async () => {
-    if (!text.trim() || !selectedChannels.length) return;
+  const handleSend = async (composeBody, resetCompose) => {
+    if (!selectedChannels.length) return;
     setSending(true);
     setSendResult(null);
     try {
-      const res = await fetch('/api/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), channelIds: selectedChannels }),
-      });
+      const body = { channelIds: selectedChannels, ...composeBody };
+      const res = await api.post('/api/broadcasts', body);
       const data = await res.json();
       if (!res.ok) {
         setSendResult({ error: data.error });
       } else {
         setSendResult(data);
-        setText('');
+        resetCompose();
         setSelectedChannels([]);
-        setBroadcasts(prev => [data, ...prev]);
+        onSendResult?.(data);
       }
     } catch (err) {
       setSendResult({ error: err.message });
@@ -111,18 +738,959 @@ export default function Broadcasts() {
     setSending(false);
   };
 
-  // Удалить рассылку из истории
+  return (
+    <>
+      <div className="bc-section">
+        <div className="bc-section-header">
+          <h3 className="bc-section-title">Каналы</h3>
+          <div className="bc-header-actions">
+            {allChannelTags.length > 0 && (
+              <div className="bc-tag-filter" ref={chTagRef}>
+                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
+                  <Tag size={13} />
+                  <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
+                  <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
+                </button>
+                {showChTagDD && (
+                  <div className="bc-tag-dropdown">
+                    {allChannelTags.length > 5 && (
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={chTagSearch}
+                          onChange={e => setChTagSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                    <div className="bc-tag-options-list">
+                      <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
+                        Все теги
+                      </div>
+                      {allChannelTags
+                        .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
+                        .map(t => (
+                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleChFilterTag(t); }}>
+                            <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                            <span>{t}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
+              <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
+              {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
+            </button>
+            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+              <Plus size={16} /> Добавить
+            </button>
+          </div>
+        </div>
+
+        {filterChannelTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {filterChannelTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => setFilterChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setFilterChannelTags([])}>Сбросить</button>
+          </div>
+        )}
+
+        {/* Active channels list */}
+        {channels.length === 0 ? (
+          <div className="bc-channels-empty">
+            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
+          </div>
+        ) : (
+          <div className="bc-list-view">
+            <label className="bc-list-item bc-list-item--all">
+              <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
+              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
+            </label>
+            {filteredChannels.map(ch => (
+              <div key={ch.id} className="bc-list-item bc-list-item--with-tags">
+                <label className="bc-list-item-main">
+                  <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
+                  <Hash size={14} className="bc-list-icon" />
+                  <span className="bc-list-title">{ch.title}</span>
+                  <span className="bc-list-id">{ch.chatId}</span>
+                </label>
+                <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
+                <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
+                  <Archive size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Archived channels */}
+        {showArchive && (
+          <div className="bc-archive-section">
+            <h4 className="bc-archive-title"><Archive size={14} /> Архив каналов</h4>
+            {archived.length === 0 ? (
+              <div className="bc-channels-empty">Архив пуст</div>
+            ) : (
+              <div className="bc-list-view bc-list-view--archive">
+                {archived.map(ch => (
+                  <div key={ch.id} className="bc-list-item bc-list-item--archived">
+                    <div className="bc-list-item-main">
+                      <Hash size={14} className="bc-list-icon" />
+                      <span className="bc-list-title">{ch.title}</span>
+                      <span className="bc-list-id">{ch.chatId}</span>
+                    </div>
+                    <button className="bc-list-restore-btn" onClick={() => handleRestore(ch.id)} title="Восстановить">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ComposeBlock
+        title="Новая рассылка в каналы"
+        hintText={selectedChannels.length > 0 ? `Выбрано каналов: ${selectedChannels.length}` : 'Выберите каналы выше'}
+        canSend={selectedChannels.length > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+        targetType="channels"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'channels', targetFilter: { channelIds: selectedChannels } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
+      />
+
+      {addModal && (
+        <PromptModal
+          title="Добавить канал"
+          placeholder="@username или chat_id (например -1001234567890)"
+          onConfirm={handleAddChannel}
+          onCancel={() => setAddModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Вкладка «Пользователи» ═══ */
+function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  // Фильтры
+  const [tags, setTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [userCount, setUserCount] = useState(null);
+  const [countLoading, setCountLoading] = useState(false);
+
+  // Загрузка тегов
+  useEffect(() => {
+    api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
+  }, []);
+
+  // Подсчёт по фильтрам
+  useEffect(() => {
+    setCountLoading(true);
+    const params = new URLSearchParams();
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+
+    api.get(`/api/broadcasts/users/count?${params}`)
+      .then(r => r.json())
+      .then(data => setUserCount(data.count))
+      .catch(() => setUserCount(null))
+      .finally(() => setCountLoading(false));
+  }, [selectedTags]);
+
+  const toggleTag = (tag) => {
+    setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const removeTag = (tag) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const handleSend = async (composeBody, resetCompose) => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      const filters = {};
+      if (selectedTags.length > 0) filters.tags = selectedTags;
+
+      const body = { filters, ...composeBody };
+
+      const res = await api.post('/api/broadcasts/users', body);
+      const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: data.error });
+      } else {
+        setSendResult(data);
+        resetCompose();
+        onSendResult?.(data);
+      }
+    } catch (err) {
+      setSendResult({ error: err.message });
+    }
+    setSending(false);
+  };
+
+  const [showTagDD, setShowTagDD] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const tagRef = useRef(null);
+  const tagSearchRef = useRef(null);
+
+  // Recipients list
+  const [showRecipients, setShowRecipients] = useState(false);
+  const [recipientsList, setRecipientsList] = useState([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [recipientsHasMore, setRecipientsHasMore] = useState(false);
+  const [recipientsLoadingMore, setRecipientsLoadingMore] = useState(false);
+  const recipientsListRef = useRef(null);
+
+  const RECIPIENTS_PAGE = 100;
+
+  const fetchRecipients = async (offset = 0) => {
+    const params = new URLSearchParams();
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    params.set('limit', RECIPIENTS_PAGE);
+    params.set('offset', offset);
+    const res = await api.get(`/api/broadcasts/users/list?${params}`);
+    return res.json();
+  };
+
+  const loadRecipients = async () => {
+    if (showRecipients) { setShowRecipients(false); return; }
+    setRecipientsLoading(true);
+    try {
+      const data = await fetchRecipients(0);
+      setRecipientsList(data);
+      setRecipientsHasMore(data.length >= RECIPIENTS_PAGE);
+      setShowRecipients(true);
+    } catch { setRecipientsList([]); }
+    setRecipientsLoading(false);
+  };
+
+  const loadMoreRecipients = async () => {
+    if (recipientsLoadingMore || !recipientsHasMore) return;
+    setRecipientsLoadingMore(true);
+    try {
+      const data = await fetchRecipients(recipientsList.length);
+      setRecipientsList(prev => [...prev, ...data]);
+      setRecipientsHasMore(data.length >= RECIPIENTS_PAGE);
+    } catch {}
+    setRecipientsLoadingMore(false);
+  };
+
+  const handleRecipientsScroll = (e) => {
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+      loadMoreRecipients();
+    }
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (tagRef.current && !tagRef.current.contains(e.target)) setShowTagDD(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <>
+      <div className="bc-users-filters">
+        <div className="bc-tag-filter" ref={tagRef}>
+          <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
+            <Tag size={14} />
+            <span>{selectedTags.length === 0 ? 'Все теги' : `Тегов: ${selectedTags.length}`}</span>
+            <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
+          </button>
+          {showTagDD && (
+            <div className="bc-tag-dropdown">
+              {tags.length > 5 && (
+                <div className="bc-tag-search-wrap">
+                  <Search size={13} className="bc-tag-search-icon" />
+                  <input
+                    ref={tagSearchRef}
+                    className="bc-tag-search-input"
+                    type="text"
+                    placeholder="Поиск тега..."
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div className="bc-tag-options-list">
+                {(!tagSearch.trim()) && (
+                  <div className={`bc-tag-option ${selectedTags.length === 0 ? 'active' : ''}`} onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
+                    Все теги
+                  </div>
+                )}
+                {tags
+                  .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                  .map(t => (
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleTag(t); }}>
+                      <input type="checkbox" checked={selectedTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                      <span>{t}</span>
+                    </label>
+                  ))}
+                {tagSearch.trim() && tags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).length === 0 && (
+                  <div className="bc-tag-option bc-tag-option--empty">Ничего не найдено</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {selectedTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {selectedTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => removeTag(t)}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setSelectedTags([])}>Сбросить</button>
+          </div>
+        )}
+
+        <div className="bc-user-count">
+          <Users size={15} />
+          {countLoading ? <span>Подсчёт...</span> : <span>Получателей: <b>{userCount ?? '—'}</b></span>}
+          {userCount > 0 && (
+            <button
+              className="bc-show-recipients-btn"
+              onClick={loadRecipients}
+              disabled={recipientsLoading}
+              title="Показать список получателей"
+            >
+              {recipientsLoading ? <Loader size={14} className="spin" /> : <Eye size={14} />}
+              Показать список
+            </button>
+          )}
+        </div>
+
+        {showRecipients && (
+          <div className="bc-recipients-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowRecipients(false); }}>
+            <div className="bc-recipients-modal">
+              <div className="bc-recipients-header">
+                <span>Получатели ({recipientsList.length}{userCount > 100 ? ` из ${userCount}` : ''})</span>
+                <button className="bc-recipients-close" onClick={() => setShowRecipients(false)}><X size={14} /></button>
+              </div>
+              <div className="bc-recipients-list" ref={recipientsListRef} onScroll={handleRecipientsScroll}>
+                {recipientsList.map(u => (
+                  <div key={u.user_id} className="bc-recipient-row">
+                    <span className="bc-recipient-name">{u.full_name || '—'}</span>
+                    {u.username && <span className="bc-recipient-username">@{u.username}</span>}
+                    <span className="bc-recipient-id">{u.user_id}</span>
+                  </div>
+                ))}
+                {recipientsLoadingMore && <div className="bc-recipients-loading-more"><Loader size={16} className="spin" /> Загрузка...</div>}
+                {recipientsList.length === 0 && !recipientsLoadingMore && <div className="bc-recipients-empty">Нет получателей</div>}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ComposeBlock
+        title="Рассылка пользователям бота"
+        hintText={userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
+        canSend={userCount > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+        targetType="users"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters: selectedTags.length > 0 ? { tags: selectedTags } : {} } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
+      />
+    </>
+  );
+}
+
+/* ═══ Вкладка «Группы» ═══ */
+function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
+  const [groups, setGroups] = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [addModal, setAddModal] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archived, setArchived] = useState([]);
+
+  // Group tags (separate table from channels)
+  const [allGroupTags, setAllGroupTags] = useState([]);
+  const [filterGroupTags, setFilterGroupTags] = useState([]);
+  const [groupTagsMap, setGroupTagsMap] = useState({});
+  const [showGrTagDD, setShowGrTagDD] = useState(false);
+  const [grTagSearch, setGrTagSearch] = useState('');
+  const grTagRef = useRef(null);
+
+  const loadAllGroupTags = useCallback(() => {
+    api.get('/api/broadcasts/group-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
+  }, []);
+
+  const loadGroupTagsMap = useCallback(async (grList) => {
+    const map = {};
+    await Promise.all(grList.map(async (g) => {
+      try {
+        const res = await api.get(`/api/broadcasts/groups/${encodeURIComponent(g.chatId)}/tags`);
+        map[g.chatId] = await res.json();
+      } catch { map[g.chatId] = []; }
+    }));
+    setGroupTagsMap(map);
+  }, []);
+
+  const loadGroups = useCallback(() => {
+    api.get('/api/broadcasts/groups').then(r => r.json()).then(data => {
+      setGroups(data);
+      loadGroupTagsMap(data);
+    }).catch(() => {});
+  }, [loadGroupTagsMap]);
+
+  const loadArchive = useCallback(() => {
+    api.get('/api/broadcasts/groups/archive').then(r => r.json()).then(setArchived).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadGroups(); loadAllGroupTags(); }, [loadGroups, loadAllGroupTags]);
+
+  useEffect(() => {
+    const handler = (e) => { if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleTagsChange = () => {
+    loadAllGroupTags();
+    loadGroups();
+  };
+
+  const handleArchive = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/groups/${id}/archive`);
+      loadGroups();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      await api.post(`/api/broadcasts/groups/restore/${id}`);
+      loadGroups();
+      loadArchive();
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
+  const handleAddGroup = async (input) => {
+    setAddModal(false);
+    const chatId = input.trim();
+    if (!chatId) return;
+    const title = chatId.startsWith('@') ? chatId : `Группа ${chatId}`;
+    try {
+      const res = await api.post('/api/broadcasts/groups', { chatId, title });
+      const g = await res.json();
+      if (!res.ok) return alert(g.error);
+      setGroups(prev => [...prev, g]);
+    } catch (err) { alert(err.message); }
+  };
+
+  const handleDeleteGroup = async (id) => {
+    const res = await api.delete(`/api/broadcasts/groups/${id}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+    setGroups(prev => prev.filter(g => g.id !== id));
+  };
+
+  const toggleGrFilterTag = (tag) => {
+    setFilterGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const filteredGroups = filterGroupTags.length > 0
+    ? groups.filter(g => (groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t)))
+    : groups;
+
+  const toggleGroup = (chatId) => {
+    setSelectedGroups(prev =>
+      prev.includes(chatId) ? prev.filter(c => c !== chatId) : [...prev, chatId]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedGroups(prev =>
+      prev.length === filteredGroups.length ? [] : filteredGroups.map(g => g.chatId)
+    );
+  };
+
+  const handleSend = async (composeBody, resetCompose) => {
+    if (!selectedGroups.length) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const body = { groupIds: selectedGroups, ...composeBody };
+      const res = await api.post('/api/broadcasts/groups/send', body);
+      const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: data.error });
+      } else {
+        setSendResult(data);
+        resetCompose();
+        setSelectedGroups([]);
+        onSendResult?.(data);
+      }
+    } catch (err) {
+      setSendResult({ error: err.message });
+    }
+    setSending(false);
+  };
+
+  return (
+    <>
+      <div className="bc-section">
+        <div className="bc-section-header">
+          <h3 className="bc-section-title">Группы / чаты</h3>
+          <div className="bc-header-actions">
+            {allGroupTags.length > 0 && (
+              <div className="bc-tag-filter" ref={grTagRef}>
+                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
+                  <Tag size={13} />
+                  <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
+                  <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
+                </button>
+                {showGrTagDD && (
+                  <div className="bc-tag-dropdown">
+                    {allGroupTags.length > 5 && (
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={grTagSearch}
+                          onChange={e => setGrTagSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                    <div className="bc-tag-options-list">
+                      <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
+                        Все теги
+                      </div>
+                      {allGroupTags
+                        .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
+                        .map(t => (
+                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleGrFilterTag(t); }}>
+                            <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                            <span>{t}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
+              <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
+              {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
+            </button>
+            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
+              <Plus size={16} /> Добавить
+            </button>
+          </div>
+        </div>
+
+        {filterGroupTags.length > 0 && (
+          <div className="bc-selected-tags">
+            {filterGroupTags.map(t => (
+              <span key={t} className="bc-selected-tag-chip">
+                {t}
+                <button className="bc-chip-remove" onClick={() => setFilterGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => setFilterGroupTags([])}>Сбросить</button>
+          </div>
+        )}
+
+        {groups.length === 0 ? (
+          <div className="bc-channels-empty">
+            Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
+          </div>
+        ) : (
+          <div className="bc-list-view">
+            <label className="bc-list-item bc-list-item--all">
+              <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
+              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
+            </label>
+            {filteredGroups.map(g => (
+              <div key={g.id} className="bc-list-item bc-list-item--with-tags">
+                <label className="bc-list-item-main">
+                  <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
+                  <MessageCircle size={14} className="bc-list-icon" />
+                  <span className="bc-list-title">{g.title}</span>
+                  <span className="bc-list-id">{g.chatId}</span>
+                </label>
+                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
+                <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
+                  <Archive size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showArchive && (
+          <div className="bc-archive-section">
+            <h4 className="bc-archive-title"><Archive size={14} /> Архив групп</h4>
+            {archived.length === 0 ? (
+              <div className="bc-channels-empty">Архив пуст</div>
+            ) : (
+              <div className="bc-list-view bc-list-view--archive">
+                {archived.map(g => (
+                  <div key={g.id} className="bc-list-item bc-list-item--archived">
+                    <div className="bc-list-item-main">
+                      <MessageCircle size={14} className="bc-list-icon" />
+                      <span className="bc-list-title">{g.title}</span>
+                      <span className="bc-list-id">{g.chatId}</span>
+                    </div>
+                    <button className="bc-list-restore-btn" onClick={() => handleRestore(g.id)} title="Восстановить">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ComposeBlock
+        title="Рассылка в группы"
+        hintText={selectedGroups.length > 0 ? `Выбрано групп: ${selectedGroups.length}` : 'Выберите группы выше'}
+        canSend={selectedGroups.length > 0}
+        sending={sending}
+        sendResult={sendResult}
+        onSend={handleSend}
+        targetType="groups"
+        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'groups', targetFilter: { groupIds: selectedGroups } }, resetCb)}
+        savingDraft={savingDraft}
+        initialDraft={initialDraft}
+      />
+
+      {addModal && (
+        <PromptModal
+          title="Добавить группу"
+          placeholder="Chat ID группы (например -1001234567890)"
+          onConfirm={handleAddGroup}
+          onCancel={() => setAddModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Вкладка «Черновики» ═══ */
+function DraftsTab({ onSendResult, onEditDraft }) {
+  const [drafts, setDrafts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sendingId, setSendingId] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [confirmSend, setConfirmSend] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const loadDrafts = useCallback(async () => {
+    try {
+      const res = await api.get('/api/broadcasts/drafts');
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      setDrafts(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadDrafts(); }, [loadDrafts]);
+
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    try {
+      await api.delete(`/api/broadcasts/drafts/${deleteModal}`);
+      setDrafts(prev => prev.filter(d => d.id !== deleteModal));
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setDeleteModal(null);
+  };
+
+  const handleSend = async (draft) => {
+    setSendingId(draft.id);
+    try {
+      const res = await api.post(`/api/broadcasts/drafts/${draft.id}/send`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Ошибка отправки');
+      } else {
+        onSendResult?.(data);
+        setDrafts(prev => prev.filter(d => d.id !== draft.id));
+      }
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setSendingId(null);
+    setConfirmSend(null);
+  };
+
+  const handleCancelSchedule = async (scheduleId, draftId) => {
+    setCancellingId(scheduleId);
+    try {
+      await api.delete(`/api/broadcasts/scheduled/${scheduleId}`);
+      setDrafts(prev => prev.map(d => d.id === draftId ? { ...d, scheduledAt: null, scheduleId: null, scheduleStatus: null } : d));
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setCancellingId(null);
+  };
+
+  const TARGET_LABELS = { channels: 'Каналы', groups: 'Группы', users: 'Пользователи' };
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 32 }}><Loader size={24} className="spin" style={{ color: 'var(--color-orange)' }} /></div>;
+  }
+
+  return (
+    <>
+      {drafts.length === 0 ? (
+        <div className="bc-channels-empty">
+          Черновиков нет. Создайте черновик из вкладки Каналы, Группы или Пользователи.
+        </div>
+      ) : (
+        <div className="bc-drafts-list">
+          {drafts.map(d => (
+            <div key={d.id} className="bc-draft-card">
+              <div className="bc-draft-header">
+                <span className="bc-draft-name">{d.name || 'Без названия'}</span>
+                <span className="bc-draft-target">{TARGET_LABELS[d.targetType] || d.targetType}</span>
+                {d.scheduledAt && d.scheduleStatus === 'pending' && (
+                  <span className="bc-draft-scheduled-badge">
+                    <Clock size={12} />
+                    {new Date(d.scheduledAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}{' '}
+                    {new Date(d.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <div className="bc-draft-preview">
+                {d.poll ? (
+                  <span>[{d.poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] {d.poll.question}</span>
+                ) : (
+                  <span dangerouslySetInnerHTML={{ __html: renderTgHtml((d.text || '').substring(0, 120)) }} />
+                )}
+              </div>
+              <div className="bc-draft-footer">
+                <span className="bc-draft-date">
+                  {new Date(d.updatedAt).toLocaleDateString('ru-RU')}{' '}
+                  {new Date(d.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <div className="bc-draft-actions">
+                  {d.scheduleId && d.scheduleStatus === 'pending' && (
+                    <button
+                      className="bc-draft-action-btn bc-draft-cancel-btn"
+                      onClick={() => handleCancelSchedule(d.scheduleId, d.id)}
+                      disabled={cancellingId === d.scheduleId}
+                      title="Отменить расписание"
+                    >
+                      {cancellingId === d.scheduleId ? <Loader size={13} className="spin" /> : <X size={13} />}
+                      Отменить
+                    </button>
+                  )}
+                  <button
+                    className="bc-draft-action-btn bc-draft-edit-btn"
+                    onClick={() => onEditDraft?.(d)}
+                    title="Редактировать"
+                  >
+                    <Edit3 size={13} /> Редактировать
+                  </button>
+                  <button
+                    className="bc-draft-action-btn bc-draft-send-btn"
+                    onClick={() => setConfirmSend(d)}
+                    disabled={sendingId === d.id}
+                    title="Отправить сейчас"
+                  >
+                    {sendingId === d.id ? <Loader size={13} className="spin" /> : <Play size={13} />}
+                    Отправить
+                  </button>
+                  <button
+                    className="bc-draft-action-btn bc-draft-delete-btn"
+                    onClick={() => setDeleteModal(d.id)}
+                    title="Удалить"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {deleteModal && (
+        <PromptModal
+          title="Удалить черновик?"
+          isConfirm
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteModal(null)}
+        />
+      )}
+
+      {confirmSend && (
+        <PromptModal
+          title={`Отправить «${confirmSend.name}»?`}
+          isConfirm
+          onConfirm={() => handleSend(confirmSend)}
+          onCancel={() => setConfirmSend(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ═══ Главный компонент ═══ */
+function LoadMoreTrigger({ onVisible }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) onVisible(); },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onVisible]);
+  return <div ref={ref} style={{ height: 1 }} />;
+}
+
+export default function Broadcasts() {
+  const [openSection, setOpenSection] = useState('channels');
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deliveryModal, setDeliveryModal] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
+  const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
+  const [filterType, setFilterType] = useState(''); // channels|users|groups
+  const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
+  const [pollStatsModal, setPollStatsModal] = useState(null); // { question, stats, totalVotes, ... }
+  const [pollStatsLoading, setPollStatsLoading] = useState(false);
+
+  const fetchBroadcasts = useCallback(async () => {
+    try {
+      const res = await api.get('/api/broadcasts');
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      setBroadcasts(await res.json());
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchBroadcasts(); }, [fetchBroadcasts]);
+
+  const loadPollStats = async (pollId) => {
+    setPollStatsLoading(true);
+    try {
+      const res = await api.get(`/api/broadcasts/poll/${pollId}/stats`);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      const data = await res.json();
+      setPollStatsModal(data);
+    } catch { setPollStatsModal(null); }
+    setPollStatsLoading(false);
+  };
+
+  const handleSendResult = (data) => {
+    if (data && !data.error) {
+      setBroadcasts(prev => [data, ...prev]);
+    }
+  };
+
   const handleDeleteBroadcast = async () => {
     if (!deleteModal) return;
-    await fetch(`/api/broadcasts/${deleteModal}`, { method: 'DELETE' });
+    const res = await api.delete(`/api/broadcasts/${deleteModal}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setBroadcasts(prev => prev.filter(b => b.id !== deleteModal));
     setDeleteModal(null);
   };
 
-  // Фильтр истории
-  const filtered = broadcasts.filter(b =>
-    b.text.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleSaveDraft = async (body, resetCb) => {
+    setSavingDraft(true);
+    try {
+      const isSchedule = body._schedule;
+      const scheduledAt = body._scheduledAt;
+      const { _schedule, _scheduledAt, ...cleanBody } = body;
+
+      const draftPayload = {
+        name: cleanBody.text ? stripTgHtml(cleanBody.text).substring(0, 60) : (cleanBody.poll?.question?.substring(0, 60) || 'Без названия'),
+        text: cleanBody.text || null,
+        media: cleanBody.media || null,
+        poll: cleanBody.poll || null,
+        targetType: cleanBody.targetType || 'channels',
+        targetFilter: cleanBody.targetFilter || null,
+      };
+
+      let draftId;
+      if (editingDraft) {
+        await api.put(`/api/broadcasts/drafts/${editingDraft.id}`, draftPayload);
+        draftId = editingDraft.id;
+        setEditingDraft(null);
+      } else {
+        const res = await api.post('/api/broadcasts/drafts', draftPayload);
+        const data = await res.json();
+        draftId = data.id;
+      }
+
+      if (isSchedule && scheduledAt && draftId) {
+        await api.post(`/api/broadcasts/drafts/${draftId}/schedule`, { scheduledAt: new Date(scheduledAt).toISOString() });
+      }
+
+      if (resetCb) resetCb();
+      const msg = isSchedule ? '⏰ Рассылка запланирована!' : '✅ Черновик сохранён!';
+      setToast({ message: msg, type: 'success' });
+      setTimeout(() => setToast(null), 3000);
+    } catch (e) {
+      setToast({ message: 'Ошибка: ' + e.message, type: 'error' });
+      setTimeout(() => setToast(null), 4000);
+    }
+    setSavingDraft(false);
+  };
+
+  const handleEditDraft = (draft) => {
+    setEditingDraft(draft);
+    // Switch to the appropriate tab
+    const targetSection = draft.targetType || 'channels';
+    setOpenSection(targetSection);
+    setMounted(prev => ({ ...prev, [targetSection]: true }));
+  };
+
+  const filtered = broadcasts.filter(b => {
+    if (search && !(b.text || '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterType && b.type !== filterType) return false;
+    if (filterStatus && b.status !== filterStatus) return false;
+    return true;
+  });
+
+  const paginatedFiltered = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
+
+  const TYPE_ICONS = { channels: '📢', users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
+
+  const [mounted, setMounted] = useState({ channels: true }); // track which sections have been opened
+  const toggleSection = (id) => {
+    setOpenSection(prev => prev === id ? null : id);
+    setMounted(prev => ({ ...prev, [id]: true }));
+  };
 
   if (loading) {
     return (
@@ -135,85 +1703,43 @@ export default function Broadcasts() {
   return (
     <div className="broadcasts-container">
 
-      {/* === БЛОК: КАНАЛЫ === */}
-      <div className="bc-section">
-        <div className="bc-section-header">
-          <h3 className="bc-section-title">Каналы</h3>
-          <button className="bc-add-channel-btn" onClick={() => setAddChannelModal(true)}>
-            <Plus size={16} /> Добавить
-          </button>
+      {/* Toast notification */}
+      {toast && (
+        <div className={`bc-toast bc-toast--${toast.type}`} onClick={() => setToast(null)}>
+          {toast.message}
         </div>
+      )}
 
-        {channels.length === 0 ? (
-          <div className="bc-channels-empty">
-            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
+      {/* Аккордеон секций */}
+      {SECTIONS.map(s => {
+        const Icon = s.icon;
+        const isOpen = openSection === s.id;
+        return (
+          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`}>
+            <button className="bc-accordion-header" onClick={() => toggleSection(s.id)}>
+              <Icon size={18} />
+              <span className="bc-accordion-label">{s.label}</span>
+              <ChevronDown size={18} className={`bc-accordion-chevron ${isOpen ? 'open' : ''}`} />
+            </button>
+            <div className="bc-accordion-body-wrap">
+              <div className="bc-accordion-body">
+                <div className="bc-accordion-body-inner">
+                  {mounted[s.id] && (
+                    <>
+                      {s.id === 'channels' && <ChannelsTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'channels' ? editingDraft : null} />}
+                      {s.id === 'users' && <UsersTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'users' ? editingDraft : null} />}
+                      {s.id === 'groups' && <GroupsTab onSendResult={handleSendResult} onSaveDraft={handleSaveDraft} savingDraft={savingDraft} initialDraft={editingDraft?.targetType === 'groups' ? editingDraft : null} />}
+                      {s.id === 'drafts' && <DraftsTab onSendResult={handleSendResult} onEditDraft={handleEditDraft} />}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="bc-channels-list">
-            <label className="bc-channel-item bc-channel-item--all" onClick={selectAll}>
-              <input type="checkbox" checked={selectedChannels.length === channels.length} readOnly />
-              <span>Все каналы ({channels.length})</span>
-            </label>
-            {channels.map(ch => (
-              <label key={ch.id} className="bc-channel-item">
-                <input
-                  type="checkbox"
-                  checked={selectedChannels.includes(ch.chatId)}
-                  onChange={() => toggleChannel(ch.chatId)}
-                />
-                <Hash size={14} className="bc-channel-hash" />
-                <span className="bc-channel-name">{ch.title}</span>
-                <button
-                  className="bc-channel-remove"
-                  onClick={(e) => { e.preventDefault(); handleDeleteChannel(ch.id); }}
-                  title="Удалить канал"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
+        );
+      })}
 
-      {/* === БЛОК: НОВАЯ РАССЫЛКА === */}
-      <div className="bc-section">
-        <h3 className="bc-section-title">Новая рассылка</h3>
-        <textarea
-          className="bc-compose-textarea"
-          placeholder="Текст сообщения (поддерживается HTML: <b>, <i>, <a href>...)"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={4}
-        />
-        <div className="bc-compose-footer">
-          <span className="bc-compose-hint">
-            {selectedChannels.length > 0
-              ? `Выбрано каналов: ${selectedChannels.length}`
-              : 'Выберите каналы выше'}
-          </span>
-          <button
-            className="broadcasts-create-btn"
-            disabled={sending || !text.trim() || !selectedChannels.length}
-            onClick={handleSend}
-          >
-            {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
-            {sending ? 'Отправка...' : 'Отправить'}
-          </button>
-        </div>
-
-        {sendResult && (
-          <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-            {sendResult.error ? (
-              <><AlertCircle size={16} /> {sendResult.error}</>
-            ) : (
-              <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* === БЛОК: ИСТОРИЯ === */}
+      {/* История */}
       <div className="bc-section bc-section--grow">
         <div className="bc-section-header">
           <h3 className="bc-section-title">История рассылок</h3>
@@ -223,8 +1749,23 @@ export default function Broadcasts() {
               className="bc-search-input"
               placeholder="Поиск..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setVisibleCount(20); }}
             />
+          </div>
+        </div>
+
+        <div className="bc-history-filters">
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Тип:</span>
+            {[['', 'Все'], ['channels', 'Каналы'], ['groups', 'Группы'], ['users', 'Польз.']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterType === v ? 'active' : ''}`} onClick={() => { setFilterType(v); setVisibleCount(20); }}>{l}</button>
+            ))}
+          </div>
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Статус:</span>
+            {[['', 'Все'], ['published', 'Доставлена'], ['partial', 'Частично'], ['failed', 'Ошибка'], ['scheduled', 'Отложена']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterStatus === v ? 'active' : ''}`} onClick={() => { setFilterStatus(v); setVisibleCount(20); }}>{l}</button>
+            ))}
           </div>
         </div>
 
@@ -233,20 +1774,20 @@ export default function Broadcasts() {
             <thead>
               <tr>
                 <th>Текст</th>
-                <th>Каналы</th>
+                <th>Получатели</th>
                 <th>Статус</th>
                 <th>Дата</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {paginatedFiltered.length === 0 ? (
                 <tr><td colSpan={5} className="broadcasts-empty">Рассылок пока нет</td></tr>
-              ) : filtered.map(b => (
+              ) : paginatedFiltered.map(b => (
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
-                    <Send size={14} className="bc-type-icon" />
-                    <span>{b.text}</span>
+                    <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
+                    <span dangerouslySetInnerHTML={{ __html: (b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '') }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
@@ -256,7 +1797,13 @@ export default function Broadcasts() {
                       {b.status === 'published' && <CheckCircle size={12} />}
                       {b.status === 'failed' && <XCircle size={12} />}
                       {b.status === 'partial' && <AlertCircle size={12} />}
+                      {b.status === 'scheduled' && <Clock size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
+                      {b.total > 0 && (
+                        <button className="bc-delivery-btn" onClick={(e) => { e.stopPropagation(); setDeliveryModal(b); }} title="Показать получателей">
+                          {b.success}/{b.total}
+                        </button>
+                      )}
                     </span>
                   </td>
                   <td className="bc-date">
@@ -264,11 +1811,12 @@ export default function Broadcasts() {
                     {new Date(b.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="bc-actions">
-                    <button
-                      className="bc-action-btn bc-action-delete"
-                      title="Удалить из истории"
-                      onClick={() => setDeleteModal(b.id)}
-                    >
+                    {b.pollId && (
+                      <button className="bc-action-btn bc-action-stats" title="Статистика опроса" onClick={() => loadPollStats(b.pollId)}>
+                        <BarChart2 size={14} />
+                      </button>
+                    )}
+                    <button className="bc-action-btn bc-action-delete" title="Удалить из истории" onClick={() => setDeleteModal(b.id)}>
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -277,17 +1825,9 @@ export default function Broadcasts() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Модалки */}
-      {addChannelModal && (
-        <PromptModal
-          title="Добавить канал"
-          placeholder="@username или chat_id (например -1001234567890)"
-          onConfirm={handleAddChannel}
-          onCancel={() => setAddChannelModal(false)}
-        />
-      )}
+        {hasMore && <LoadMoreTrigger onVisible={() => setVisibleCount(prev => prev + 20)} />}
+      </div>
 
       {deleteModal && (
         <PromptModal
@@ -296,6 +1836,64 @@ export default function Broadcasts() {
           onConfirm={handleDeleteBroadcast}
           onCancel={() => setDeleteModal(null)}
         />
+      )}
+
+      {deliveryModal && (
+        <div className="bc-delivery-overlay" onClick={() => setDeliveryModal(null)}>
+          <div className="bc-delivery-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-delivery-modal-header">
+              <h3>Получатели рассылки</h3>
+              <button className="bc-delivery-close" onClick={() => setDeliveryModal(null)}><X size={18} /></button>
+            </div>
+            <div className="bc-delivery-summary">
+              <span className="bc-delivery-ok"><CheckCircle size={14} /> Доставлено: {deliveryModal.success}</span>
+              <span className="bc-delivery-fail"><XCircle size={14} /> Ошибки: {deliveryModal.failed}</span>
+            </div>
+            <div className="bc-delivery-list">
+              {(deliveryModal.results || []).map((r, i) => (
+                <div key={i} className={`bc-delivery-item ${r.ok ? 'bc-delivery-item--ok' : 'bc-delivery-item--fail'}`}>
+                  <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}</span>
+                  <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
+                  {r.username && <span className="bc-delivery-username">@{r.username}</span>}
+                  {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
+                  {r.error && <span className="bc-delivery-error">{r.error}</span>}
+                </div>
+              ))}
+              {(!deliveryModal.results || deliveryModal.results.length === 0) && (
+                <div className="bc-delivery-empty">Нет детальных данных</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pollStatsModal && (
+        <div className="bc-delivery-overlay" onClick={() => setPollStatsModal(null)}>
+          <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-delivery-modal-header">
+              <h3>{pollStatsModal.type === 'quiz' ? '🧠 Викторина' : '📊 Опрос'}</h3>
+              <button className="bc-delivery-close" onClick={() => setPollStatsModal(null)}><X size={18} /></button>
+            </div>
+            <div className="bc-poll-question">{pollStatsModal.question}</div>
+            <div className="bc-poll-total">Всего голосов: <b>{pollStatsModal.totalVotes}</b></div>
+            <div className="bc-poll-options">
+              {(pollStatsModal.stats || []).map((s, i) => (
+                <div key={i} className={`bc-poll-option ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''}`}>
+                  <div className="bc-poll-option-header">
+                    <span className="bc-poll-option-text">
+                      {pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i && <Check size={14} className="bc-poll-correct-icon" />}
+                      {s.option}
+                    </span>
+                    <span className="bc-poll-option-count">{s.count} ({s.percent}%)</span>
+                  </div>
+                  <div className="bc-poll-bar">
+                    <div className="bc-poll-bar-fill" style={{ width: `${s.percent}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,22 +4,43 @@ import './Hostess.css';
 
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// Логика статуса: 1/11/111... → выдать приз, 2/22/222... → уже получил
-// Для реальных ID: первый скан → выдать, повторный → уже получил
-const getScanStatus = (id, givenIds) => {
-  if (/^1+$/.test(id)) return 'give';
-  if (/^2+$/.test(id)) return 'already';
-  return givenIds.has(id) ? 'already' : 'give';
-};
+const API_BASE = window.location.origin;
+
+async function serverScan(userId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/events/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn('[hostess] Server scan failed:', e.message);
+    return null;
+  }
+}
 
 export default function Hostess() {
   const [inputValue, setInputValue]     = useState('');
-  const [result, setResult]             = useState(null); // null | { id, status }
+  const [result, setResult]             = useState(null); // null | { id, status, userName, scanCount, message }
   const [scannedCount, setScannedCount] = useState(0);
   const [cameraError, setCameraError]   = useState(null);
   const [scanning, setScanning]         = useState(false);
+  const [processing, setProcessing]     = useState(false);
+  const [stats, setStats]               = useState(null);
 
-  const givenIds  = useRef(new Set());
+  // Fetch stats on mount and after each scan
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/events/public-stats`);
+      if (res.ok) setStats(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  const givenIds  = useRef(new Set()); // fallback for offline mode
   const inputRef  = useRef(null);
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
@@ -27,7 +48,7 @@ export default function Hostess() {
   const rafRef    = useRef(null);
   const isMobile  = isMobileDevice();
 
-  /* ─── Завершить сканирование ─── */
+  /* ─── Stop camera ─── */
   const stopCamera = useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) {
@@ -37,17 +58,43 @@ export default function Hostess() {
     setScanning(false);
   }, []);
 
-  /* ─── Обработка результата сканирования ─── */
-  const handleScan = useCallback((rawId) => {
+  /* ─── Handle scan result ─── */
+  const handleScan = useCallback(async (rawId) => {
     const id = String(rawId).trim();
-    if (!id) return;
-    stopCamera();
-    const status = getScanStatus(id, givenIds.current);
-    setResult({ id, status });
-    setInputValue('');
-  }, [stopCamera]);
+    if (!id || processing) return;
 
-  /* ─── jsQR: читаем фреймы с видео через canvas ─── */
+    stopCamera();
+    setProcessing(true);
+
+    // Try server first
+    const serverResult = await serverScan(id);
+
+    if (serverResult) {
+      // Server responded
+      setResult({
+        id,
+        status: serverResult.status, // 'give' | 'already' | 'not_found'
+        userName: serverResult.user_name || null,
+        scanCount: serverResult.scan_count || 0,
+        message: serverResult.message || '',
+      });
+    } else {
+      // Fallback: local mode
+      const status = givenIds.current.has(id) ? 'already' : 'give';
+      setResult({
+        id,
+        status,
+        userName: null,
+        scanCount: 0,
+        message: status === 'give' ? 'Выдайте гостю приз' : 'Гость уже получил приз',
+      });
+    }
+
+    setInputValue('');
+    setProcessing(false);
+  }, [stopCamera, processing]);
+
+  /* ─── jsQR scan loop ─── */
   const scanLoop = useCallback(() => {
     const video  = videoRef.current;
     const canvas = canvasRef.current;
@@ -59,15 +106,37 @@ export default function Hostess() {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imgData.data, imgData.width, imgData.height, {
-        inversionAttempts: 'dontInvert',
+
+      // Enhance contrast for colored QR on dark background
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        // Convert to grayscale using luminance (R/G/B weighted)
+        const gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+        // Threshold: anything above 80 → white, below → black
+        const val = gray > 80 ? 255 : 0;
+        d[i] = val; d[i+1] = val; d[i+2] = val;
+      }
+
+      // Try with enhanced image first
+      let code = jsQR(d, imgData.width, imgData.height, {
+        inversionAttempts: 'attemptBoth',
       });
+
+      // Fallback: try original image without enhancement
+      if (!code) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        code = jsQR(origData.data, origData.width, origData.height, {
+          inversionAttempts: 'attemptBoth',
+        });
+      }
+
       if (code) { handleScan(code.data); return; }
     }
     rafRef.current = requestAnimationFrame(scanLoop);
   }, [handleScan]);
 
-  /* ─── Запуск камеры ─── */
+  /* ─── Start camera ─── */
   const startCamera = useCallback(async () => {
     setCameraError(null);
     try {
@@ -87,48 +156,87 @@ export default function Hostess() {
     }
   }, [scanLoop]);
 
-  /* ─── Автостарт камеры на мобиле ─── */
+  /* ─── Auto-start camera on mobile ─── */
   useEffect(() => {
-    if (isMobile && !result) startCamera();
+    if (isMobile && !result && !processing) startCamera();
     return () => { if (isMobile) stopCamera(); };
-  }, [isMobile, result]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isMobile, result, processing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ─── Автофокус на десктопе ─── */
+  /* ─── Auto-focus on desktop ─── */
   useEffect(() => {
-    if (!isMobile && !result) inputRef.current?.focus();
-  }, [isMobile, result]);
+    if (!isMobile && !result && !processing) inputRef.current?.focus();
+  }, [isMobile, result, processing]);
 
-  /* ─── Клавиатурный ввод (десктоп) ─── */
+  /* ─── Keyboard input (desktop) ─── */
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleScan(inputValue);
   };
 
-  /* ─── «Далее» ─── */
+  /* ─── Next button ─── */
   const handleNext = () => {
-    if (result?.status === 'give' && !/^[12]+$/.test(result.id)) {
+    if (result?.status === 'give') {
       givenIds.current.add(result.id);
     }
     setScannedCount(prev => prev + 1);
     setResult(null);
+    fetchStats(); // refresh stats
+  };
+
+  /* ─── Result card styling ─── */
+  const getCardClass = () => {
+    if (!result) return '';
+    if (result.status === 'give') return 'give';
+    if (result.status === 'not_found') return 'not-found';
+    return 'already';
+  };
+
+  const getResultText = () => {
+    if (!result) return '';
+    if (result.message) return result.message;
+    if (result.status === 'give') return 'Выдайте гостю приз';
+    if (result.status === 'not_found') return 'Пользователь не найден';
+    return 'Гость уже получил приз';
   };
 
   return (
     <div className="hostess-page">
 
-      {/* Логотип */}
+      {/* Logo */}
       <div className="hostess-logo-wrap">
-        <div className="hostess-logo-badge">
-          <span className="hostess-logo-text">Winline</span>
-          <span className="hostess-logo-circle" />
-        </div>
-        <div className="hostess-logo-subtitle">PARTNERS</div>
+        <img src="/logo.svg" alt="Winline Partners" className="hostess-logo-img" />
       </div>
 
-      {/* Центральная зона */}
+      {/* Mini stats */}
+      {stats && (
+        <div className="hostess-stats">
+          <div className="hostess-stat">
+            <span className="hostess-stat-value">{stats.totalCodes}</span>
+            <span className="hostess-stat-label">Выдано</span>
+          </div>
+          <div className="hostess-stat-divider" />
+          <div className="hostess-stat">
+            <span className="hostess-stat-value">{stats.usedCodes}</span>
+            <span className="hostess-stat-label">Активировано</span>
+          </div>
+          {stats.codeLimit > 0 && (
+            <>
+              <div className="hostess-stat-divider" />
+              <div className="hostess-stat">
+                <span className="hostess-stat-value">{stats.codeLimit}</span>
+                <span className="hostess-stat-label">Лимит</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Center zone */}
       <div className="hostess-center">
-        {!result ? (
+        {processing ? (
+          <div className="hostess-processing">Проверка...</div>
+        ) : !result ? (
           isMobile ? (
-            /* === МОБИЛЬ: живая камера === */
+            /* === MOBILE: live camera === */
             <div className="hostess-camera-wrap">
               {cameraError ? (
                 <div className="hostess-camera-error">{cameraError}</div>
@@ -139,13 +247,12 @@ export default function Hostess() {
                     className="hostess-camera-video"
                     autoPlay playsInline muted
                   />
-                  {/* скрытый canvas для jsQR */}
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                 </>
               )}
             </div>
           ) : (
-            /* === ДЕСКТОП: текстовый ввод === */
+            /* === DESKTOP: text input === */
             <input
               ref={inputRef}
               className="hostess-scan-input"
@@ -158,20 +265,29 @@ export default function Hostess() {
             />
           )
         ) : (
-          /* === Карточка результата === */
-          <div className={`hostess-result-card ${result.status === 'give' ? 'give' : 'already'}`}>
-            <div className="hostess-result-id">Гость с ID<br />{result.id}</div>
-            <div className="hostess-result-action">
-              {result.status === 'give' ? 'Выдайте гостю приз' : 'Гость уже получил приз'}
-            </div>
+          /* === Result card === */
+          <div className={`hostess-result-card ${getCardClass()}`}>
+            {result.userName ? (
+              <div className="hostess-result-id">
+                {result.userName}
+                <span className="hostess-result-subid">ID {result.id}</span>
+              </div>
+            ) : (
+              <div className="hostess-result-id">Гость с ID<br />{result.id}</div>
+            )}
+            <div className="hostess-result-action">{getResultText()}</div>
+            {result.scanCount > 0 && (
+              <div className="hostess-result-scan-count">
+                Сканирований: {result.scanCount}
+              </div>
+            )}
             <button className="hostess-next-btn" onClick={handleNext}>Далее</button>
           </div>
         )}
       </div>
 
-      {/* Нижняя панель */}
+      {/* Footer */}
       <div className="hostess-footer">
-        <span>Отсканировано кодов: {scannedCount}</span>
         <a
           href="https://t.me/avoynich"
           target="_blank"

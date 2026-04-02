@@ -1,90 +1,178 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown } from 'lucide-react';
-import { usersData } from '../../data/usersData';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2 } from 'lucide-react';
+import { api } from '../../utils/api.js';
 import './Users.css';
+
+const PAGE_SIZE = 50;
 
 export default function Users() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [users, setUsers] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const searchRef = useRef(null);
 
-  // Состояния фильтров
-  const [filterPartner, setFilterPartner] = useState('all'); // all, partner, guest
-  const [filterCountry, setFilterCountry] = useState('all');
-  const [filterGender, setFilterGender] = useState('all');
-  const [filterEntity, setFilterEntity] = useState('all'); // all, phys, legal
-  const [filterTag, setFilterTag] = useState('all');
+  // Фильтры
+  const [filterTags, setFilterTags] = useState([]);  // [] = all
+  const [tagSearch, setTagSearch] = useState('');
 
-  // Состояние сортировки (ключ и направление)
+  // Сортировка
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
+
+  // Tag filter dropdown
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const tagFilterRef = useRef(null);
 
   // Export dropdown
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const exportRef = useRef(null);
+  const sentinelRef = useRef(null);
 
+  // Дебаунс поиска — не теряем фокус
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Загрузка пользователей
+  const fetchUsers = useCallback(async (offset = 0, searchQuery = '') => {
+    try {
+      const isAppend = offset > 0;
+      if (!isAppend) setLoading(true);
+      else setLoadingMore(true);
+
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (searchQuery) params.set('search', searchQuery);
+
+      const res = await api.get(`/api/users?${params}`);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      const data = await res.json();
+
+      if (isAppend) {
+        setUsers(prev => [...prev, ...data.users]);
+      } else {
+        setUsers(data.users);
+      }
+      setTotal(data.total);
+      setHasMore(offset + data.users.length < data.total);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  // Перезагрузка при смене поиска
+  useEffect(() => {
+    fetchUsers(0, debouncedSearch);
+  }, [debouncedSearch, fetchUsers]);
+
+  // Infinite scroll — IntersectionObserver
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchUsers(users.length, debouncedSearch);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch]);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
         setShowExportDropdown(false);
+      }
+      if (tagFilterRef.current && !tagFilterRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Все уникальные теги для выпадающего списка
-  const allTags = useMemo(() => {
-    const tags = new Set();
-    usersData.forEach(user => user.tags.forEach(t => tags.add(t)));
-    return Array.from(tags);
+  // Все уникальные теги — загружаем с сервера
+  const [allTags, setAllTags] = useState([]);
+  const loadTags = useCallback(() => {
+    api.get('/api/users/all-tags').then(r => r.json()).then(setAllTags).catch(() => {});
   }, []);
+  useEffect(() => { loadTags(); }, [loadTags]);
 
-  // Все уникальные страны
-  const allCountries = useMemo(() => {
-    const countries = new Set();
-    usersData.forEach(user => { if (user.country) countries.add(user.country); });
-    return Array.from(countries).sort();
-  }, []);
+  // Модал редактирования тега
+  const [tagModal, setTagModal] = useState(null); // { tag, newName }
+  const [tagModalSaving, setTagModalSaving] = useState(false);
 
-  // Все уникальные значения пола
-  const allGenders = useMemo(() => {
-    const genders = new Set();
-    usersData.forEach(user => { if (user.gender && user.gender !== '-') genders.add(user.gender); });
-    return Array.from(genders);
-  }, []);
+  const openRenameModal = (tag, e) => {
+    e.stopPropagation();
+    setTagModal({ tag, newName: tag });
+    setShowTagDropdown(false);
+  };
 
-  // Функция применения фильтров и сортировки
+  const handleRenameSubmit = async () => {
+    if (!tagModal || !tagModal.newName.trim() || tagModal.newName.trim() === tagModal.tag) {
+      setTagModal(null);
+      return;
+    }
+    setTagModalSaving(true);
+    try {
+      const res = await api.put('/api/users/tags/rename', { oldTag: tagModal.tag, newTag: tagModal.newName.trim() });
+      const data = await res.json();
+      if (data.ok) {
+        loadTags();
+        fetchUsers(0, debouncedSearch);
+        if (filterTags.includes(tagModal.tag)) setFilterTags(filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t));
+      }
+    } catch (err) { alert('Ошибка: ' + err.message); }
+    setTagModalSaving(false);
+    setTagModal(null);
+  };
+
+  // Модал удаления тега
+  const [deleteTagModal, setDeleteTagModal] = useState(null); // tag string
+  const [deleteTagSaving, setDeleteTagSaving] = useState(false);
+
+  const openDeleteModal = (tag, e) => {
+    e.stopPropagation();
+    setDeleteTagModal(tag);
+    setShowTagDropdown(false);
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (!deleteTagModal) return;
+    setDeleteTagSaving(true);
+    try {
+      const res = await api.delete(`/api/users/tags/bulk-delete?tag=${encodeURIComponent(deleteTagModal)}`);
+      const data = await res.json();
+      if (data.ok) {
+        loadTags();
+        fetchUsers(0, debouncedSearch);
+        if (filterTags.includes(deleteTagModal)) setFilterTags(filterTags.filter(t => t !== deleteTagModal));
+      }
+    } catch (err) { alert('Ошибка: ' + err.message); }
+    setDeleteTagSaving(false);
+    setDeleteTagModal(null);
+  };
+
+  // Фильтрация и сортировка (клиентская, по загруженным)
   const filteredAndSortedUsers = useMemo(() => {
-    let result = [...usersData];
+    let result = [...users];
 
-		// 1. Поиск (по ФИО)
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(u =>
-        u.fullName.toLowerCase().includes(q)
-      );
+    if (filterTags.length > 0) {
+      result = result.filter(u => filterTags.some(ft => (u.tags || []).includes(ft)));
     }
 
-    // 2. Фильтры
-    if (filterPartner !== 'all') {
-      const isPartner = filterPartner === 'partner';
-      result = result.filter(u => u.isPartner === isPartner);
-    }
-    if (filterCountry !== 'all') {
-      result = result.filter(u => u.country === filterCountry);
-    }
-    if (filterGender !== 'all') {
-      result = result.filter(u => u.gender === filterGender);
-    }
-    if (filterEntity !== 'all') {
-      const entity = filterEntity === 'phys' ? 'Физ. лицо' : 'Юр. лицо';
-      result = result.filter(u => u.entityType === entity);
-    }
-    if (filterTag !== 'all') {
-      result = result.filter(u => u.tags.includes(filterTag));
-    }
-
-    // 3. Сортировка
     if (sortConfig.key) {
       result.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -94,9 +182,8 @@ export default function Users() {
     }
 
     return result;
-  }, [search, filterPartner, filterCountry, filterGender, filterEntity, filterTag, sortConfig]);
+  }, [users, filterTags, sortConfig]);
 
-  // Смена сортировки при клике на заголовок колонки
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -105,27 +192,21 @@ export default function Users() {
     setSortConfig({ key, direction });
   };
 
-  // Клик по тегу прямо в таблице (быстрая фильтрация / снятие)
   const handleTagClick = (tag) => {
-    setFilterTag(prev => prev === tag ? 'all' : tag);
+    setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
-  const hasActiveFilters = filterPartner !== 'all' || filterCountry !== 'all' || filterGender !== 'all' || filterEntity !== 'all' || filterTag !== 'all' || search;
+  const hasActiveFilters = filterTags.length > 0 || search;
 
   const resetFilters = () => {
     setSearch('');
-    setFilterPartner('all');
-    setFilterCountry('all');
-    setFilterGender('all');
-    setFilterEntity('all');
-    setFilterTag('all');
+    setFilterTags([]);
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
 
-  // Кнопка Чат — найти или создать чат для пользователя
   const handleOpenChat = async (userId) => {
     try {
-      const res = await fetch(`/api/chats/by-user/${userId}`);
+      const res = await api.get(`/api/chats/by-user/${userId}`);
       const chat = await res.json();
       navigate(`/chats/${chat.id}`);
     } catch {
@@ -134,21 +215,17 @@ export default function Users() {
   };
 
   // Экспорт CSV
-  const exportCSV = (users) => {
+  const exportCSV = (list) => {
     const BOM = '\uFEFF';
-    const headers = ['ФИО', 'Telegram', 'Статус', 'Тип лица', 'Страна', 'Пол', 'Дата регистрации', 'Комиссия (₽)', 'Теги'];
-    const rows = users.map(u => [
+    const headers = ['ФИО', 'Telegram', 'Дата регистрации', 'Забанен', 'Теги'];
+    const rows = list.map(u => [
       u.fullName,
       u.telegram,
-      u.isPartner ? 'Партнёр' : 'Гость',
-      u.entityType,
-      u.country,
-      u.gender,
       u.registrationDate,
-      u.commission,
-      u.tags.join('; ')
+      u.banned ? 'Да' : 'Нет',
+      (u.tags || []).join('; ')
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -160,12 +237,38 @@ export default function Users() {
   };
 
   const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
-
-  const handleExportGoogle = () => {
-    exportCSV(filteredAndSortedUsers);
-    // CSV открывается и в Google Sheets через Файл → Импорт
+  const handleExportTxt = () => {
+    const BOM = '\uFEFF';
+    const lines = filteredAndSortedUsers.map(u =>
+      `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${(u.tags || []).join(', ')}`
+    );
+    const txt = lines.join('\n');
+    const blob = new Blob([BOM + txt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'users.txt';
+    a.click();
+    URL.revokeObjectURL(url);
     setShowExportDropdown(false);
   };
+
+  if (loading && users.length === 0 && !search && !debouncedSearch) {
+    return (
+      <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+        <Loader size={32} className="spinner" />
+        <span style={{ marginLeft: 12, color: '#aaa' }}>Загрузка пользователей...</span>
+      </div>
+    );
+  }
+
+  if (error && users.length === 0) {
+    return (
+      <div className="users-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: '#ff5555' }}>
+        Ошибка загрузки: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="users-container">
@@ -176,13 +279,17 @@ export default function Users() {
           <div className="search-box">
             <Search size={18} className="search-icon" />
             <input
+              ref={searchRef}
               type="text"
               className="search-input"
-              placeholder="Поиск по ФИО..."
+              placeholder="Поиск по ФИО или Telegram..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <span style={{ color: '#888', fontSize: 14 }}>
+            Всего: {total}{filteredAndSortedUsers.length !== users.length ? ` | Найдено: ${filteredAndSortedUsers.length}` : ''}
+          </span>
           <div className="export-wrapper" ref={exportRef}>
             <button className="btn-control primary" onClick={() => setShowExportDropdown(!showExportDropdown)}>
               <Download size={18} /> Экспорт <ChevronDown size={14} />
@@ -192,8 +299,8 @@ export default function Users() {
                 <div className="export-dropdown-item" onClick={handleExportExcel}>
                   <Download size={14} /> Excel (CSV)
                 </div>
-                <div className="export-dropdown-item" onClick={handleExportGoogle}>
-                  <Download size={14} /> Google Таблицы (CSV)
+                <div className="export-dropdown-item" onClick={handleExportTxt}>
+                  <Download size={14} /> Текст (TXT)
                 </div>
               </div>
             )}
@@ -201,38 +308,70 @@ export default function Users() {
         </div>
 
         <div className="filters-row">
-          <select className="filter-select" value={filterPartner} onChange={(e) => setFilterPartner(e.target.value)}>
-            <option value="all">Все статусы</option>
-            <option value="partner">Партнёр</option>
-            <option value="guest">Гость</option>
-          </select>
-
-          <select className="filter-select" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
-            <option value="all">Все страны</option>
-            {allCountries.map(country => (
-              <option key={country} value={country}>{country}</option>
-            ))}
-          </select>
-
-          <select className="filter-select" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
-            <option value="all">Любой пол</option>
-            {allGenders.map(gender => (
-              <option key={gender} value={gender}>{gender}</option>
-            ))}
-          </select>
-
-          <select className="filter-select" value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)}>
-            <option value="all">Все лица</option>
-            <option value="phys">Физ. лицо</option>
-            <option value="legal">Юр. лицо</option>
-          </select>
-
-          <select className="filter-select" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
-            <option value="all">Все теги</option>
-            {allTags.map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
+          <div className="tag-filter-wrapper" ref={tagFilterRef}>
+            <button
+              className={`filter-select${filterTags.length > 0 ? ' filter-select--active' : ''}`}
+              onClick={() => { setShowTagDropdown(!showTagDropdown); setTagSearch(''); }}
+            >
+              {filterTags.length === 0 ? 'Все теги' : filterTags.length === 1 ? filterTags[0] : `${filterTags.length} тегов`}
+              <ChevronDown size={14} className={`filter-chevron${showTagDropdown ? ' filter-chevron--open' : ''}`} />
+            </button>
+            {showTagDropdown && (
+              <div className="tag-modal-overlay" onClick={() => setShowTagDropdown(false)}>
+                <div className="tag-modal" onClick={e => e.stopPropagation()}>
+                  <div className="tag-modal-header">
+                    <h3>Фильтр по тегам</h3>
+                    <button className="tag-modal-close" onClick={() => setShowTagDropdown(false)}><X size={18} /></button>
+                  </div>
+                  <div className="tag-modal-search">
+                    <input
+                      className="tag-filter-search"
+                      placeholder="Поиск тегов..."
+                      value={tagSearch}
+                      onChange={e => setTagSearch(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="tag-modal-list">
+                    <div
+                      className={`tag-filter-item${filterTags.length === 0 ? ' tag-filter-item--active' : ''}`}
+                      onClick={() => setFilterTags([])}
+                    >
+                      Все теги
+                    </div>
+                    {allTags
+                      .filter(tag => !tagSearch.trim() || tag.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                      .map(tag => (
+                      <div
+                        key={tag}
+                        className={`tag-filter-item${filterTags.includes(tag) ? ' tag-filter-item--active' : ''}`}
+                        onClick={() => {
+                          setFilterTags(prev =>
+                            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                          );
+                        }}
+                      >
+                        <span className="tag-filter-item-check">{filterTags.includes(tag) ? '✓' : ''}</span>
+                        <span className="tag-filter-item-text">{tag}</span>
+                        <div className="tag-filter-actions">
+                          <button className="tag-action-btn" onClick={(e) => openRenameModal(tag, e)} title="Переименовать">
+                            <Pencil size={12} />
+                          </button>
+                          <button className="tag-action-btn tag-action-delete" onClick={(e) => openDeleteModal(tag, e)} title="Удалить у всех">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="tag-modal-footer">
+                    <span className="tag-modal-count">{filterTags.length > 0 ? `Выбрано: ${filterTags.length}` : 'Все пользователи'}</span>
+                    <button className="tag-modal-apply" onClick={() => setShowTagDropdown(false)}>Применить</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <button
             className={`btn-sort${sortConfig.key === 'registrationDate' ? ' btn-sort-active' : ''}`}
@@ -241,15 +380,6 @@ export default function Users() {
             <ArrowUpDown size={14} />
             Дата регистрации
             {sortConfig.key === 'registrationDate' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-          </button>
-
-          <button
-            className={`btn-sort${sortConfig.key === 'commission' ? ' btn-sort-active' : ''}`}
-            onClick={() => handleSort('commission')}
-          >
-            <ArrowUpDown size={14} />
-            Комиссия
-            {sortConfig.key === 'commission' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
           </button>
 
           {hasActiveFilters && (
@@ -273,24 +403,27 @@ export default function Users() {
           </thead>
           <tbody>
             {filteredAndSortedUsers.map(user => (
-              <tr key={user.id}>
+              <tr key={user.id} className={user.banned ? 'row-banned' : ''}>
                 <td>
                   <Link to={`/users/${user.id}`} className="user-cell-link">
                     <div className="user-cell">
                       <div className="user-avatar">
                         {user.fullName.charAt(0)}
                       </div>
-                      <span className="user-name">{user.fullName}</span>
+                      <div className="user-name-block">
+                        <span className="user-name">{user.fullName}</span>
+                        <span className="user-telegram">{user.telegram}</span>
+                      </div>
                     </div>
                   </Link>
                 </td>
 
                 <td>
                   <div className="tags-wrapper">
-                    {user.tags.map(tag => (
+                    {(user.tags || []).map(tag => (
                       <span
                         key={tag}
-                        className={`tag-badge${filterTag === tag ? ' tag-active' : ''}`}
+                        className={`tag-badge${filterTags.includes(tag) ? ' tag-active' : ''}`}
                         onClick={() => handleTagClick(tag)}
                       >
                         {tag}
@@ -307,7 +440,7 @@ export default function Users() {
                 </td>
               </tr>
             ))}
-            {filteredAndSortedUsers.length === 0 && (
+            {filteredAndSortedUsers.length === 0 && !loading && (
               <tr>
                 <td colSpan="3" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
                   Пользователи не найдены
@@ -316,7 +449,73 @@ export default function Users() {
             )}
           </tbody>
         </table>
+
+        {/* Sentinel для infinite scroll */}
+        <div ref={sentinelRef} style={{ height: 1 }} />
+
+        {loadingMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+            <Loader size={24} className="spinner" />
+            <span style={{ marginLeft: 10, color: '#888', fontSize: 14 }}>Загрузка...</span>
+          </div>
+        )}
       </div>
+
+      {/* Модал переименования тега */}
+      {tagModal && (
+        <div className="tag-modal-overlay" onClick={() => setTagModal(null)}>
+          <div className="tag-modal" onClick={e => e.stopPropagation()}>
+            <button className="tag-modal-close" onClick={() => setTagModal(null)}><X size={18} /></button>
+            <h3>Переименовать тег</h3>
+            <p className="tag-modal-desc">
+              Тег <strong>«{tagModal.tag}»</strong> будет переименован у всех пользователей
+            </p>
+            <div className="tag-modal-field">
+              <label>Новое название</label>
+              <input
+                type="text"
+                value={tagModal.newName}
+                onChange={e => setTagModal({ ...tagModal, newName: e.target.value })}
+                onKeyDown={e => e.key === 'Enter' && handleRenameSubmit()}
+                autoFocus
+              />
+            </div>
+            <div className="tag-modal-actions">
+              <button className="tag-modal-cancel" onClick={() => setTagModal(null)}>Отмена</button>
+              <button
+                className="tag-modal-submit"
+                onClick={handleRenameSubmit}
+                disabled={tagModalSaving || !tagModal.newName.trim() || tagModal.newName.trim() === tagModal.tag}
+              >
+                {tagModalSaving ? 'Сохранение...' : 'Переименовать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал удаления тега */}
+      {deleteTagModal && (
+        <div className="tag-modal-overlay" onClick={() => setDeleteTagModal(null)}>
+          <div className="tag-modal" onClick={e => e.stopPropagation()}>
+            <button className="tag-modal-close" onClick={() => setDeleteTagModal(null)}><X size={18} /></button>
+            <h3>Удалить тег</h3>
+            <p className="tag-modal-desc">
+              Тег <strong>«{deleteTagModal}»</strong> будет удалён у всех пользователей. Это действие необратимо.
+            </p>
+            <div className="tag-modal-actions">
+              <button className="tag-modal-cancel" onClick={() => setDeleteTagModal(null)}>Отмена</button>
+              <button
+                className="tag-modal-submit tag-modal-danger"
+                onClick={handleDeleteSubmit}
+                disabled={deleteTagSaving}
+              >
+                {deleteTagSaving ? 'Удаление...' : 'Удалить у всех'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

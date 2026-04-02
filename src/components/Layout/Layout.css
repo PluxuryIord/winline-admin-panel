@@ -27,14 +27,20 @@
 
 .logo-area h2 {
   font-size: 1.4rem;
-  font-weight: 800; /* Жирный шрифт как у спортивных брендов */
+  font-weight: 800;
   color: var(--color-white);
-  text-transform: uppercase; /* Делаем все буквы заглавными */
+  text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .logo-area span {
-  color: var(--color-orange); /* Фирменный оранжевый акцент */
+  color: var(--color-orange);
+}
+
+.sidebar-logo {
+  height: 56px;
+  width: auto;
+  object-fit: contain;
 }
 
 /* --- МЕНЮ --- */
@@ -102,6 +108,22 @@
 }
 
 
+/* --- ИНДИКАТОР НЕПРОЧИТАННЫХ --- */
+.menu-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-orange);
+  margin-left: auto;
+  flex-shrink: 0;
+  animation: unread-pulse 2s ease-in-out infinite;
+}
+
+@keyframes unread-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* --- ПРОФИЛЬ АДМИНА --- */
 .admin-profile {
   /* margin-top: auto — это магия Flexbox. Она заставляет этот блок 
@@ -167,7 +189,7 @@
   min-height: 0; /* <--- МАГИЧЕСКАЯ СТРОЧКА, КОТОРАЯ ЧИНИТ СКРОЛЛ НА МОБИЛКАХ */
 }
 
-/* --- ШАПКА --- */
+/* --- ШАПКА (glass) --- */
 .header {
   height: 70px;
   display: flex;
@@ -176,13 +198,18 @@
   padding: 0 32px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   gap: 24px;
+  background: rgba(18, 18, 30, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .header-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.85rem;
