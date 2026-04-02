@@ -425,11 +425,8 @@ router.post('/users', async (req, res, next) => {
       // Support both filters.tags (array) and legacy filters.tag (string)
       const tagsArr = Array.isArray(filters.tags) ? filters.tags : (filters.tag && filters.tag !== 'all' ? [filters.tag] : []);
       if (tagsArr.length > 0) {
-        tagsArr.forEach((tag, i) => {
-          const alias = `t${i}`;
-          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
-          params.push(tag);
-        });
+        joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
+        params.push(...tagsArr);
       }
     }
 
@@ -522,16 +519,13 @@ router.get('/users/count', async (req, res, next) => {
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
     let joins = '';
-    // Support comma-separated tags (AND logic)
+    // Support comma-separated tags (OR logic — user with ANY of the selected tags)
     const tagsParam = req.query.tags?.trim() || req.query.tag?.trim();
     if (tagsParam && tagsParam !== 'all') {
       const tagsArr = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
       if (tagsArr.length > 0) {
-        tagsArr.forEach((tag, i) => {
-          const alias = `t${i}`;
-          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
-          params.push(tag);
-        });
+        joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
+        params.push(...tagsArr);
       }
     }
     const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
@@ -549,11 +543,8 @@ router.get('/users/list', async (req, res, next) => {
     if (tagsParam && tagsParam !== 'all') {
       const tagsArr = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
       if (tagsArr.length > 0) {
-        tagsArr.forEach((tag, i) => {
-          const alias = `t${i}`;
-          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
-          params.push(tag);
-        });
+        joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
+        params.push(...tagsArr);
       }
     }
     const [rows] = await dbPool.query(
@@ -778,11 +769,8 @@ router.post('/drafts/:id/send', async (req, res, next) => {
       let joins = '';
       const tagsArr = Array.isArray(filters.tags) ? filters.tags : [];
       if (tagsArr.length > 0) {
-        tagsArr.forEach((tag, i) => {
-          const alias = `t${i}`;
-          joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
-          params.push(tag);
-        });
+        joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
+        params.push(...tagsArr);
       }
       const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
       const results = [];
@@ -932,11 +920,8 @@ setInterval(async () => {
           let joins = '';
           const tagsArr = Array.isArray(filters.tags) ? filters.tags : [];
           if (tagsArr.length > 0) {
-            tagsArr.forEach((tag, i) => {
-              const alias = `t${i}`;
-              joins += ` INNER JOIN wl_admin_user_tags ${alias} ON ${alias}.user_id = u.user_id AND ${alias}.tag = ?`;
-              params.push(tag);
-            });
+            joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
+            params.push(...tagsArr);
           }
           const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
           const results = [];
