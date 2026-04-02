@@ -133,8 +133,8 @@ function buildPollMessage(poll, pollId) {
   return { text, keyboard };
 }
 
-/** Отправить inline-опрос одному chatId */
-async function sendPollToChat(chatId, poll, pollId) {
+/** Отправить inline-опрос одному chatId (с retry) */
+async function sendPollToChat(chatId, poll, pollId, attempt = 0) {
   const { text, keyboard } = buildPollMessage(poll, pollId);
   const body = {
     chat_id: chatId,
@@ -142,12 +142,25 @@ async function sendPollToChat(chatId, poll, pollId) {
     parse_mode: 'HTML',
     reply_markup: JSON.stringify({ inline_keyboard: keyboard }),
   };
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return r.json();
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.parameters?.retry_after && attempt < 3) {
+      await new Promise(ok => setTimeout(ok, (data.parameters.retry_after + 1) * 1000));
+      return sendPollToChat(chatId, poll, pollId, attempt + 1);
+    }
+    return data;
+  } catch (err) {
+    if (attempt < 3) {
+      await new Promise(ok => setTimeout(ok, 2000));
+      return sendPollToChat(chatId, poll, pollId, attempt + 1);
+    }
+    return { ok: false, description: err.message };
+  }
 }
 
 /** Отправить сообщение (текст/медиа/опрос) одному chatId */
