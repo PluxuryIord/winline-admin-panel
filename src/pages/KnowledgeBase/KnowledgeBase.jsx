@@ -36,7 +36,10 @@ export default function KnowledgeBase() {
 
   const fetchArticles = () => {
     api.get('/api/knowledge')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+        return res.json();
+      })
       .then(data => {
         const list = data.articles || [];
         setArticles(list);
@@ -70,7 +73,8 @@ export default function KnowledgeBase() {
     if (!active) return;
     setSaving(true);
     try {
-      await api.put(`/api/knowledge/${active.key}`, { content: editContent });
+      const res = await api.put(`/api/knowledge/${active.key}`, { content: editContent });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       setArticles(prev => prev.map(a => a.key === active.key ? { ...a, content: editContent } : a));
       setIsEditing(false);
     } catch (err) {
@@ -105,6 +109,7 @@ export default function KnowledgeBase() {
         body: formData,
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const data = await res.json();
       if (data.ok) {
         setArticles(prev => prev.map(a => {

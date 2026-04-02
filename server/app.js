@@ -20,6 +20,12 @@ import analyticsRouter from './routes/analytics.js';
 import eventsRouter, { scanHandler } from './routes/events.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+if (!JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET is not set. Refusing to start without authentication.');
+  process.exit(1);
+}
+
 const app = express();
 app.set('trust proxy', 1); // Trust reverse proxy (nginx/caddy) for secure cookies
 
@@ -40,7 +46,19 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const broadcastLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Слишком много рассылок, попробуйте через минуту' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/broadcasts/groups/send', broadcastLimiter);
+app.use('/api/broadcasts/users', broadcastLimiter);
+app.use('/api/broadcasts/drafts/:id/send', broadcastLimiter);
+app.post('/api/broadcasts', broadcastLimiter);
 app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '5mb' }));
@@ -75,12 +93,7 @@ app.get('/api/events/codes/:code/qr', qrHandler);
 // QR-карточка с фоном и текстом (публичный, бот скачивает без токена)
 app.get('/api/events/codes/:code/qr-card', qrCardHandler);
 
-// Все остальные API — с JWT авторизацией (если JWT_SECRET задан)
-if (JWT_SECRET) {
-  app.use('/api', authMiddleware);
-} else {
-  console.warn('[auth] JWT_SECRET не задан — авторизация отключена. Добавьте JWT_SECRET в .env для включения.');
-}
+app.use('/api', authMiddleware);
 
 app.use('/api/users', usersRouter);
 app.use('/api/chats', chatsRouter);

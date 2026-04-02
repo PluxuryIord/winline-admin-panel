@@ -19,6 +19,11 @@ router.post('/', async (req, res, next) => {
     const match = data.match(/^data:image\/(\w+);base64,(.+)$/);
     if (!match) return res.status(400).json({ error: 'Invalid image data' });
 
+    const allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!allowedFormats.includes(match[1].toLowerCase())) {
+      return res.status(400).json({ error: `Image format "${match[1]}" is not allowed. Use: ${allowedFormats.join(', ')}` });
+    }
+
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const buffer = Buffer.from(match[2], 'base64');
     const name = `image.${ext}`;

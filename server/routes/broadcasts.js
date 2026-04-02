@@ -7,6 +7,11 @@ import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
+function isValidChatId(chatId) {
+  const s = String(chatId);
+  return /^-?\d+$/.test(s) || /^@[\w]+$/.test(s);
+}
+
 const router = Router();
 
 async function markBlockedIfNeeded(userId, errorText) {
@@ -21,15 +26,13 @@ async function markBlockedIfNeeded(userId, errorText) {
 function verifyBroadcastWebhook(req) {
   if (!WEBHOOK_SECRET) return false;
   const sig = req.headers['x-webhook-signature'];
-  if (sig) {
-    try {
-      const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
-        .update(JSON.stringify(req.body))
-        .digest('hex');
-      return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
-    } catch { return false; }
-  }
-  return req.headers['x-webhook-secret'] === WEBHOOK_SECRET;
+  if (!sig) return false;
+  try {
+    const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+  } catch { return false; }
 }
 
 // ===================== WEBHOOK (без JWT) =====================
@@ -247,6 +250,7 @@ router.post('/channels', async (req, res, next) => {
   try {
     const { chatId, title } = req.body;
     if (!chatId) return res.status(400).json({ error: 'chatId is required' });
+    if (!isValidChatId(chatId)) return res.status(400).json({ error: 'chatId must be a number or start with @' });
     const [existing] = await dbPool.query('SELECT id FROM wl_admin_channels WHERE chat_id = ?', [String(chatId)]);
     if (existing.length) return res.status(409).json({ error: 'Канал уже добавлен' });
     const [result] = await dbPool.query('INSERT INTO wl_admin_channels (chat_id, title) VALUES (?, ?)', [String(chatId), title || chatId]);
@@ -321,6 +325,7 @@ router.post('/groups', async (req, res, next) => {
   try {
     const { chatId, title } = req.body;
     if (!chatId) return res.status(400).json({ error: 'chatId is required' });
+    if (!isValidChatId(chatId)) return res.status(400).json({ error: 'chatId must be a number or start with @' });
     const [existing] = await dbPool.query('SELECT id FROM wl_admin_groups WHERE chat_id = ?', [String(chatId)]);
     if (existing.length) return res.status(409).json({ error: 'Группа уже добавлена' });
     const [result] = await dbPool.query('INSERT INTO wl_admin_groups (chat_id, title) VALUES (?, ?)', [String(chatId), title || chatId]);

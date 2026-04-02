@@ -691,7 +691,8 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   };
 
   const handleDeleteChannel = async (id) => {
-    await api.delete(`/api/broadcasts/channels/${id}`);
+    const res = await api.delete(`/api/broadcasts/channels/${id}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setChannels(prev => prev.filter(c => c.id !== id));
   };
 
@@ -1208,7 +1209,8 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   };
 
   const handleDeleteGroup = async (id) => {
-    await api.delete(`/api/broadcasts/groups/${id}`);
+    const res = await api.delete(`/api/broadcasts/groups/${id}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setGroups(prev => prev.filter(g => g.id !== id));
   };
 
@@ -1410,6 +1412,7 @@ function DraftsTab({ onSendResult, onEditDraft }) {
   const loadDrafts = useCallback(async () => {
     try {
       const res = await api.get('/api/broadcasts/drafts');
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       setDrafts(await res.json());
     } catch { /* ignore */ }
     setLoading(false);
@@ -1588,6 +1591,7 @@ export default function Broadcasts() {
   const fetchBroadcasts = useCallback(async () => {
     try {
       const res = await api.get('/api/broadcasts');
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       setBroadcasts(await res.json());
     } catch { /* ignore */ }
     setLoading(false);
@@ -1599,6 +1603,7 @@ export default function Broadcasts() {
     setPollStatsLoading(true);
     try {
       const res = await api.get(`/api/broadcasts/poll/${pollId}/stats`);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const data = await res.json();
       setPollStatsModal(data);
     } catch { setPollStatsModal(null); }
@@ -1613,7 +1618,8 @@ export default function Broadcasts() {
 
   const handleDeleteBroadcast = async () => {
     if (!deleteModal) return;
-    await api.delete(`/api/broadcasts/${deleteModal}`);
+    const res = await api.delete(`/api/broadcasts/${deleteModal}`);
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setBroadcasts(prev => prev.filter(b => b.id !== deleteModal));
     setDeleteModal(null);
   };

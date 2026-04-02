@@ -94,7 +94,10 @@ export default function ChatView() {
   // Загрузка чата
   useEffect(() => {
     api.get('/api/chats')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Ошибка ${r.status}`);
+        return r.json();
+      })
       .then(chats => {
         const found = chats.find(c => c.id === Number(id));
         setChat(found || null);
@@ -235,6 +238,7 @@ export default function ChatView() {
         body.media = mediaList;
       }
       const res = await api.post(`/api/chats/${id}/messages`, body);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const newMsg = await res.json();
       // Preserve tgError on the message object for display
       const msgWithError = { ...newMsg };

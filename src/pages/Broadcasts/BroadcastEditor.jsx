@@ -33,12 +33,15 @@ function PostEditor({ text, onText }) {
   );
 }
 
+let _optionId = 0;
+function makeOption(text = '') { return { id: ++_optionId, text }; }
+
 function PollEditor({ question, onQuestion, options, onOptions }) {
-  const addOption = () => onOptions([...options, '']);
+  const addOption = () => onOptions([...options, makeOption()]);
   const removeOption = (i) => onOptions(options.filter((_, idx) => idx !== i));
   const editOption = (i, val) => {
     const next = [...options];
-    next[i] = val;
+    next[i] = { ...next[i], text: val };
     onOptions(next);
   };
 
@@ -56,13 +59,13 @@ function PollEditor({ question, onQuestion, options, onOptions }) {
       <label className="be-label" style={{ marginTop: '20px' }}>Варианты ответа</label>
       <div className="be-options-list">
         {options.map((opt, i) => (
-          <div key={i} className="be-option-row">
+          <div key={opt.id} className="be-option-row">
             <span className="be-option-num">{i + 1}</span>
             <input
               className="be-input be-input--flex"
               type="text"
               placeholder={`Вариант ${i + 1}`}
-              value={opt}
+              value={opt.text}
               onChange={e => editOption(i, e.target.value)}
             />
             {options.length > 2 && (
@@ -120,7 +123,7 @@ function ContestEditor({ text, onText, randomizer, onRandomizer }) {
 }
 
 function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, onCorrect }) {
-  const addOption = () => onOptions([...options, '']);
+  const addOption = () => onOptions([...options, makeOption()]);
   const removeOption = (i) => {
     onOptions(options.filter((_, idx) => idx !== i));
     if (correctIndex === i) onCorrect(0);
@@ -128,7 +131,7 @@ function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, on
   };
   const editOption = (i, val) => {
     const next = [...options];
-    next[i] = val;
+    next[i] = { ...next[i], text: val };
     onOptions(next);
   };
 
@@ -148,7 +151,7 @@ function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, on
       </label>
       <div className="be-options-list">
         {options.map((opt, i) => (
-          <div key={i} className={`be-option-row ${correctIndex === i ? 'be-option-row--correct' : ''}`}>
+          <div key={opt.id} className={`be-option-row ${correctIndex === i ? 'be-option-row--correct' : ''}`}>
             <button
               className={`be-correct-btn ${correctIndex === i ? 'be-correct-btn--active' : ''}`}
               onClick={() => onCorrect(i)}
@@ -160,7 +163,7 @@ function QuizEditor({ question, onQuestion, options, onOptions, correctIndex, on
               className="be-input be-input--flex"
               type="text"
               placeholder={`Вариант ${i + 1}`}
-              value={opt}
+              value={opt.text}
               onChange={e => editOption(i, e.target.value)}
             />
             {options.length > 2 && (
@@ -285,8 +288,8 @@ export default function BroadcastEditor() {
   // Состояние контента
   const [text, setText] = useState('');
   const [question, setQuestion] = useState('');
-  const [pollOptions, setPollOptions] = useState(['', '']);
-  const [quizOptions, setQuizOptions] = useState(['', '']);
+  const [pollOptions, setPollOptions] = useState([makeOption(), makeOption()]);
+  const [quizOptions, setQuizOptions] = useState([makeOption(), makeOption()]);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [randomizer, setRandomizer] = useState(true);
 
@@ -331,15 +334,15 @@ export default function BroadcastEditor() {
     if (type === 'post' || type === 'contest') return text;
     if (type === 'poll') {
       const opts = pollOptions
-        .filter(o => o.trim())
-        .map((o, i) => `${i + 1}. ${o}`)
+        .filter(o => o.text.trim())
+        .map((o, i) => `${i + 1}. ${o.text}`)
         .join('\n');
       return `❓ <b>${question}</b>\n\n${opts}`;
     }
     if (type === 'quiz') {
       const opts = quizOptions
-        .filter(o => o.trim())
-        .map((o, i) => `${i === correctIndex ? '✅' : '▫️'} ${o}`)
+        .filter(o => o.text.trim())
+        .map((o, i) => `${i === correctIndex ? '✅' : '▫️'} ${o.text}`)
         .join('\n');
       return `🧠 <b>${question}</b>\n\n${opts}`;
     }
@@ -356,12 +359,12 @@ export default function BroadcastEditor() {
     const body = { channelIds: selectedIds };
 
     if (type === 'poll') {
-      const opts = pollOptions.filter(o => o.trim());
+      const opts = pollOptions.map(o => o.text).filter(t => t.trim());
       if (!question.trim()) { alert('Введите вопрос опроса!'); return; }
       if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
       body.poll = { question: question.trim(), options: opts, type: 'regular' };
     } else if (type === 'quiz') {
-      const opts = quizOptions.filter(o => o.trim());
+      const opts = quizOptions.map(o => o.text).filter(t => t.trim());
       if (!question.trim()) { alert('Введите вопрос викторины!'); return; }
       if (opts.length < 2) { alert('Добавьте минимум 2 варианта ответа!'); return; }
       if (correctIndex >= opts.length) { alert('Выберите правильный ответ!'); return; }

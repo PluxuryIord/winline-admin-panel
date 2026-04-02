@@ -12,8 +12,6 @@ export default function authMiddleware(req, res, next) {
     token = header.slice(7);
   } else if (req.cookies?.wl_token) {
     token = req.cookies.wl_token;
-  } else if (req.query.token) {
-    token = req.query.token;
   } else {
     return res.status(401).json({ error: 'Требуется авторизация' });
   }

@@ -8,16 +8,14 @@ import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
 function verifyWebhook(req) {
   if (!WEBHOOK_SECRET) return false;
-  // 1. HMAC signature (preferred)
   const sig = req.headers['x-webhook-signature'];
-  if (sig) {
+  if (!sig) return false;
+  try {
     const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
       .update(JSON.stringify(req.body))
       .digest('hex');
     return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
-  }
-  // 2. Plain secret (backward compat — will be removed later)
-  return req.headers['x-webhook-secret'] === WEBHOOK_SECRET;
+  } catch { return false; }
 }
 
 const router = Router();
@@ -104,26 +102,35 @@ async function handleWebhook(req, res, next) {
     console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video);
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
-    // Находим или создаём чат
-    const [existingChats] = await dbPool.query(
+    // Находим или создаём чат (upsert to avoid race condition)
+    await dbPool.query(
+      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = id', [user_id]
+    );
+    const [chatRows] = await dbPool.query(
       'SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [user_id]
     );
-    let chatId;
-    if (existingChats.length) {
-      chatId = existingChats[0].id;
-    } else {
-      const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [user_id]);
-      chatId = ins.insertId;
-    }
+    const chatId = chatRows[0].id;
 
     // Обработка медиа от бота — поддержка разных форматов
     // media: массив (альбом) ИЛИ photo/document/video/voice/audio (одиночное)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
     async function downloadAndUpload(src) {
       const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${src.file_id}`);
       const fileData = await fileRes.json();
       if (!fileData.ok) return null;
       const filePath = fileData.result.file_path;
+      if (fileData.result.file_size && fileData.result.file_size > MAX_FILE_SIZE) {
+        console.warn(`[webhook] File too large (${fileData.result.file_size} bytes), skipping`);
+        return null;
+      }
       const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+      const headRes = await fetch(fileUrl, { method: 'HEAD' });
+      const contentLength = Number(headRes.headers.get('content-length'));
+      if (contentLength && contentLength > MAX_FILE_SIZE) {
+        console.warn(`[webhook] File too large (${contentLength} bytes), skipping`);
+        return null;
+      }
       const originalName = src.file_name || path.basename(filePath);
       const mimeType = src.mime_type || (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') ? 'image/jpeg' : filePath.endsWith('.png') ? 'image/png' : 'application/octet-stream');
       const buffer = await downloadBuffer(fileUrl);
