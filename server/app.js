@@ -105,6 +105,8 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/events', eventsRouter);
 import scenariosRouter from './routes/scenarios.js';
 app.use('/api/scenarios', scenariosRouter);
+import emojisRouter from './routes/emojis.js';
+app.use('/api/emojis', emojisRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {

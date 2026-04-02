@@ -1,22 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Bold, Italic, Code, Link2, Smile } from 'lucide-react';
+import { Bold, Italic, Code, Link2, Smile, Settings } from 'lucide-react';
+import STANDARD_EMOJIS from '../EmojiPicker/standardEmojis.js';
+import EmojiManageModal from '../EmojiPicker/EmojiManageModal.jsx';
 import './TgHtmlEditor.css';
-
-/* ── Custom Emoji IDs (same as EmojiPicker) ───────────────────────────── */
-const CUSTOM_EMOJI_IDS = [
-  '5249203579134179981','5249222386795967624','5249038167058709114',
-  '5249101968797889750','5249380256908865528','5249497067134418748',
-  '5248961824015024533','5249022679406641203','5249500859590539214',
-  '5249393919199836094','5249315265463743154','5249137793120107984',
-  '5249431560293220758','5248978625927083352','5249266736628266267',
-  '5249284625167055914','5248996780753844722','5249377542489535714',
-  '5249100031767641367','5249370271109905382','5249023950716959287',
-  '5249494885291033786','5249233003955125362','5249132016389092908',
-  '5249455491850991356','5249484955326643084','5249109553710136350',
-  '5249409342427396269','5249407873548581860','5249222721803416777',
-  '5249042689659273281','5249150639367287343','5249302071324214197',
-  '5249311528842196557','5249350832087925208',
-];
 
 /* ── Telegram HTML  ->  contentEditable safe HTML ─────────────────────── */
 function tgHtmlToEditable(tgHtml) {
@@ -211,8 +197,22 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
   const isComposingRef = useRef(false);
 
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiTab, setEmojiTab] = useState('winline');
+  const [customEmojiIds, setCustomEmojiIds] = useState([]);
+  const [manageOpen, setManageOpen] = useState(false);
   const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, code: false });
   const savedSelectionRef = useRef(null);
+
+  /* ── Load custom emoji IDs from API ─────────────────────────────────── */
+  const loadEmojis = useCallback(async () => {
+    try {
+      const res = await fetch('/api/emojis');
+      const data = await res.json();
+      setCustomEmojiIds(data.map((e) => e.emoji_id));
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadEmojis(); }, [loadEmojis]);
 
   /* ── Track active formatting on selection change ────────────────────── */
   useEffect(() => {
@@ -376,7 +376,6 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
     setEmojiOpen(false);
     editorRef.current?.focus();
 
-    // Restore selection
     if (savedSelectionRef.current) {
       restoreSelection(savedSelectionRef.current);
       savedSelectionRef.current = null;
@@ -384,6 +383,19 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
 
     const imgHtml = `<img src="/emoji/${emojiId}.webp" data-emoji-id="${emojiId}" class="tg-emoji-inline" contenteditable="false" alt="emoji" />`;
     insertHtmlAtCaret(imgHtml);
+    handleInput();
+  };
+
+  const handleStandardEmojiSelect = (emoji) => {
+    setEmojiOpen(false);
+    editorRef.current?.focus();
+
+    if (savedSelectionRef.current) {
+      restoreSelection(savedSelectionRef.current);
+      savedSelectionRef.current = null;
+    }
+
+    insertHtmlAtCaret(emoji);
     handleInput();
   };
 
@@ -469,25 +481,75 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
             <>
               <div className="emoji-picker-backdrop" onClick={() => setEmojiOpen(false)} />
               <div className="tg-editor-emoji-popup" style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 280 }}>
-                <div className="tg-editor-emoji-grid">
-                  {CUSTOM_EMOJI_IDS.map((id) => (
-                    <button
-                      key={id}
-                      className="tg-editor-emoji-item"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleEmojiSelect(id)}
-                      title={id}
-                      type="button"
-                    >
-                      <img
-                        src={`/emoji/${id}.webp`}
-                        alt="emoji"
-                        className="tg-editor-emoji-img"
-                        loading="lazy"
-                      />
-                    </button>
-                  ))}
+                <div className="tg-editor-emoji-tabs">
+                  <button
+                    className={`tg-editor-emoji-tab ${emojiTab === 'winline' ? 'tg-editor-emoji-tab--active' : ''}`}
+                    onClick={() => setEmojiTab('winline')}
+                    type="button"
+                  >
+                    Winline
+                  </button>
+                  <button
+                    className={`tg-editor-emoji-tab ${emojiTab === 'standard' ? 'tg-editor-emoji-tab--active' : ''}`}
+                    onClick={() => setEmojiTab('standard')}
+                    type="button"
+                  >
+                    {'\u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0435'}
+                  </button>
+                  <button
+                    className="tg-editor-emoji-tab tg-editor-emoji-tab--gear"
+                    onClick={() => { setEmojiOpen(false); setManageOpen(true); }}
+                    title={'\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u044D\u043C\u043E\u0434\u0437\u0438'}
+                    type="button"
+                  >
+                    <Settings size={13} />
+                  </button>
                 </div>
+
+                {emojiTab === 'winline' && (
+                  <div className="tg-editor-emoji-grid">
+                    {customEmojiIds.map((id) => (
+                      <button
+                        key={id}
+                        className="tg-editor-emoji-item"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleEmojiSelect(id)}
+                        title={id}
+                        type="button"
+                      >
+                        <img
+                          src={`/emoji/${id}.webp`}
+                          alt="emoji"
+                          className="tg-editor-emoji-img"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {emojiTab === 'standard' && (
+                  <div className="tg-editor-emoji-standard">
+                    {STANDARD_EMOJIS.map((cat) => (
+                      <div key={cat.name}>
+                        <div className="tg-editor-emoji-cat-label">{cat.name}</div>
+                        <div className="tg-editor-emoji-grid">
+                          {cat.emojis.map((em) => (
+                            <button
+                              key={em}
+                              className="tg-editor-emoji-item tg-editor-emoji-item--unicode"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleStandardEmojiSelect(em)}
+                              type="button"
+                            >
+                              {em}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -505,8 +567,14 @@ export default function TgHtmlEditor({ value, onChange, placeholder, minRows = 3
         onCompositionEnd={() => { isComposingRef.current = false; handleInput(); }}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
-        data-placeholder={placeholder || 'Введите текст...'}
+        data-placeholder={placeholder || '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043A\u0441\u0442...'}
         style={{ minHeight: `${minHeight}px` }}
+      />
+
+      <EmojiManageModal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        onChanged={loadEmojis}
       />
     </div>
   );

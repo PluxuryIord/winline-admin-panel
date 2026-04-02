@@ -30,7 +30,7 @@
 }
 
 .emoji-picker-popup {
-  width: 280px; /* overridden by inline style */
+  width: 280px;
   background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -39,15 +39,51 @@
   overflow: hidden;
 }
 
-.emoji-picker-header {
-  padding: 10px 14px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+
+.emoji-picker-tabs {
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
+
+.emoji-picker-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.emoji-picker-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.emoji-picker-tab--active {
+  color: var(--color-orange);
+  border-bottom-color: var(--color-orange);
+}
+
+.emoji-picker-tab--gear {
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.emoji-picker-tab--gear:hover {
+  color: var(--color-orange);
+}
+
+/* ── Grid ──────────────────────────────────────────────────────────────── */
 
 .emoji-picker-grid {
   display: grid;
@@ -76,10 +112,39 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.emoji-picker-item--unicode {
+  font-size: 1.25rem;
+  padding: 0;
+}
+
 .emoji-picker-img {
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+.emoji-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+  padding: 16px;
+}
+
+/* ── Standard emojis section ──────────────────────────────────────────── */
+
+.emoji-picker-standard {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.emoji-picker-cat-label {
+  padding: 6px 10px 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Compact variant for narrow panels */

@@ -1,25 +1,14 @@
 import { useState, useRef } from 'react';
-import { Smile } from 'lucide-react';
+import { Smile, Settings } from 'lucide-react';
+import STANDARD_EMOJIS from './standardEmojis.js';
+import EmojiManageModal from './EmojiManageModal.jsx';
 import './EmojiPicker.css';
 
-const CUSTOM_EMOJI_IDS = [
-  '5249203579134179981','5249222386795967624','5249038167058709114',
-  '5249101968797889750','5249380256908865528','5249497067134418748',
-  '5248961824015024533','5249022679406641203','5249500859590539214',
-  '5249393919199836094','5249315265463743154','5249137793120107984',
-  '5249431560293220758','5248978625927083352','5249266736628266267',
-  '5249284625167055914','5248996780753844722','5249377542489535714',
-  '5249100031767641367','5249370271109905382','5249023950716959287',
-  '5249494885291033786','5249233003955125362','5249132016389092908',
-  '5249455491850991356','5249484955326643084','5249109553710136350',
-  '5249409342427396269','5249407873548581860','5249222721803416777',
-  '5249042689659273281','5249150639367287343','5249302071324214197',
-  '5249311528842196557','5249350832087925208',
-];
-
-export default function EmojiPicker({ onInsert, textareaRef, compact = false }) {
+export default function EmojiPicker({ onInsert, textareaRef, compact = false, customEmojiIds = [] }) {
   const [open, setOpen] = useState(false);
   const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+  const [tab, setTab] = useState('winline');
+  const [manageOpen, setManageOpen] = useState(false);
   const cursorPosRef = useRef(null);
   const triggerRef = useRef(null);
 
@@ -36,13 +25,10 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false }) 
 
       let left;
       if (spaceRight >= popupWidth + 8) {
-        // Show to the right of the button
         left = rect.right + 4;
       } else if (spaceLeft >= popupWidth + 8) {
-        // Show to the left
         left = rect.left - popupWidth - 4;
       } else {
-        // Fallback: align right edge with button
         left = Math.max(8, rect.right - popupWidth);
       }
 
@@ -54,9 +40,14 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false }) 
     setOpen(!open);
   };
 
-  const handleSelect = (emojiId) => {
-    const tag = `<tg-emoji emoji-id="${emojiId}">⭐</tg-emoji>`;
+  const handleSelectCustom = (emojiId) => {
+    const tag = `<tg-emoji emoji-id="${emojiId}">\u2B50</tg-emoji>`;
     onInsert(tag, cursorPosRef.current);
+    setOpen(false);
+  };
+
+  const handleSelectStandard = (emoji) => {
+    onInsert(emoji, cursorPosRef.current);
     setOpen(false);
   };
 
@@ -67,7 +58,7 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false }) 
         className="emoji-picker-trigger"
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleOpen}
-        title="Фирменные эмодзи"
+        title={'\u042D\u043C\u043E\u0434\u0437\u0438'}
         type="button"
       >
         <Smile size={16} />
@@ -86,27 +77,81 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false }) 
               width: popupWidth,
             }}
           >
-            <div className="emoji-picker-grid">
-              {CUSTOM_EMOJI_IDS.map((id) => (
-                <button
-                  key={id}
-                  className="emoji-picker-item"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSelect(id)}
-                  title={id}
-                >
-                  <img
-                    src={`/emoji/${id}.webp`}
-                    alt="emoji"
-                    className="emoji-picker-img"
-                    loading="lazy"
-                  />
-                </button>
-              ))}
+            <div className="emoji-picker-tabs">
+              <button
+                className={`emoji-picker-tab ${tab === 'winline' ? 'emoji-picker-tab--active' : ''}`}
+                onClick={() => setTab('winline')}
+                type="button"
+              >
+                Winline
+              </button>
+              <button
+                className={`emoji-picker-tab ${tab === 'standard' ? 'emoji-picker-tab--active' : ''}`}
+                onClick={() => setTab('standard')}
+                type="button"
+              >
+                {'\u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0435'}
+              </button>
+              <button
+                className="emoji-picker-tab emoji-picker-tab--gear"
+                onClick={() => { setOpen(false); setManageOpen(true); }}
+                title={'\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u044D\u043C\u043E\u0434\u0437\u0438'}
+                type="button"
+              >
+                <Settings size={13} />
+              </button>
             </div>
+
+            {tab === 'winline' && (
+              <div className="emoji-picker-grid">
+                {customEmojiIds.map((id) => (
+                  <button
+                    key={id}
+                    className="emoji-picker-item"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelectCustom(id)}
+                    title={id}
+                  >
+                    <img
+                      src={`/emoji/${id}.webp`}
+                      alt="emoji"
+                      className="emoji-picker-img"
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+                {customEmojiIds.length === 0 && (
+                  <div className="emoji-picker-empty">{'\u041D\u0435\u0442 \u044D\u043C\u043E\u0434\u0437\u0438'}</div>
+                )}
+              </div>
+            )}
+
+            {tab === 'standard' && (
+              <div className="emoji-picker-standard">
+                {STANDARD_EMOJIS.map((cat) => (
+                  <div key={cat.name}>
+                    <div className="emoji-picker-cat-label">{cat.name}</div>
+                    <div className="emoji-picker-grid">
+                      {cat.emojis.map((em) => (
+                        <button
+                          key={em}
+                          className="emoji-picker-item emoji-picker-item--unicode"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelectStandard(em)}
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
+
+      <EmojiManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
     </div>
   );
 }

@@ -91,6 +91,50 @@
   letter-spacing: 0.5px;
 }
 
+/* ── Emoji tabs ──────────────────────────────────────────────────────── */
+
+.tg-editor-emoji-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tg-editor-emoji-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tg-editor-emoji-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tg-editor-emoji-tab--active {
+  color: var(--color-orange);
+  border-bottom-color: var(--color-orange);
+}
+
+.tg-editor-emoji-tab--gear {
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.tg-editor-emoji-tab--gear:hover {
+  color: var(--color-orange);
+}
+
 .tg-editor-emoji-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -120,6 +164,25 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+.tg-editor-emoji-item--unicode {
+  font-size: 1.25rem;
+  padding: 0;
+}
+
+.tg-editor-emoji-standard {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.tg-editor-emoji-cat-label {
+  padding: 6px 10px 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* ── Editable content area ────────────────────────────────────────────── */

@@ -98,6 +98,13 @@ const TABLES = [
     INDEX idx_code (code),
     INDEX idx_scanned_at (scanned_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+  `CREATE TABLE IF NOT EXISTS wl_admin_emojis (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    emoji_id VARCHAR(50) NOT NULL UNIQUE,
+    image_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
 export default async function migrate(pool) {
