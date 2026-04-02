@@ -111,39 +111,21 @@ function safeJsonParse(val, fallback = []) {
   try { return JSON.parse(val); } catch { return fallback; }
 }
 
-/** Создать опрос в БД и вернуть poll_id */
-async function createPoll(poll, broadcastId) {
-  const [result] = await dbPool.query(
-    'INSERT INTO wl_admin_polls (broadcast_id, question, options_json, type, correct_index) VALUES (?, ?, ?, ?, ?)',
-    [broadcastId || null, poll.question, JSON.stringify(poll.options), poll.type || 'regular', poll.type === 'quiz' ? (poll.correctIndex ?? null) : null]
-  );
-  return result.insertId;
-}
-
-/** Построить текст + inline-кнопки для опроса */
-function buildPollMessage(poll, pollId) {
-  const isQuiz = poll.type === 'quiz';
-  const emoji = isQuiz ? '🧠' : '📊';
-  const label = isQuiz ? 'Викторина' : 'Опрос';
-  let text = `${emoji} <b>${label}</b>\n\n${poll.question}\n`;
-  const keyboard = poll.options.map((opt, i) => ([{
-    text: opt,
-    callback_data: `poll_vote:${pollId}:${i}`,
-  }]));
-  return { text, keyboard };
-}
-
-/** Отправить inline-опрос одному chatId (с retry) */
-async function sendPollToChat(chatId, poll, pollId, attempt = 0) {
-  const { text, keyboard } = buildPollMessage(poll, pollId);
+/** Отправить нативный Telegram опрос (anonymous для каналов, non-anonymous для групп/юзеров) */
+async function sendNativePoll(chatId, poll, targetType, attempt = 0) {
+  const isChannel = targetType === 'channels';
   const body = {
     chat_id: chatId,
-    text,
-    parse_mode: 'HTML',
-    reply_markup: JSON.stringify({ inline_keyboard: keyboard }),
+    question: poll.question,
+    options: JSON.stringify(poll.options.map(o => typeof o === 'string' ? { text: o } : o)),
+    is_anonymous: isChannel,
+    type: poll.type === 'quiz' ? 'quiz' : 'regular',
   };
+  if (poll.type === 'quiz' && poll.correctIndex != null) {
+    body.correct_option_id = poll.correctIndex;
+  }
   try {
-    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPoll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -151,22 +133,22 @@ async function sendPollToChat(chatId, poll, pollId, attempt = 0) {
     const data = await r.json();
     if (data.parameters?.retry_after && attempt < 3) {
       await new Promise(ok => setTimeout(ok, (data.parameters.retry_after + 1) * 1000));
-      return sendPollToChat(chatId, poll, pollId, attempt + 1);
+      return sendNativePoll(chatId, poll, targetType, attempt + 1);
     }
     return data;
   } catch (err) {
     if (attempt < 3) {
       await new Promise(ok => setTimeout(ok, 2000));
-      return sendPollToChat(chatId, poll, pollId, attempt + 1);
+      return sendNativePoll(chatId, poll, targetType, attempt + 1);
     }
     return { ok: false, description: err.message };
   }
 }
 
 /** Отправить сообщение (текст/медиа/опрос) одному chatId */
-async function sendToChat(chatId, text, media, poll, pollId) {
-  if (poll && pollId) {
-    return sendPollToChat(chatId, poll, pollId);
+async function sendToChat(chatId, text, media, poll, targetType) {
+  if (poll) {
+    return sendNativePoll(chatId, poll, targetType || 'channels');
   }
   if (media?.url) {
     const buffer = await downloadBuffer(media.url);
@@ -353,13 +335,10 @@ router.post('/groups/send', async (req, res, next) => {
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
     if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
 
-    let pollId = null;
-    if (poll) pollId = await createPoll(poll);
-
     const results = [];
     for (const chatId of groupIds) {
       try {
-        const data = await sendToChat(chatId, text?.trim() || '', media, poll, pollId);
+        const data = await sendToChat(chatId, text?.trim() || '', media, poll, 'groups');
         results.push({ chatId, ok: data.ok, error: data.description || null });
       } catch (err) {
         results.push({ chatId, ok: false, error: err.message });
@@ -375,7 +354,7 @@ router.post('/groups/send', async (req, res, next) => {
 
     const record = await saveBroadcast({
       text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'groups', channels: groupNames, channelIds: groupIds,
-      total: groupIds.length, success, failed: groupIds.length - success, results, media, pollId,
+      total: groupIds.length, success, failed: groupIds.length - success, results, media,
     });
 
     res.json(record);
@@ -393,17 +372,6 @@ router.get('/', async (req, res, next) => {
 
     // Get poll ids from wl_admin_polls by broadcast_id
     const broadcastIds = rows.map(r => r.id);
-    let pollMap = {};
-    if (broadcastIds.length) {
-      try {
-        const [polls] = await dbPool.query(
-          `SELECT id, broadcast_id FROM wl_admin_polls WHERE broadcast_id IN (${broadcastIds.map(() => '?').join(',')})`,
-          broadcastIds
-        );
-        for (const p of polls) { pollMap[p.broadcast_id] = p.id; }
-      } catch {}
-    }
-
     const history = rows.map(r => ({
       id: r.id,
       text: r.text,
@@ -415,7 +383,6 @@ router.get('/', async (req, res, next) => {
       failed: r.failed,
       results: safeJsonParse(r.results_json, []),
       media: withMedia ? safeJsonParse(r.media_json, null) : null,
-      pollId: pollMap[r.id] || null,
       date: r.date,
       status: r.status,
     }));
@@ -456,13 +423,10 @@ router.post('/', async (req, res, next) => {
 
     await conn.beginTransaction();
 
-    let pollId = null;
-    if (poll) pollId = await createPoll(poll);
-
     const results = [];
     for (const chatId of channelIds) {
       try {
-        const data = await sendToChat(chatId, text?.trim() || '', media, poll, pollId);
+        const data = await sendToChat(chatId, text?.trim() || '', media, poll, 'channels');
         results.push({ chatId, ok: data.ok, error: data.description || null });
       } catch (err) {
         results.push({ chatId, ok: false, error: err.message });
@@ -480,7 +444,7 @@ router.post('/', async (req, res, next) => {
 
     const record = await saveBroadcast({
       text: broadcastText, type: 'channels', channels: channelNames, channelIds,
-      total: channelIds.length, success, failed: channelIds.length - success, results, media, pollId,
+      total: channelIds.length, success, failed: channelIds.length - success, results, media,
     }, conn);
 
     await conn.commit();
@@ -531,9 +495,6 @@ router.post('/users', async (req, res, next) => {
     const results = [];
     let successCount = 0;
 
-    let pollId = null;
-    if (poll) pollId = await createPoll(poll);
-
     // Prepare broadcast message text for chat storage
     const MEDIA_PREFIX = '__media__:';
     let chatMessageText = '';
@@ -547,7 +508,7 @@ router.post('/users', async (req, res, next) => {
 
     for (const row of rows) {
       try {
-        const data = await sendToChat(row.user_id, text?.trim() || '', media, poll, pollId);
+        const data = await sendToChat(row.user_id, text?.trim() || '', media, poll, 'users');
         results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: data.ok, error: data.description || null });
         if (!data.ok) {
           await markBlockedIfNeeded(row.user_id, data.description || '');
@@ -594,7 +555,7 @@ router.post('/users', async (req, res, next) => {
     try {
       record = await saveBroadcast({
         text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
-        total: rows.length, success: successCount, failed: rows.length - successCount, results: truncatedResults, media, pollId,
+        total: rows.length, success: successCount, failed: rows.length - successCount, results: truncatedResults, media,
       });
     } catch (saveErr) {
       console.error('[broadcasts] saveBroadcast failed:', saveErr.message);
@@ -858,34 +819,31 @@ router.post('/drafts/:id/send', async (req, res, next) => {
     const poll = safeJsonParse(draft.poll_json, null);
     const targetFilter = safeJsonParse(draft.target_filter, null);
 
-    let pollId = null;
-    if (poll) pollId = await createPoll(poll);
-
     let record;
     if (draft.target_type === 'channels') {
       const channelIds = targetFilter?.channelIds || [];
       if (!channelIds.length) return res.status(400).json({ error: 'Нет каналов для отправки' });
       const results = [];
       for (const chatId of channelIds) {
-        try { const d = await sendToChat(chatId, text.trim() || '', media, poll, pollId); results.push({ chatId, ok: d.ok, error: d.description || null }); }
+        try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'channels'); results.push({ chatId, ok: d.ok, error: d.description || null }); }
         catch (e) { results.push({ chatId, ok: false, error: e.message }); }
       }
       const success = results.filter(r => r.ok).length;
       const [channels] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
       const channelNames = channelIds.map(cid => { const ch = channels.find(c => String(c.chat_id) === String(cid)); return ch?.title || cid; });
-      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media, pollId });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media });
     } else if (draft.target_type === 'groups') {
       const groupIds = targetFilter?.groupIds || [];
       if (!groupIds.length) return res.status(400).json({ error: 'Нет групп для отправки' });
       const results = [];
       for (const chatId of groupIds) {
-        try { const d = await sendToChat(chatId, text.trim() || '', media, poll, pollId); results.push({ chatId, ok: d.ok, error: d.description || null }); }
+        try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'groups'); results.push({ chatId, ok: d.ok, error: d.description || null }); }
         catch (e) { results.push({ chatId, ok: false, error: e.message }); }
       }
       const success = results.filter(r => r.ok).length;
       const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
       const groupNames = groupIds.map(gid => { const g = groups.find(gr => String(gr.chat_id) === String(gid)); return g?.title || gid; });
-      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media, pollId });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
     } else if (draft.target_type === 'users') {
       const filters = targetFilter?.filters || {};
       let where = ['u.user_id IS NOT NULL'];
@@ -899,11 +857,11 @@ router.post('/drafts/:id/send', async (req, res, next) => {
       const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
       const results = [];
       for (const row of users) {
-        try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll, pollId); results.push({ chatId: row.user_id, ok: d.ok, error: d.description || null }); }
+        try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll, 'users'); results.push({ chatId: row.user_id, ok: d.ok, error: d.description || null }); }
         catch (e) { results.push({ chatId: row.user_id, ok: false, error: e.message }); }
       }
       const success = results.filter(r => r.ok).length;
-      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media, pollId });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media });
     } else {
       return res.status(400).json({ error: 'Неизвестный тип цели' });
     }
@@ -1011,34 +969,31 @@ setInterval(async () => {
         const poll = safeJsonParse(draft.poll_json, null);
         const targetFilter = safeJsonParse(draft.target_filter, null);
 
-        let pollId = null;
-        if (poll) pollId = await createPoll(poll);
-
         if (draft.target_type === 'channels') {
           const channelIds = targetFilter?.channelIds || [];
           if (channelIds.length) {
             const results = [];
             for (const chatId of channelIds) {
-              try { const d = await sendToChat(chatId, text.trim() || '', media, poll, pollId); results.push({ chatId, ok: d.ok }); }
+              try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'channels'); results.push({ chatId, ok: d.ok }); }
               catch (e) { results.push({ chatId, ok: false, error: e.message }); }
             }
             const success = results.filter(r => r.ok).length;
             const [channels] = await dbPool.query('SELECT chat_id, title FROM wl_admin_channels WHERE chat_id IN (?)', [channelIds.map(String)]);
             const channelNames = channelIds.map(id => { const ch = channels.find(c => String(c.chat_id) === String(id)); return ch?.title || id; });
-            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media, pollId });
+            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'channels', channels: channelNames, channelIds, total: channelIds.length, success, failed: channelIds.length - success, results, media });
           }
         } else if (draft.target_type === 'groups') {
           const groupIds = targetFilter?.groupIds || [];
           if (groupIds.length) {
             const results = [];
             for (const chatId of groupIds) {
-              try { const d = await sendToChat(chatId, text.trim() || '', media, poll, pollId); results.push({ chatId, ok: d.ok }); }
+              try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'groups'); results.push({ chatId, ok: d.ok }); }
               catch (e) { results.push({ chatId, ok: false, error: e.message }); }
             }
             const success = results.filter(r => r.ok).length;
             const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
             const groupNames = groupIds.map(id => { const g = groups.find(gr => String(gr.chat_id) === String(id)); return g?.title || id; });
-            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media, pollId });
+            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
           }
         } else if (draft.target_type === 'users') {
           const filters = targetFilter?.filters || {};
@@ -1053,11 +1008,11 @@ setInterval(async () => {
           const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
           const results = [];
           for (const row of users) {
-            try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll, pollId); results.push({ chatId: row.user_id, ok: d.ok }); }
+            try { const d = await sendToChat(row.user_id, text.trim() || '', media, poll, 'users'); results.push({ chatId: row.user_id, ok: d.ok }); }
             catch (e) { results.push({ chatId: row.user_id, ok: false, error: e.message }); }
           }
           const success = results.filter(r => r.ok).length;
-          await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media, pollId });
+          await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media });
         }
 
         // Mark as sent and delete draft
@@ -1075,7 +1030,7 @@ setInterval(async () => {
 
 // ===================== ХЕЛПЕР =====================
 
-async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media, pollId }, conn) {
+async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media }, conn) {
   const db = conn || dbPool;
   const status = success === total ? 'published' : (success > 0 ? 'partial' : 'failed');
   const withMedia = await checkMediaColumn();
@@ -1094,14 +1049,9 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
   const sql = `INSERT INTO wl_admin_broadcasts (${cols}) VALUES (${placeholders})`;
   const [result] = await db.query(sql, vals);
 
-  // Link poll to broadcast
-  if (pollId) {
-    try { await db.query('UPDATE wl_admin_polls SET broadcast_id = ? WHERE id = ?', [result.insertId, pollId]); } catch {}
-  }
-
   return {
     id: result.insertId, text: (text || '').substring(0, 200), type, channels, channelIds,
-    total, success, failed, results, media: media || null, date: new Date().toISOString(), status, pollId,
+    total, success, failed, results, media: media || null, date: new Date().toISOString(), status,
   };
 }
 
