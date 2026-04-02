@@ -1224,17 +1224,14 @@ pollVoteRouter.post('/', async (req, res) => {
     const isQuiz = poll.type === 'quiz';
     const emoji = isQuiz ? '🧠' : '📊';
     const label = isQuiz ? 'Викторина' : 'Опрос';
+    const chosenOption = options[option_index] || '';
     let resultText = `${emoji} <b>${label}</b>\n\n${poll.question}\n\n`;
-    options.forEach((opt, i) => {
-      const v = votes.find(vv => vv.option_index === i);
-      const cnt = v ? v.cnt : 0;
-      const pct = totalVotes > 0 ? Math.round(cnt / totalVotes * 100) : 0;
-      const bar = '▓'.repeat(Math.round(pct / 5)) + '░'.repeat(20 - Math.round(pct / 5));
-      const chosen = i === option_index ? ' ← твой ответ' : '';
-      const correctMark = isQuiz && poll.correct_index === i ? ' ✅' : '';
-      resultText += `${opt}${correctMark}${chosen}\n${bar} ${pct}% (${cnt})\n\n`;
-    });
-    resultText += `👥 Проголосовало: ${totalVotes}`;
+    resultText += `Ваш ответ: <b>${chosenOption}</b>\n\n`;
+    if (isQuiz && poll.correct_index != null) {
+      resultText += correct ? '✅ Правильный ответ' : `❌ Неправильно. Правильный ответ: <b>${options[poll.correct_index] || ''}</b>`;
+    } else {
+      resultText += '✅ Спасибо, ваш голос учтён';
+    }
 
     res.json({ ok: true, correct, option: options[option_index] || '', totalVotes, stats: votes, resultText });
   } catch (err) {
