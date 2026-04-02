@@ -1273,6 +1273,16 @@ input[type="checkbox"]:checked {
   font-size: 0.85rem;
 }
 
+.bc-recipients-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.82rem;
+}
+
 /* ─── Delivery button ─── */
 .bc-delivery-btn {
   background: rgba(255, 255, 255, 0.08);

@@ -547,8 +547,11 @@ router.get('/users/list', async (req, res, next) => {
         params.push(...tagsArr);
       }
     }
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
+    params.push(limit, offset);
     const [rows] = await dbPool.query(
-      `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u${joins} WHERE ${where.join(' AND ')} LIMIT 100`,
+      `SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u${joins} WHERE ${where.join(' AND ')} LIMIT ? OFFSET ?`,
       params
     );
     res.json(rows);

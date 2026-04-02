@@ -868,19 +868,49 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showRecipients, setShowRecipients] = useState(false);
   const [recipientsList, setRecipientsList] = useState([]);
   const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [recipientsHasMore, setRecipientsHasMore] = useState(false);
+  const [recipientsLoadingMore, setRecipientsLoadingMore] = useState(false);
+  const recipientsListRef = useRef(null);
+
+  const RECIPIENTS_PAGE = 100;
+
+  const fetchRecipients = async (offset = 0) => {
+    const params = new URLSearchParams();
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    params.set('limit', RECIPIENTS_PAGE);
+    params.set('offset', offset);
+    const res = await api.get(`/api/broadcasts/users/list?${params}`);
+    return res.json();
+  };
 
   const loadRecipients = async () => {
     if (showRecipients) { setShowRecipients(false); return; }
     setRecipientsLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
-      const res = await api.get(`/api/broadcasts/users/list?${params}`);
-      const data = await res.json();
+      const data = await fetchRecipients(0);
       setRecipientsList(data);
+      setRecipientsHasMore(data.length >= RECIPIENTS_PAGE);
       setShowRecipients(true);
     } catch { setRecipientsList([]); }
     setRecipientsLoading(false);
+  };
+
+  const loadMoreRecipients = async () => {
+    if (recipientsLoadingMore || !recipientsHasMore) return;
+    setRecipientsLoadingMore(true);
+    try {
+      const data = await fetchRecipients(recipientsList.length);
+      setRecipientsList(prev => [...prev, ...data]);
+      setRecipientsHasMore(data.length >= RECIPIENTS_PAGE);
+    } catch {}
+    setRecipientsLoadingMore(false);
+  };
+
+  const handleRecipientsScroll = (e) => {
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+      loadMoreRecipients();
+    }
   };
 
   // Close dropdown on click outside
@@ -974,7 +1004,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 <span>Получатели ({recipientsList.length}{userCount > 100 ? ` из ${userCount}` : ''})</span>
                 <button className="bc-recipients-close" onClick={() => setShowRecipients(false)}><X size={14} /></button>
               </div>
-              <div className="bc-recipients-list">
+              <div className="bc-recipients-list" ref={recipientsListRef} onScroll={handleRecipientsScroll}>
                 {recipientsList.map(u => (
                   <div key={u.user_id} className="bc-recipient-row">
                     <span className="bc-recipient-name">{u.full_name || '—'}</span>
@@ -982,7 +1012,8 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <span className="bc-recipient-id">{u.user_id}</span>
                   </div>
                 ))}
-                {recipientsList.length === 0 && <div className="bc-recipients-empty">Нет получателей</div>}
+                {recipientsLoadingMore && <div className="bc-recipients-loading-more"><Loader size={16} className="spin" /> Загрузка...</div>}
+                {recipientsList.length === 0 && !recipientsLoadingMore && <div className="bc-recipients-empty">Нет получателей</div>}
               </div>
             </div>
           </div>
