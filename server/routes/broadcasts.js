@@ -1220,7 +1220,23 @@ pollVoteRouter.post('/', async (req, res) => {
       correct = option_index === poll.correct_index;
     }
 
-    res.json({ ok: true, correct, option: options[option_index] || '', totalVotes, stats: votes });
+    // Build result text for editMessageText
+    const isQuiz = poll.type === 'quiz';
+    const emoji = isQuiz ? '🧠' : '📊';
+    const label = isQuiz ? 'Викторина' : 'Опрос';
+    let resultText = `${emoji} <b>${label}</b>\n\n${poll.question}\n\n`;
+    options.forEach((opt, i) => {
+      const v = votes.find(vv => vv.option_index === i);
+      const cnt = v ? v.cnt : 0;
+      const pct = totalVotes > 0 ? Math.round(cnt / totalVotes * 100) : 0;
+      const bar = '▓'.repeat(Math.round(pct / 5)) + '░'.repeat(20 - Math.round(pct / 5));
+      const chosen = i === option_index ? ' ← твой ответ' : '';
+      const correctMark = isQuiz && poll.correct_index === i ? ' ✅' : '';
+      resultText += `${opt}${correctMark}${chosen}\n${bar} ${pct}% (${cnt})\n\n`;
+    });
+    resultText += `👥 Проголосовало: ${totalVotes}`;
+
+    res.json({ ok: true, correct, option: options[option_index] || '', totalVotes, stats: votes, resultText });
   } catch (err) {
     console.error('[poll-vote]', err.message);
     res.status(500).json({ error: err.message });
