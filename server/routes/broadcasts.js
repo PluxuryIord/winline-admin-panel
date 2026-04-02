@@ -528,7 +528,10 @@ router.get('/users/count', async (req, res, next) => {
         params.push(...tagsArr);
       }
     }
-    const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
+    const sql = `SELECT COUNT(DISTINCT u.user_id) as count FROM users u${joins} WHERE ${where.join(' AND ')}`;
+    console.log('[debug /users/count] sql:', sql, 'params:', params);
+    const [[{ count }]] = await dbPool.query(sql, params);
+    console.log('[debug /users/count] result:', count);
     res.json({ count });
   } catch (err) { next(err); }
 });
