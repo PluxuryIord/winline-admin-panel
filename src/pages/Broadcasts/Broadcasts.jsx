@@ -507,7 +507,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
 }
 
 /* ═══ Вкладка «Каналы» ═══ */
-function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange }) {
+function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 'channels' }) {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDD, setShowDD] = useState(false);
@@ -515,11 +515,11 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange }) {
   const ddRef = useRef(null);
 
   useEffect(() => {
-    api.get(`/api/broadcasts/channels/${encodeURIComponent(chatId)}/tags`)
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`)
       .then(r => r.json())
       .then(data => { setTags(data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [chatId]);
+  }, [chatId, entityType]);
 
   useEffect(() => {
     const handler = (e) => { if (ddRef.current && !ddRef.current.contains(e.target)) setShowDD(false); };
@@ -530,7 +530,7 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange }) {
   const saveTags = async (newTags) => {
     setTags(newTags);
     try {
-      await api.put(`/api/broadcasts/channels/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
       onTagsChange?.();
     } catch { /* ignore */ }
   };
@@ -1131,7 +1131,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
-  // Group tags (reuses same channel_tags table)
+  // Group tags (separate table from channels)
   const [allGroupTags, setAllGroupTags] = useState([]);
   const [filterGroupTags, setFilterGroupTags] = useState([]);
   const [groupTagsMap, setGroupTagsMap] = useState({});
@@ -1140,14 +1140,14 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const grTagRef = useRef(null);
 
   const loadAllGroupTags = useCallback(() => {
-    api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
+    api.get('/api/broadcasts/group-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
   }, []);
 
   const loadGroupTagsMap = useCallback(async (grList) => {
     const map = {};
     await Promise.all(grList.map(async (g) => {
       try {
-        const res = await api.get(`/api/broadcasts/channels/${encodeURIComponent(g.chatId)}/tags`);
+        const res = await api.get(`/api/broadcasts/groups/${encodeURIComponent(g.chatId)}/tags`);
         map[g.chatId] = await res.json();
       } catch { map[g.chatId] = []; }
     }));
@@ -1339,7 +1339,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <span className="bc-list-title">{g.title}</span>
                   <span className="bc-list-id">{g.chatId}</span>
                 </label>
-                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} />
+                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
                 <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
                   <Archive size={14} />
                 </button>

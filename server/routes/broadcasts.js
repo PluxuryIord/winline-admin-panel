@@ -664,10 +664,63 @@ router.put('/channels/:chatId/tags', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Get all unique channel tags
+// Get all unique channel tags (only for existing channels)
 router.get('/channel-tags', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query('SELECT DISTINCT tag FROM wl_admin_channel_tags ORDER BY tag');
+    const [rows] = await dbPool.query(
+      `SELECT DISTINCT t.tag FROM wl_admin_channel_tags t
+       INNER JOIN wl_admin_channels c ON c.chat_id = t.chat_id
+       ORDER BY t.tag`
+    );
+    res.json(rows.map(r => r.tag));
+  } catch (err) { next(err); }
+});
+
+// ── Group tags (separate from channel tags) ──
+
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_group_tags (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      chat_id VARCHAR(100) NOT NULL,
+      tag VARCHAR(255) NOT NULL,
+      UNIQUE KEY uq_chat_tag (chat_id, tag)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[group-tags] Failed to create table:', err.message);
+  }
+})();
+
+router.get('/groups/:chatId/tags', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT tag FROM wl_admin_group_tags WHERE chat_id = ? ORDER BY tag',
+      [String(req.params.chatId)]
+    );
+    res.json(rows.map(r => r.tag));
+  } catch (err) { next(err); }
+});
+
+router.put('/groups/:chatId/tags', async (req, res, next) => {
+  try {
+    const chatId = String(req.params.chatId);
+    const tags = Array.isArray(req.body.tags) ? req.body.tags.filter(t => t && typeof t === 'string') : [];
+    await dbPool.query('DELETE FROM wl_admin_group_tags WHERE chat_id = ?', [chatId]);
+    if (tags.length > 0) {
+      const values = tags.map(t => [chatId, t.trim()]);
+      await dbPool.query('INSERT IGNORE INTO wl_admin_group_tags (chat_id, tag) VALUES ?', [values]);
+    }
+    res.json({ ok: true, tags });
+  } catch (err) { next(err); }
+});
+
+router.get('/group-tags', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      `SELECT DISTINCT t.tag FROM wl_admin_group_tags t
+       INNER JOIN wl_admin_groups g ON g.chat_id = t.chat_id
+       ORDER BY t.tag`
+    );
     res.json(rows.map(r => r.tag));
   } catch (err) { next(err); }
 });
