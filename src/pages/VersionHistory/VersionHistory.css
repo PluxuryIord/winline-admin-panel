@@ -103,6 +103,30 @@
   font-size: 0.85rem;
 }
 
+.btn-create-snapshot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #60a5fa;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-create-snapshot:hover {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: #60a5fa;
+}
+.btn-create-snapshot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-rollback {
   display: inline-flex;
   align-items: center;

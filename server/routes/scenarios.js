@@ -191,6 +191,25 @@ const SEED_DATA = {
         btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner' },
       },
     },
+    event_anketa: {
+      title: 'Анкета мероприятия',
+      description: 'Предсобытийная анкета для неавторизованных пользователей',
+      messages: {
+        anketa_question_prompt: {
+          label: 'Вопрос анкеты (шаблон)',
+          text: '<b>{question_text}</b>',
+        },
+        anketa_complete: {
+          label: 'Анкета завершена',
+          text: '<b>Спасибо за заполнение анкеты!</b>',
+        },
+      },
+      buttons: {
+        _order: ['btn_fill_anketa', 'btn_become_partner'],
+        btn_fill_anketa: { label: 'Заполнить анкету', action: 'callback:client_event_anketa' },
+        btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner' },
+      },
+    },
     /* logout_screen removed — button stays in main_menu but is locked */
     // ── Сценарий 4: Работа бота в чатах ──
     group_menu: {

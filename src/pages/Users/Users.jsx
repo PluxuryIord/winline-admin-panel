@@ -41,7 +41,7 @@ export default function Users() {
   }, [search]);
 
   // Загрузка пользователей
-  const fetchUsers = useCallback(async (offset = 0, searchQuery = '') => {
+  const fetchUsers = useCallback(async (offset = 0, searchQuery = '', currentTags = []) => {
     try {
       const isAppend = offset > 0;
       if (!isAppend) setLoading(true);
@@ -49,6 +49,7 @@ export default function Users() {
 
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
       if (searchQuery) params.set('search', searchQuery);
+      if (currentTags.length > 0) params.set('tags', currentTags.join(','));
 
       const res = await api.get(`/api/users?${params}`);
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
@@ -69,10 +70,10 @@ export default function Users() {
     }
   }, []);
 
-  // Перезагрузка при смене поиска
+  // Перезагрузка при смене поиска или тегов
   useEffect(() => {
-    fetchUsers(0, debouncedSearch);
-  }, [debouncedSearch, fetchUsers]);
+    fetchUsers(0, debouncedSearch, filterTags);
+  }, [debouncedSearch, filterTags, fetchUsers]);
 
   // Infinite scroll — IntersectionObserver
   useEffect(() => {
@@ -80,14 +81,14 @@ export default function Users() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchUsers(users.length, debouncedSearch);
+          fetchUsers(users.length, debouncedSearch, filterTags);
         }
       },
       { rootMargin: '200px' }
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch]);
+  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch, filterTags]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -131,7 +132,7 @@ export default function Users() {
       const data = await res.json();
       if (data.ok) {
         loadTags();
-        fetchUsers(0, debouncedSearch);
+        fetchUsers(0, debouncedSearch, filterTags);
         if (filterTags.includes(tagModal.tag)) setFilterTags(filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t));
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
@@ -157,7 +158,7 @@ export default function Users() {
       const data = await res.json();
       if (data.ok) {
         loadTags();
-        fetchUsers(0, debouncedSearch);
+        fetchUsers(0, debouncedSearch, filterTags);
         if (filterTags.includes(deleteTagModal)) setFilterTags(filterTags.filter(t => t !== deleteTagModal));
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
@@ -169,10 +170,6 @@ export default function Users() {
   const filteredAndSortedUsers = useMemo(() => {
     let result = [...users];
 
-    if (filterTags.length > 0) {
-      result = result.filter(u => filterTags.some(ft => (u.tags || []).includes(ft)));
-    }
-
     if (sortConfig.key) {
       result.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -182,7 +179,7 @@ export default function Users() {
     }
 
     return result;
-  }, [users, filterTags, sortConfig]);
+  }, [users, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';

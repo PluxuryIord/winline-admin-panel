@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader, X, RotateCcw } from 'lucide-react';
+import { Loader, X, RotateCcw, Plus } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import './VersionHistory.css';
@@ -17,6 +17,7 @@ export default function VersionHistory() {
   const [loading, setLoading] = useState(true);
   const [rollbackTarget, setRollbackTarget] = useState(null);
   const [rolling, setRolling] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const fetchSnapshots = useCallback(async () => {
     setLoading(true);
@@ -56,6 +57,18 @@ export default function VersionHistory() {
       ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleCreateSnapshot = async () => {
+    setCreating(true);
+    try {
+      await api.post('/api/snapshots', { entity_type: activeTab });
+      fetchSnapshots();
+    } catch {
+      // ignore
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -72,6 +85,16 @@ export default function VersionHistory() {
             {tab.label}
           </button>
         ))}
+        {isAdmin && (
+          <button
+            className="btn-create-snapshot"
+            onClick={handleCreateSnapshot}
+            disabled={creating}
+          >
+            {creating ? <Loader size={14} className="spin" /> : <Plus size={14} />}
+            {creating ? 'Создание...' : 'Создать снимок'}
+          </button>
+        )}
       </div>
 
       <div className="version-list-wrap">

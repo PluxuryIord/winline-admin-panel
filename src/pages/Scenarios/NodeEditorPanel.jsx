@@ -277,6 +277,33 @@ export default function NodeEditorPanel({
 
                   {/* Action: URL or Target Screen */}
                   <div className="node-editor-btn-action">
+                    <div className="node-editor-mode-toggle">
+                      <button
+                        className={`node-editor-mode-btn ${!isUrl ? 'active' : ''}`}
+                        onClick={() => {
+                          if (isUrl) {
+                            onUpdateButtonAction(key, 'callback:noop');
+                          }
+                        }}
+                        title="Ссылка на блок"
+                        type="button"
+                      >
+                        <Link size={12} /> Блок
+                      </button>
+                      <button
+                        className={`node-editor-mode-btn ${isUrl ? 'active' : ''}`}
+                        onClick={() => {
+                          if (!isUrl) {
+                            onUpdateButtonAction(key, 'url:');
+                            onUpdateButtonTarget(key, '');
+                          }
+                        }}
+                        title="URL ссылка"
+                        type="button"
+                      >
+                        <ExternalLink size={12} /> URL
+                      </button>
+                    </div>
                     {isUrl ? (
                       <div className="node-editor-url-row">
                         <ExternalLink size={14} className="node-editor-url-icon" />

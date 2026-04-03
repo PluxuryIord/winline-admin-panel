@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import path from 'path';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import dbPool from '../config/db.js';
-import { WEBHOOK_SECRET, BOT_TOKEN } from '../config/env.js';
+import { WEBHOOK_SECRET, BOT_TOKEN, JWT_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendMediaGroup } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
@@ -60,8 +61,17 @@ function broadcast(event) {
   }
 }
 
-// GET /api/chats/stream — SSE поток
-router.get('/stream', (req, res) => {
+// SSE stream — exported separately, mounted before JWT middleware (EventSource can't send headers)
+export const streamRouter = Router();
+streamRouter.get('/', (req, res) => {
+  // Validate JWT token from query param
+  const token = req.query.token;
+  if (!token) return res.status(401).json({ error: 'Token required' });
+  try {
+    jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',

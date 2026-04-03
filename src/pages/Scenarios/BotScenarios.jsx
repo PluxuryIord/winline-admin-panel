@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader, Plus, RotateCcw, X } from 'lucide-react';
+import { Loader, Plus, RotateCcw, X, Link, ExternalLink } from 'lucide-react';
 import { api } from '../../utils/api';
 import FlowCanvas from './FlowCanvas';
 import NodeEditorPanel from './NodeEditorPanel';
@@ -123,6 +123,8 @@ export default function BotScenarios() {
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [showAddBtnModal, setShowAddBtnModal] = useState(false);
   const [newBtnLabel, setNewBtnLabel] = useState('');
+  const [newBtnType, setNewBtnType] = useState('block'); // 'block' or 'url'
+  const [newBtnUrl, setNewBtnUrl] = useState('');
 
   // Feature 3: Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -479,16 +481,20 @@ export default function BotScenarios() {
   // Add button modal
   const openAddBtnModal = () => {
     setNewBtnLabel('');
+    setNewBtnType('block');
+    setNewBtnUrl('');
     setShowAddBtnModal(true);
   };
 
   const confirmAddButton = () => {
     if (!newBtnLabel.trim()) return;
+    if (newBtnType === 'url' && !newBtnUrl.trim()) return;
     const btnId = `btn_${Date.now()}`;
+    const action = newBtnType === 'url' ? `url:${newBtnUrl.trim()}` : 'callback:noop';
     setEditData(prev => {
       const next = { ...prev, buttons: { ...prev.buttons } };
       const order = [...(next.buttons._order || []), btnId];
-      next.buttons = { ...next.buttons, _order: order, [btnId]: { label: newBtnLabel.trim(), action: 'callback:noop' } };
+      next.buttons = { ...next.buttons, _order: order, [btnId]: { label: newBtnLabel.trim(), action } };
       return next;
     });
     setDirty(true);
@@ -658,10 +664,41 @@ export default function BotScenarios() {
                   onKeyDown={e => e.key === 'Enter' && confirmAddButton()}
                 />
               </div>
+              <div className="sc-modal-field">
+                <label>Тип кнопки</label>
+                <div className="sc-btn-type-toggle">
+                  <button
+                    className={`sc-btn-type-option ${newBtnType === 'block' ? 'active' : ''}`}
+                    onClick={() => setNewBtnType('block')}
+                    type="button"
+                  >
+                    <Link size={14} /> Ссылка на блок
+                  </button>
+                  <button
+                    className={`sc-btn-type-option ${newBtnType === 'url' ? 'active' : ''}`}
+                    onClick={() => setNewBtnType('url')}
+                    type="button"
+                  >
+                    <ExternalLink size={14} /> URL ссылка
+                  </button>
+                </div>
+              </div>
+              {newBtnType === 'url' && (
+                <div className="sc-modal-field">
+                  <label>URL адрес</label>
+                  <input
+                    className="sc-modal-input"
+                    value={newBtnUrl}
+                    onChange={e => setNewBtnUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    onKeyDown={e => e.key === 'Enter' && confirmAddButton()}
+                  />
+                </div>
+              )}
             </div>
             <div className="sc-modal-footer">
               <button className="sc-modal-cancel" onClick={() => setShowAddBtnModal(false)}>Отмена</button>
-              <button className="sc-modal-confirm" onClick={confirmAddButton} disabled={!newBtnLabel.trim()}>
+              <button className="sc-modal-confirm" onClick={confirmAddButton} disabled={!newBtnLabel.trim() || (newBtnType === 'url' && !newBtnUrl.trim())}>
                 <Plus size={16} /> Добавить
               </button>
             </div>

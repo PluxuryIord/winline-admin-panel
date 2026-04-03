@@ -38,34 +38,53 @@ export function UnreadProvider({ children }) {
     }
   }, [location.pathname]);
 
-  // Global SSE listener
+  // Global SSE listener with reconnection
   useEffect(() => {
     const token = localStorage.getItem('wl_admin_token');
     if (!token) return;
 
-    const url = `/api/chats/stream?token=${token}`;
-    const es = new EventSource(url);
+    let es = null;
+    let reconnectTimer = null;
+    let closed = false;
 
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'new_message' && data.message?.from === 'user') {
-          const chatId = data.chatId;
-          // Don't mark as unread if user is currently viewing this chat
-          const currentPath = locationRef.current;
-          if (currentPath === `/chats/${chatId}`) return;
+    function connect() {
+      if (closed) return;
+      const url = `/api/chats/stream?token=${token}`;
+      es = new EventSource(url);
 
-          setUnreadChats(prev => {
-            if (prev.has(chatId)) return prev;
-            const next = new Set(prev);
-            next.add(chatId);
-            return next;
-          });
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'new_message' && data.message?.from === 'user') {
+            const chatId = data.chatId;
+            const currentPath = locationRef.current;
+            if (currentPath === `/chats/${chatId}`) return;
+
+            setUnreadChats(prev => {
+              if (prev.has(chatId)) return prev;
+              const next = new Set(prev);
+              next.add(chatId);
+              return next;
+            });
+          }
+        } catch {}
+      };
+
+      es.onerror = () => {
+        es.close();
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 3000);
         }
-      } catch {}
-    };
+      };
+    }
 
-    return () => es.close();
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (es) es.close();
+    };
   }, []);
 
   const markRead = useCallback((chatId) => {

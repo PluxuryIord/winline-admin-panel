@@ -86,17 +86,27 @@ router.get('/', async (req, res, next) => {
     const offset = Number(req.query.offset) || 0;
     const search = (req.query.search || '').trim();
 
-    let where = '';
+    const tags = (req.query.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+
+    // Build params in SQL clause order: tagJoin params first, then where params
     const params = [];
+    let tagJoin = '';
+    if (tags.length) {
+      tagJoin = 'INNER JOIN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (?) GROUP BY user_id HAVING COUNT(DISTINCT tag) = ?) AS tf ON tf.user_id = u.user_id';
+      params.push(tags, tags.length);
+    }
+
+    let where = '';
     if (search) {
-      where = 'WHERE (full_name LIKE ? OR rl_full_name LIKE ? OR username LIKE ?)';
+      where = 'WHERE (u.full_name LIKE ? OR u.rl_full_name LIKE ? OR u.username LIKE ?)';
       const like = `%${search}%`;
       params.push(like, like, like);
     }
 
-    const [[{ total }]] = await dbPool.query(`SELECT COUNT(*) as total FROM users ${where}`, params);
+    const fromClause = `FROM users u ${tagJoin} ${where}`;
+    const [[{ total }]] = await dbPool.query(`SELECT COUNT(*) as total ${fromClause}`, params);
     const [rows] = await dbPool.query(
-      `SELECT ${USER_COLUMNS} FROM users ${where} ORDER BY date_reg DESC LIMIT ? OFFSET ?`,
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')} ${fromClause} ORDER BY u.date_reg DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
