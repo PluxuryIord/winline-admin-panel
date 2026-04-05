@@ -1,39 +1,69 @@
 import dbPool from '../config/db.js';
 import { logAudit } from './auditLog.js';
 
-/**
- * Create a daily snapshot for the given entity type.
- * Uses INSERT ... ON DUPLICATE KEY UPDATE so only one snapshot per type per day.
- */
-export async function createDailySnapshot(entityType, userId, userName) {
-  try {
-    let snapshotData;
+const UNIFIED_TYPE = 'all';
 
-    if (entityType === 'scenarios') {
-      const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
-      snapshotData = rows.length ? (typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data) : null;
-    } else if (entityType === 'knowledge') {
-      const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
-      snapshotData = rows.length ? (typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data) : null;
-    } else if (entityType === 'tags') {
-      const [userTags] = await dbPool.query('SELECT user_id, tag FROM wl_admin_user_tags');
-      const [channelTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_channel_tags');
-      const [groupTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_group_tags');
-      snapshotData = { userTags, channelTags, groupTags };
-    } else {
-      return;
+// Run schema adjustment once on first use: drop unique (date, entity_type) if exists
+let schemaReady = false;
+async function ensureSchema() {
+  if (schemaReady) return;
+  try {
+    const [idx] = await dbPool.query(
+      `SELECT COUNT(*) AS c FROM information_schema.statistics
+       WHERE table_schema = DATABASE() AND table_name = 'wl_admin_snapshots'
+         AND index_name = 'uq_date_type'`
+    );
+    if (idx[0]?.c) {
+      await dbPool.query('ALTER TABLE wl_admin_snapshots DROP INDEX uq_date_type');
+      console.log('[snapshots] dropped legacy uq_date_type index');
+    }
+  } catch (err) {
+    console.error('[snapshots] schema check failed:', err.message);
+  }
+  schemaReady = true;
+}
+
+async function collectAll() {
+  const [scRows] = await dbPool.query("SELECT data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
+  const scenarios = scRows.length ? (typeof scRows[0].data === 'string' ? JSON.parse(scRows[0].data) : scRows[0].data) : null;
+
+  const [kbRows] = await dbPool.query("SELECT data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+  const knowledge = kbRows.length ? (typeof kbRows[0].data === 'string' ? JSON.parse(kbRows[0].data) : kbRows[0].data) : null;
+
+  const [userTags] = await dbPool.query('SELECT user_id, tag FROM wl_admin_user_tags');
+  const [channelTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_channel_tags');
+  const [groupTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_group_tags');
+
+  return { scenarios, knowledge, tags: { userTags, channelTags, groupTags } };
+}
+
+/**
+ * Create a unified snapshot capturing scenarios + knowledge + tags in one row.
+ * Debounces: if the most recent snapshot is < 30 seconds old, skip (so auto-saves don't spam).
+ */
+export async function createDailySnapshot(_entityType, userId, userName, opts = {}) {
+  try {
+    await ensureSchema();
+
+    if (!opts.force) {
+      const [recent] = await dbPool.query(
+        `SELECT id, created_at FROM wl_admin_snapshots
+         WHERE entity_type = ? ORDER BY created_at DESC LIMIT 1`,
+        [UNIFIED_TYPE]
+      );
+      if (recent.length) {
+        const ageMs = Date.now() - new Date(recent[0].created_at).getTime();
+        if (ageMs < 30 * 1000) return; // debounce auto-saves
+      }
     }
 
-    if (!snapshotData) return;
-
+    const data = await collectAll();
     const today = new Date().toISOString().split('T')[0];
-    const dataJson = JSON.stringify(snapshotData);
 
     await dbPool.query(
       `INSERT INTO wl_admin_snapshots (entity_type, snapshot_date, data, created_by, created_by_name)
-       VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE data = VALUES(data), created_by = VALUES(created_by), created_by_name = VALUES(created_by_name)`,
-      [entityType, today, dataJson, userId, userName]
+       VALUES (?, ?, ?, ?, ?)`,
+      [UNIFIED_TYPE, today, JSON.stringify(data), userId || null, userName || null]
     );
   } catch (err) {
     console.error('[snapshots] Failed to create snapshot:', err.message);
@@ -41,9 +71,10 @@ export async function createDailySnapshot(entityType, userId, userName) {
 }
 
 /**
- * List snapshots for a given entity type.
+ * List all unified snapshots (newest first).
  */
-export async function listSnapshots(entityType) {
+export async function listSnapshots(_entityType) {
+  await ensureSchema();
   const [rows] = await dbPool.query(
     `SELECT s.id, s.entity_type, s.snapshot_date, s.created_by_name, s.created_at,
             u.username, COALESCE(p.display_name, u.display_name) AS user_display_name
@@ -51,8 +82,8 @@ export async function listSnapshots(entityType) {
      LEFT JOIN wl_admin_users u ON u.id = s.created_by
      LEFT JOIN wl_admin_user_profiles p ON p.user_id = s.created_by
      WHERE s.entity_type = ?
-     ORDER BY s.snapshot_date DESC`,
-    [entityType]
+     ORDER BY s.created_at DESC`,
+    [UNIFIED_TYPE]
   );
   return rows.map(r => ({
     ...r,
@@ -60,9 +91,6 @@ export async function listSnapshots(entityType) {
   }));
 }
 
-/**
- * Get a single snapshot by id.
- */
 export async function getSnapshot(id) {
   const [rows] = await dbPool.query('SELECT * FROM wl_admin_snapshots WHERE id = ?', [id]);
   if (!rows.length) return null;
@@ -72,60 +100,53 @@ export async function getSnapshot(id) {
 }
 
 /**
- * Rollback: restore data from a snapshot to the original tables.
+ * Rollback: restore scenarios + knowledge + tags from a unified snapshot.
  */
 export async function rollbackSnapshot(id, userId, userName) {
   const snapshot = await getSnapshot(id);
   if (!snapshot) throw new Error('Snapshot not found');
 
-  const { entity_type, data } = snapshot;
+  const data = snapshot.data || {};
+  const oldState = await collectAll();
 
-  if (entity_type === 'scenarios') {
-    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
-    if (!rows.length) throw new Error('Scenarios row not found in DB');
-    const oldData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
-    logAudit(userId, userName, 'rollback', 'scenarios', id, `snapshot #${id}`, oldData, data);
-  } else if (entity_type === 'knowledge') {
-    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'knowledge_base' LIMIT 1");
-    if (!rows.length) throw new Error('Knowledge base row not found in DB');
-    const oldData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
-    logAudit(userId, userName, 'rollback', 'knowledge', id, `snapshot #${id}`, oldData, data);
-  } else if (entity_type === 'tags') {
-    const { userTags, channelTags, groupTags } = data;
-
-    // Capture old state for audit
-    const [oldUserTags] = await dbPool.query('SELECT user_id, tag FROM wl_admin_user_tags');
-    const [oldChannelTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_channel_tags');
-    const [oldGroupTags] = await dbPool.query('SELECT chat_id, tag FROM wl_admin_group_tags');
-
-    // Restore user tags
-    await dbPool.query('DELETE FROM wl_admin_user_tags');
-    if (userTags && userTags.length > 0) {
-      const values = userTags.map(r => [r.user_id, r.tag]);
-      await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES ?', [values]);
+  // Scenarios
+  if (data.scenarios) {
+    const [rows] = await dbPool.query("SELECT id FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
+    if (rows.length) {
+      await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data.scenarios), rows[0].id]);
+    } else {
+      await dbPool.query("INSERT INTO texts (category, data) VALUES ('bot_scenarios', ?)", [JSON.stringify(data.scenarios)]);
     }
-
-    // Restore channel tags
-    await dbPool.query('DELETE FROM wl_admin_channel_tags');
-    if (channelTags && channelTags.length > 0) {
-      const values = channelTags.map(r => [r.chat_id, r.tag]);
-      await dbPool.query('INSERT INTO wl_admin_channel_tags (chat_id, tag) VALUES ?', [values]);
-    }
-
-    // Restore group tags
-    await dbPool.query('DELETE FROM wl_admin_group_tags');
-    if (groupTags && groupTags.length > 0) {
-      const values = groupTags.map(r => [r.chat_id, r.tag]);
-      await dbPool.query('INSERT INTO wl_admin_group_tags (chat_id, tag) VALUES ?', [values]);
-    }
-
-    logAudit(userId, userName, 'rollback', 'tags', id, `snapshot #${id}`,
-      { userTags: oldUserTags, channelTags: oldChannelTags, groupTags: oldGroupTags }, data);
-  } else {
-    throw new Error(`Unknown entity type: ${entity_type}`);
   }
 
+  // Knowledge
+  if (data.knowledge) {
+    const [rows] = await dbPool.query("SELECT id FROM texts WHERE category = 'knowledge_base' LIMIT 1");
+    if (rows.length) {
+      await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data.knowledge), rows[0].id]);
+    } else {
+      await dbPool.query("INSERT INTO texts (category, data) VALUES ('knowledge_base', ?)", [JSON.stringify(data.knowledge)]);
+    }
+  }
+
+  // Tags
+  if (data.tags) {
+    const { userTags = [], channelTags = [], groupTags = [] } = data.tags;
+
+    await dbPool.query('DELETE FROM wl_admin_user_tags');
+    if (userTags.length) {
+      await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES ?', [userTags.map(r => [r.user_id, r.tag])]);
+    }
+    await dbPool.query('DELETE FROM wl_admin_channel_tags');
+    if (channelTags.length) {
+      await dbPool.query('INSERT INTO wl_admin_channel_tags (chat_id, tag) VALUES ?', [channelTags.map(r => [r.chat_id, r.tag])]);
+    }
+    await dbPool.query('DELETE FROM wl_admin_group_tags');
+    if (groupTags.length) {
+      await dbPool.query('INSERT INTO wl_admin_group_tags (chat_id, tag) VALUES ?', [groupTags.map(r => [r.chat_id, r.tag])]);
+    }
+  }
+
+  logAudit(userId, userName, 'rollback', 'snapshot', id, `snapshot #${id}`, oldState, data);
   return snapshot;
 }

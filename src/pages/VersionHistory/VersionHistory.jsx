@@ -4,15 +4,8 @@ import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import './VersionHistory.css';
 
-const TABS = [
-  { key: 'scenarios', label: 'Сценарии' },
-  { key: 'knowledge', label: 'База знаний' },
-  { key: 'tags', label: 'Теги' },
-];
-
 export default function VersionHistory() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('scenarios');
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rollbackTarget, setRollbackTarget] = useState(null);
@@ -22,7 +15,7 @@ export default function VersionHistory() {
   const fetchSnapshots = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/api/snapshots?entity_type=${activeTab}`);
+      const res = await api.get('/api/snapshots');
       if (res.ok) {
         const data = await res.json();
         setSnapshots(Array.isArray(data) ? data : data.items || []);
@@ -32,7 +25,7 @@ export default function VersionHistory() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
 
@@ -60,7 +53,7 @@ export default function VersionHistory() {
   const handleCreateSnapshot = async () => {
     setCreating(true);
     try {
-      await api.post('/api/snapshots', { entity_type: activeTab });
+      await api.post('/api/snapshots', {});
       fetchSnapshots();
     } catch {
       // ignore
@@ -76,15 +69,6 @@ export default function VersionHistory() {
       <h1 className="version-history-title">История версий</h1>
 
       <div className="version-tabs">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            className={`version-tab ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
         {isAdmin && (
           <button
             className="btn-create-snapshot"

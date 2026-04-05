@@ -4,12 +4,10 @@ import { listSnapshots, getSnapshot, rollbackSnapshot, createDailySnapshot } fro
 
 const router = Router();
 
-// GET /api/snapshots?entity_type=
+// GET /api/snapshots — unified list (all scenarios/knowledge/tags in every snapshot)
 router.get('/', async (req, res, next) => {
   try {
-    const entityType = req.query.entity_type;
-    if (!entityType) return res.status(400).json({ error: 'entity_type query param required' });
-    const snapshots = await listSnapshots(entityType);
+    const snapshots = await listSnapshots();
     res.json(snapshots);
   } catch (err) { next(err); }
 });
@@ -26,11 +24,9 @@ router.get('/:id', async (req, res, next) => {
 // POST /api/snapshots — create snapshot on demand
 router.post('/', requireAdmin, async (req, res, next) => {
   try {
-    const { entity_type } = req.body;
-    if (!entity_type) return res.status(400).json({ error: 'entity_type required' });
     const userId = req.user.id;
     const userName = req.user.displayName || req.user.username;
-    await createDailySnapshot(entity_type, userId, userName);
+    await createDailySnapshot('all', userId, userName, { force: true });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
