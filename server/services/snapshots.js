@@ -1,31 +1,13 @@
 import dbPool from '../config/db.js';
 import { logAudit } from './auditLog.js';
 
-const UNIFIED_TYPE = 'all';
-
-// Run schema adjustment once on first use: drop unique (date, entity_type) if exists
-let schemaReady = false;
-async function ensureSchema() {
-  if (schemaReady) return;
-  try {
-    // Find any UNIQUE index on wl_admin_snapshots that constrains snapshot_date/entity_type
-    const [rows] = await dbPool.query(
-      `SELECT DISTINCT index_name FROM information_schema.statistics
-       WHERE table_schema = DATABASE() AND table_name = 'wl_admin_snapshots'
-         AND non_unique = 0 AND index_name <> 'PRIMARY'`
-    );
-    for (const r of rows) {
-      try {
-        await dbPool.query(`ALTER TABLE wl_admin_snapshots DROP INDEX \`${r.index_name}\``);
-        console.log('[snapshots] dropped unique index', r.index_name);
-      } catch (e) {
-        console.error('[snapshots] drop index failed', r.index_name, e.message);
-      }
-    }
-  } catch (err) {
-    console.error('[snapshots] schema check failed:', err.message);
-  }
-  schemaReady = true;
+// DB user has no ALTER privilege, so we can't drop the legacy
+// UNIQUE (snapshot_date, entity_type) index. Instead we encode a per-snapshot
+// suffix into entity_type ('all_<timestamp>') so every row is unique, and we
+// match all of them via LIKE 'all%' on read.
+const UNIFIED_PREFIX = 'all';
+function newUnifiedType() {
+  return `${UNIFIED_PREFIX}_${Date.now()}`;
 }
 
 async function collectAll() {
@@ -49,13 +31,10 @@ async function collectAll() {
 export async function createDailySnapshot(_entityType, userId, userName, opts = {}) {
   const silent = !opts.force;
   try {
-    await ensureSchema();
-
     if (!opts.force) {
       const [recent] = await dbPool.query(
         `SELECT id, created_at FROM wl_admin_snapshots
-         WHERE entity_type = ? ORDER BY created_at DESC LIMIT 1`,
-        [UNIFIED_TYPE]
+         WHERE entity_type LIKE 'all%' ORDER BY created_at DESC LIMIT 1`
       );
       if (recent.length) {
         const ageMs = Date.now() - new Date(recent[0].created_at).getTime();
@@ -69,7 +48,7 @@ export async function createDailySnapshot(_entityType, userId, userName, opts = 
     await dbPool.query(
       `INSERT INTO wl_admin_snapshots (entity_type, snapshot_date, data, created_by, created_by_name)
        VALUES (?, ?, ?, ?, ?)`,
-      [UNIFIED_TYPE, today, JSON.stringify(data), userId || null, userName || null]
+      [newUnifiedType(), today, JSON.stringify(data), userId || null, userName || null]
     );
   } catch (err) {
     console.error('[snapshots] Failed to create snapshot:', err.message);
@@ -81,16 +60,14 @@ export async function createDailySnapshot(_entityType, userId, userName, opts = 
  * List all unified snapshots (newest first).
  */
 export async function listSnapshots(_entityType) {
-  await ensureSchema();
   const [rows] = await dbPool.query(
     `SELECT s.id, s.entity_type, s.snapshot_date, s.created_by_name, s.created_at,
             u.username, COALESCE(p.display_name, u.display_name) AS user_display_name
      FROM wl_admin_snapshots s
      LEFT JOIN wl_admin_users u ON u.id = s.created_by
      LEFT JOIN wl_admin_user_profiles p ON p.user_id = s.created_by
-     WHERE s.entity_type = ?
-     ORDER BY s.created_at DESC`,
-    [UNIFIED_TYPE]
+     WHERE s.entity_type LIKE 'all%'
+     ORDER BY s.created_at DESC`
   );
   return rows.map(r => ({
     ...r,
