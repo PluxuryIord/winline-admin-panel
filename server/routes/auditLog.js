@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
+import requireAdmin from '../middleware/requireAdmin.js';
 
 const router = Router();
+
+router.use(requireAdmin);
 
 // GET /api/audit-log?entity_type=&user_id=&date_from=&date_to=&limit=&offset=
 router.get('/', async (req, res, next) => {

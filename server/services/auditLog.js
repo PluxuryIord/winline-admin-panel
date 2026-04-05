@@ -10,3 +10,22 @@ export async function logAudit(userId, userName, action, entityType, entityId, e
     console.error('[audit] Failed to log:', err.message);
   }
 }
+
+// Retention: keep last 180 days
+const RETENTION_DAYS = 180;
+export async function cleanupAuditLog() {
+  try {
+    const [r] = await dbPool.query(
+      'DELETE FROM wl_admin_audit_log WHERE created_at < (NOW() - INTERVAL ? DAY)',
+      [RETENTION_DAYS]
+    );
+    if (r.affectedRows) console.log(`[audit] cleanup removed ${r.affectedRows} old entries`);
+  } catch (err) {
+    console.error('[audit] cleanup failed:', err.message);
+  }
+}
+
+export function startAuditLogRetention() {
+  cleanupAuditLog();
+  setInterval(cleanupAuditLog, 24 * 60 * 60 * 1000);
+}

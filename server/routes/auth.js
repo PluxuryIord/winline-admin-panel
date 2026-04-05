@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import dbPool from '../config/db.js';
 import { JWT_SECRET } from '../config/env.js';
+import { logAudit } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -26,23 +27,25 @@ router.post('/login', async (req, res, next) => {
     );
 
     if (!rows.length) {
+      logAudit(null, username, 'login_failed', 'auth', null, 'unknown user', null, null);
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
     const user = rows[0];
 
     if (!user.is_active) {
+      logAudit(user.id, user.username, 'login_blocked', 'auth', user.id, 'inactive account', null, null);
       return res.status(403).json({ error: 'Учётная запись деактивирована' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      logAudit(user.id, user.username, 'login_failed', 'auth', user.id, 'wrong password', null, null);
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
-    // Auto-create profile if missing
-    if (user.role === 'editor' && !user.profile_display_name && user.profile_display_name === undefined) {
-      // No profile row — create one
+    // Auto-create profile if missing (profile row absent → profile_display_name is null)
+    if (user.profile_display_name == null) {
       const autoRole = user.id === 1 ? 'admin' : 'editor';
       await dbPool.query(
         'INSERT IGNORE INTO wl_admin_user_profiles (user_id, role, display_name) VALUES (?, ?, ?)',
@@ -67,6 +70,8 @@ router.post('/login', async (req, res, next) => {
       maxAge: 24 * 60 * 60 * 1000, // 24h
       path: '/',
     });
+
+    logAudit(user.id, displayName || user.username, 'login', 'auth', user.id, user.username, null, null);
 
     res.json({
       user: { id: user.id, username: user.username, displayName, role: user.role },
@@ -113,6 +118,13 @@ router.get('/me', async (req, res, next) => {
 
 // POST /api/auth/logout
 router.post('/logout', (req, res) => {
+  try {
+    const token = req.cookies?.wl_token;
+    if (token) {
+      const payload = jwt.verify(token, JWT_SECRET);
+      logAudit(payload.id, payload.displayName || payload.username, 'logout', 'auth', payload.id, payload.username, null, null);
+    }
+  } catch { /* ignore */ }
   res.clearCookie('wl_token', { path: '/' });
   res.json({ ok: true });
 });

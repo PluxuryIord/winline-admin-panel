@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import app from './app.js';
 import { API_PORT, BOT_TOKEN, JWT_SECRET, MYSQL_HOST } from './config/env.js';
+import { startAuditLogRetention } from './services/auditLog.js';
 
 // --- Ловим необработанные ошибки чтобы сервер не падал молча ---
 process.on('uncaughtException', (err) => {
@@ -20,6 +21,7 @@ console.log('[db] MySQL:', MYSQL_HOST || 'NOT SET');
 
 const server = app.listen(API_PORT, () => {
   console.log(`API server running on http://localhost:${API_PORT}`);
+  startAuditLogRetention();
 });
 
 server.on('error', (err) => {

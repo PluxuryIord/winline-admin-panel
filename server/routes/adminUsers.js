@@ -2,6 +2,9 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import dbPool from '../config/db.js';
 import requireAdmin from '../middleware/requireAdmin.js';
+import { logAudit } from '../services/auditLog.js';
+
+const actorName = (req) => req.user?.displayName || req.user?.username || 'unknown';
 
 const router = Router();
 
@@ -51,6 +54,8 @@ router.post('/', async (req, res, next) => {
       [userId, userRole, displayName || null]
     );
 
+    logAudit(req.user.id, actorName(req), 'create', 'admin_user', userId, username,
+      null, { username, displayName: displayName || null, role: userRole });
     res.status(201).json({ id: userId, username, displayName: displayName || null, role: userRole });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -66,6 +71,14 @@ router.put('/:id', async (req, res, next) => {
     const userId = Number(req.params.id);
     const { displayName, role, password } = req.body;
     const validRoles = ['admin', 'editor'];
+
+    // Snapshot old state for audit
+    const [oldRows] = await dbPool.query(
+      `SELECT u.username, u.display_name, COALESCE(p.role, 'editor') AS role
+       FROM wl_admin_users u LEFT JOIN wl_admin_user_profiles p ON p.user_id = u.id
+       WHERE u.id = ?`, [userId]
+    );
+    const oldState = oldRows[0] || null;
 
     // Update display_name in wl_admin_users
     if (displayName !== undefined) {
@@ -101,6 +114,14 @@ router.put('/:id', async (req, res, next) => {
       await dbPool.query('UPDATE wl_admin_users SET password_hash = ? WHERE id = ?', [hash, userId]);
     }
 
+    const newState = {
+      displayName: displayName !== undefined ? displayName : oldState?.display_name,
+      role: role !== undefined ? role : oldState?.role,
+      passwordChanged: !!password,
+    };
+    logAudit(req.user.id, actorName(req), 'update', 'admin_user', userId,
+      oldState?.username || String(userId), oldState, newState);
+
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -122,6 +143,10 @@ router.delete('/:id', async (req, res, next) => {
       'UPDATE wl_admin_user_profiles SET is_active = 0 WHERE user_id = ?',
       [userId]
     );
+
+    const [nameRows] = await dbPool.query('SELECT username FROM wl_admin_users WHERE id = ?', [userId]);
+    logAudit(req.user.id, actorName(req), 'delete', 'admin_user', userId,
+      nameRows[0]?.username || String(userId), { is_active: 1 }, { is_active: 0 });
 
     res.json({ ok: true });
   } catch (err) { next(err); }

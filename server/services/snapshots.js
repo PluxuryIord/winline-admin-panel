@@ -30,9 +30,9 @@ export async function createDailySnapshot(entityType, userId, userName) {
     const dataJson = JSON.stringify(snapshotData);
 
     await dbPool.query(
-      `INSERT INTO wl_admin_snapshots (entity_type, snapshot_date, data, created_by_id, created_by_name)
+      `INSERT INTO wl_admin_snapshots (entity_type, snapshot_date, data, created_by, created_by_name)
        VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE data = VALUES(data), created_by_id = VALUES(created_by_id), created_by_name = VALUES(created_by_name)`,
+       ON DUPLICATE KEY UPDATE data = VALUES(data), created_by = VALUES(created_by), created_by_name = VALUES(created_by_name)`,
       [entityType, today, dataJson, userId, userName]
     );
   } catch (err) {
@@ -45,10 +45,19 @@ export async function createDailySnapshot(entityType, userId, userName) {
  */
 export async function listSnapshots(entityType) {
   const [rows] = await dbPool.query(
-    'SELECT id, entity_type, snapshot_date, created_by_name, created_at FROM wl_admin_snapshots WHERE entity_type = ? ORDER BY snapshot_date DESC',
+    `SELECT s.id, s.entity_type, s.snapshot_date, s.created_by_name, s.created_at,
+            u.username, COALESCE(p.display_name, u.display_name) AS user_display_name
+     FROM wl_admin_snapshots s
+     LEFT JOIN wl_admin_users u ON u.id = s.created_by
+     LEFT JOIN wl_admin_user_profiles p ON p.user_id = s.created_by
+     WHERE s.entity_type = ?
+     ORDER BY s.snapshot_date DESC`,
     [entityType]
   );
-  return rows;
+  return rows.map(r => ({
+    ...r,
+    user_display_name: r.user_display_name || r.created_by_name || null,
+  }));
 }
 
 /**
