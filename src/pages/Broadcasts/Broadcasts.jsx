@@ -507,6 +507,65 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
 }
 
 /* ═══ Вкладка «Каналы» ═══ */
+function CommentEditor({ chatId, entityType = 'channels' }) {
+  const [comment, setComment] = useState('');
+  const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`)
+      .then(r => r.json())
+      .then(data => { setComment(data.comment || ''); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [chatId, entityType]);
+
+  const save = async () => {
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`, { comment: draft });
+      setComment(draft);
+      setEditing(false);
+    } catch { /* ignore */ }
+  };
+
+  const startEdit = (e) => {
+    e.stopPropagation();
+    setDraft(comment);
+    setEditing(true);
+  };
+
+  if (loading) return null;
+
+  if (editing) {
+    return (
+      <div className="bc-comment-edit" onClick={e => e.stopPropagation()}>
+        <input
+          className="bc-comment-input"
+          type="text"
+          value={draft}
+          autoFocus
+          placeholder="Комментарий..."
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <button className="bc-comment-save" onClick={save} title="Сохранить">✓</button>
+        <button className="bc-comment-cancel" onClick={() => setEditing(false)} title="Отмена"><X size={12} /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bc-comment-view" onClick={startEdit} title={comment ? 'Изменить комментарий' : 'Добавить комментарий'}>
+      {comment
+        ? <span className="bc-comment-text">{comment}</span>
+        : <span className="bc-comment-placeholder">+ комментарий</span>}
+    </div>
+  );
+}
+
 function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 'channels' }) {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -824,6 +883,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <span className="bc-list-title">{ch.title}</span>
                   <span className="bc-list-id">{ch.chatId}</span>
                 </label>
+                <CommentEditor chatId={ch.chatId} entityType="channels" />
                 <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
                 <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
                   <Archive size={14} />
@@ -1341,6 +1401,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <span className="bc-list-title">{g.title}</span>
                   <span className="bc-list-id">{g.chatId}</span>
                 </label>
+                <CommentEditor chatId={g.chatId} entityType="groups" />
                 <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
                 <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
                   <Archive size={14} />

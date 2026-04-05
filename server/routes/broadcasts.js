@@ -809,6 +809,57 @@ router.get('/group-tags', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ===================== КОММЕНТАРИИ К КАНАЛАМ/ГРУППАМ =====================
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_channel_comments (
+      chat_id VARCHAR(100) PRIMARY KEY,
+      comment TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_group_comments (
+      chat_id VARCHAR(100) PRIMARY KEY,
+      comment TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[comments] Failed to create tables:', err.message);
+  }
+})();
+
+function commentsTable(entity) {
+  return entity === 'groups' ? 'wl_admin_group_comments' : 'wl_admin_channel_comments';
+}
+
+router.get('/:entity(channels|groups)/:chatId/comment', async (req, res, next) => {
+  try {
+    const { entity, chatId } = req.params;
+    const [rows] = await dbPool.query(
+      `SELECT comment FROM ${commentsTable(entity)} WHERE chat_id = ?`,
+      [chatId]
+    );
+    res.json({ comment: rows[0]?.comment || '' });
+  } catch (err) { next(err); }
+});
+
+router.put('/:entity(channels|groups)/:chatId/comment', async (req, res, next) => {
+  try {
+    const { entity, chatId } = req.params;
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment : '';
+    const table = commentsTable(entity);
+    if (!comment.trim()) {
+      await dbPool.query(`DELETE FROM ${table} WHERE chat_id = ?`, [chatId]);
+    } else {
+      await dbPool.query(
+        `INSERT INTO ${table} (chat_id, comment) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE comment = VALUES(comment)`,
+        [chatId, comment]
+      );
+    }
+    res.json({ ok: true, comment });
+  } catch (err) { next(err); }
+});
+
 // ===================== ЧЕРНОВИКИ И ЗАПЛАНИРОВАННЫЕ =====================
 
 // Ensure drafts & scheduled tables exist

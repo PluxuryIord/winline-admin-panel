@@ -609,43 +609,130 @@ input[type="checkbox"]:checked {
   border: 1px solid rgba(100, 149, 237, 0.25);
 }
 
+/* ─── Channel/Group Comment ─── */
+.bc-comment-view {
+  display: inline-flex;
+  align-items: center;
+  max-width: 220px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin: 0 8px;
+}
+.bc-comment-view:hover {
+  background: rgba(255, 126, 0, 0.08);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+.bc-comment-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-comment-placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+.bc-comment-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 8px;
+}
+.bc-comment-input {
+  min-width: 200px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 126, 0, 0.4);
+  color: #fff;
+  outline: none;
+}
+.bc-comment-save,
+.bc-comment-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+}
+.bc-comment-save {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+}
+.bc-comment-save:hover { background: rgba(46, 204, 113, 0.35); }
+.bc-comment-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+.bc-comment-cancel:hover { background: rgba(231, 76, 60, 0.25); color: #e74c3c; }
+
 /* ─── History Filters ─── */
 .bc-history-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 18px;
+  padding: 14px 16px;
+  margin: 12px 0 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
 }
 .bc-filter-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .bc-filter-label {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.4);
-  margin-right: 2px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  margin-right: 6px;
 }
 .bc-filter-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
   font-size: 0.78rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .bc-filter-chip:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
 }
 .bc-filter-chip.active {
-  background: rgba(255, 126, 0, 0.12);
-  color: var(--color-orange);
-  border-color: rgba(255, 126, 0, 0.3);
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.25), rgba(255, 126, 0, 0.12));
+  color: #fff;
+  border-color: rgba(255, 126, 0, 0.55);
+  box-shadow: 0 2px 10px rgba(255, 126, 0, 0.18), 0 0 0 1px rgba(255, 126, 0, 0.15) inset;
+}
+.bc-filter-chip.active:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 126, 0, 0.28);
 }
 
 /* ─── Poll Stats Modal ─── */
