@@ -52,6 +52,26 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PUT /api/chat-folders/assign — body: { chatId, folderId|null }
+// MUST be declared before '/:id' so it doesn't match the rename route
+router.put('/assign', async (req, res, next) => {
+  try {
+    const { chatId, folderId } = req.body || {};
+    const cid = Number(chatId);
+    if (!cid) return res.status(400).json({ error: 'chatId required' });
+    if (folderId === null || folderId === undefined) {
+      await dbPool.query('DELETE FROM wl_admin_chat_folder_map WHERE chat_id = ?', [cid]);
+    } else {
+      await dbPool.query(
+        `INSERT INTO wl_admin_chat_folder_map (chat_id, folder_id) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE folder_id = VALUES(folder_id), updated_at = NOW()`,
+        [cid, Number(folderId)]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/chat-folders/:id — rename
 router.put('/:id', async (req, res, next) => {
   try {
@@ -69,25 +89,6 @@ router.delete('/:id', async (req, res, next) => {
     const id = Number(req.params.id);
     await dbPool.query('DELETE FROM wl_admin_chat_folder_map WHERE folder_id = ?', [id]);
     await dbPool.query('DELETE FROM wl_admin_chat_folders WHERE id = ?', [id]);
-    res.json({ ok: true });
-  } catch (err) { next(err); }
-});
-
-// PUT /api/chat-folders/assign — body: { chatId, folderId|null }
-router.put('/assign', async (req, res, next) => {
-  try {
-    const { chatId, folderId } = req.body || {};
-    const cid = Number(chatId);
-    if (!cid) return res.status(400).json({ error: 'chatId required' });
-    if (folderId === null || folderId === undefined) {
-      await dbPool.query('DELETE FROM wl_admin_chat_folder_map WHERE chat_id = ?', [cid]);
-    } else {
-      await dbPool.query(
-        `INSERT INTO wl_admin_chat_folder_map (chat_id, folder_id) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE folder_id = VALUES(folder_id), updated_at = NOW()`,
-        [cid, Number(folderId)]
-      );
-    }
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
