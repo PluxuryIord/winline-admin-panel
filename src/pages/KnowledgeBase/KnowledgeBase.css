@@ -647,7 +647,7 @@
 
 
 /* --- ИЗОБРАЖЕНИЯ (КРАСИВОЕ ОФОРМЛЕНИЕ) --- */
-.html-content img {
+.html-content img:not(.tg-emoji-inline) {
   display: block;
   margin: 40px 0;
   max-width: 100%;
@@ -657,6 +657,19 @@
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   cursor: zoom-in;
+}
+
+/* Инлайн премиум-эмодзи — как в редакторе */
+.html-content img.tg-emoji-inline {
+  display: inline;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  margin: 0 1px;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  cursor: default;
 }
 
 /* Горизонтальная линия */
