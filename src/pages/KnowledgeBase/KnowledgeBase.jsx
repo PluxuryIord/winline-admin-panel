@@ -229,9 +229,10 @@ export default function KnowledgeBase() {
       .replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
       .replace(/&lt;a href="([^"]*)"&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
       .replace(/&lt;\/a&gt;/g, '</a>')
-      .replace(/&lt;tg-emoji emoji-id=&quot;([^&]*)&quot;&gt;/g, '<span class="tg-emoji" data-emoji-id="$1">')
-      .replace(/&lt;tg-emoji emoji-id="([^"]*)"&gt;/g, '<span class="tg-emoji" data-emoji-id="$1">')
-      .replace(/&lt;\/tg-emoji&gt;/g, '</span>')
+      .replace(/&lt;tg-emoji emoji-id=&quot;(\d+)&quot;&gt;[^&]*&lt;\/tg-emoji&gt;/g,
+        '<img src="/emoji/$1.webp" class="tg-emoji-inline" alt="emoji" />')
+      .replace(/&lt;tg-emoji emoji-id="(\d+)"&gt;[^<]*&lt;\/tg-emoji&gt;/g,
+        '<img src="/emoji/$1.webp" class="tg-emoji-inline" alt="emoji" />')
       .replace(/\n/g, '<br>');
   }
 
