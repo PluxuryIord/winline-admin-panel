@@ -92,15 +92,15 @@ router.get('/', async (req, res, next) => {
     const params = [];
     let tagJoin = '';
     if (tags.length) {
-      tagJoin = 'INNER JOIN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (?) GROUP BY user_id HAVING COUNT(DISTINCT tag) = ?) AS tf ON tf.user_id = u.user_id';
-      params.push(tags, tags.length);
+      tagJoin = 'INNER JOIN (SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)) AS tf ON tf.user_id = u.user_id';
+      params.push(tags);
     }
 
     let where = '';
     if (search) {
-      where = 'WHERE (u.full_name LIKE ? OR u.rl_full_name LIKE ? OR u.username LIKE ?)';
+      where = 'WHERE (u.full_name LIKE ? OR u.rl_full_name LIKE ? OR u.username LIKE ? OR EXISTS (SELECT 1 FROM wl_admin_user_tags ts WHERE ts.user_id = u.user_id AND ts.tag LIKE ?))';
       const like = `%${search}%`;
-      params.push(like, like, like);
+      params.push(like, like, like, like);
     }
 
     const fromClause = `FROM users u ${tagJoin} ${where}`;

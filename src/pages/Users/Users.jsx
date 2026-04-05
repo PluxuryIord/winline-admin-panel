@@ -279,7 +279,7 @@ export default function Users() {
               ref={searchRef}
               type="text"
               className="search-input"
-              placeholder="Поиск по ФИО или Telegram..."
+              placeholder="Поиск по ФИО, Telegram или тегу..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
