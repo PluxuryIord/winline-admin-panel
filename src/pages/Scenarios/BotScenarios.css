@@ -1343,3 +1343,162 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Event Anketa Questions ── */
+.eaq-section { margin-top: 16px; }
+.eaq-empty {
+  padding: 14px;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.82rem;
+  text-align: center;
+  font-style: italic;
+}
+.eaq-list { display: flex; flex-direction: column; gap: 8px; }
+.eaq-item {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: all 0.15s;
+}
+.eaq-item:hover { border-color: rgba(255,255,255,0.15); }
+.eaq-item--inactive { opacity: 0.5; }
+.eaq-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eaq-order-btns { display: flex; flex-direction: column; gap: 2px; }
+.eaq-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255,126,0,0.8);
+  min-width: 22px;
+}
+.eaq-text {
+  flex: 1;
+  color: rgba(255,255,255,0.9);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eaq-type-badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.eaq-type-text { background: rgba(100,149,237,0.15); color: #6495ed; }
+.eaq-type-choice { background: rgba(46,204,113,0.15); color: #2ecc71; }
+.eaq-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; height: 24px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eaq-icon-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.eaq-icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.eaq-icon-btn--active { background: rgba(46,204,113,0.2); color: #2ecc71; border-color: rgba(46,204,113,0.35); }
+.eaq-icon-btn--danger:hover { background: rgba(231,76,60,0.2); color: #e74c3c; border-color: rgba(231,76,60,0.35); }
+.eaq-opts-preview {
+  margin-top: 8px;
+  margin-left: 54px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.eaq-opt-chip {
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.2);
+  border-radius: 999px;
+  color: rgba(46,204,113,0.9);
+}
+.eaq-form {
+  background: rgba(255,126,0,0.04);
+  border: 1px solid rgba(255,126,0,0.2);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.eaq-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+}
+.eaq-input:focus { border-color: rgba(255,126,0,0.5); }
+.eaq-type-toggle { display: flex; gap: 6px; }
+.eaq-type-btn {
+  flex: 1;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.6);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eaq-type-btn.active {
+  background: rgba(255,126,0,0.15);
+  color: var(--color-orange);
+  border-color: rgba(255,126,0,0.4);
+}
+.eaq-options { display: flex; flex-direction: column; gap: 6px; }
+.eaq-option-row { display: flex; gap: 6px; align-items: center; }
+.eaq-option-input { flex: 1; }
+.eaq-add-option {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.6);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.eaq-add-option:hover { border-color: rgba(255,126,0,0.4); color: var(--color-orange); }
+.eaq-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.eaq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.eaq-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.eaq-btn--primary {
+  background: linear-gradient(135deg, rgba(255,126,0,0.25), rgba(255,126,0,0.15));
+  border-color: rgba(255,126,0,0.45);
+  color: #fff;
+}
+.eaq-btn--primary:hover { background: linear-gradient(135deg, rgba(255,126,0,0.35), rgba(255,126,0,0.2)); }
