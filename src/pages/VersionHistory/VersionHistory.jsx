@@ -114,7 +114,7 @@ export default function VersionHistory() {
                           if (e.key === 'Enter') saveNote(snap.id);
                           if (e.key === 'Escape') setEditingNoteId(null);
                         }}
-                        placeholder="Пометка..."
+                        placeholder="Заметка..."
                         autoFocus
                       />
                       <button className="icon-btn" onClick={() => saveNote(snap.id)} title="Сохранить"><Check size={14} /></button>
@@ -124,9 +124,9 @@ export default function VersionHistory() {
                     <span
                       className={`version-note ${snap.note ? '' : 'version-note--empty'}`}
                       onClick={isAdmin ? () => { setEditingNoteId(snap.id); setNoteDraft(snap.note || ''); } : undefined}
-                      title={isAdmin ? 'Редактировать пометку' : ''}
+                      title={isAdmin ? 'Редактировать заметку' : ''}
                     >
-                      {snap.note || (isAdmin ? '+ пометка' : '')}
+                      {snap.note || (isAdmin ? '+ заметка' : '')}
                       {isAdmin && snap.note && <Pencil size={11} className="version-note-edit-icon" />}
                     </span>
                   )}

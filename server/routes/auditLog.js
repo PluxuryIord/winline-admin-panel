@@ -38,7 +38,7 @@ router.get('/', async (req, res, next) => {
     );
 
     const [items] = await dbPool.query(
-      `SELECT * FROM wl_admin_audit_log ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM wl_admin_audit_log ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
