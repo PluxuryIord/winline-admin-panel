@@ -4,7 +4,6 @@ import {
   Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye, ImageIcon,
 } from 'lucide-react';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
-import EventAnketaQuestions from './EventAnketaQuestions';
 import { api } from '../../utils/api';
 
 const SCREEN_ICONS = {
@@ -209,8 +208,6 @@ export default function NodeEditorPanel({
           })}
         </div>
       )}
-
-      {screenId === 'event_anketa' && <EventAnketaQuestions />}
 
       {/* Buttons */}
       <div className="sc-section">
