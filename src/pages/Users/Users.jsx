@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2 } from 'lucide-react';
+import { Search, Download, MessageSquare, ArrowUpDown, X, ChevronDown, Loader, Pencil, Trash2, Plus, Minus } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import './Users.css';
 
@@ -138,6 +138,49 @@ export default function Users() {
     } catch (err) { alert('Ошибка: ' + err.message); }
     setTagModalSaving(false);
     setTagModal(null);
+  };
+
+  // Массовый выбор пользователей
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkModal, setBulkModal] = useState(null); // { mode: 'add'|'remove', value: '' }
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const toggleSelected = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const submitBulk = async () => {
+    if (!bulkModal) return;
+    const tag = bulkModal.value.trim();
+    if (!tag) return;
+    setBulkSaving(true);
+    try {
+      const body = {
+        userIds: [...selectedIds],
+        add: bulkModal.mode === 'add' ? [tag] : [],
+        remove: bulkModal.mode === 'remove' ? [tag] : [],
+      };
+      await api.post('/api/users/tags/bulk', body);
+      // Local patch
+      setUsers(prev => prev.map(u => {
+        if (!selectedIds.has(u.id)) return u;
+        const tags = new Set(u.tags || []);
+        if (bulkModal.mode === 'add') tags.add(tag);
+        else tags.delete(tag);
+        return { ...u, tags: [...tags] };
+      }));
+      loadTags();
+      setBulkModal(null);
+      clearSelection();
+    } catch (err) {
+      alert('Ошибка: ' + err.message);
+    }
+    setBulkSaving(false);
   };
 
   // Модал удаления тега
@@ -388,11 +431,34 @@ export default function Users() {
         </div>
       </div>
 
+      {/* Панель массовых действий */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-bar-count">Выбрано: {selectedIds.size}</span>
+          <button
+            className="bulk-bar-btn"
+            onClick={() => setSelectedIds(new Set(filteredAndSortedUsers.map(u => u.id)))}
+          >
+            Выбрать всех на странице
+          </button>
+          <button className="bulk-bar-btn bulk-bar-add" onClick={() => setBulkModal({ mode: 'add', value: '' })}>
+            <Plus size={14} /> Добавить тег
+          </button>
+          <button className="bulk-bar-btn bulk-bar-remove" onClick={() => setBulkModal({ mode: 'remove', value: '' })}>
+            <Minus size={14} /> Удалить тег
+          </button>
+          <button className="bulk-bar-btn bulk-bar-clear" onClick={clearSelection}>
+            <X size={14} /> Сбросить
+          </button>
+        </div>
+      )}
+
       {/* ТАБЛИЦА */}
       <div className="table-wrapper">
         <table className="winline-table">
           <thead>
             <tr>
+              <th className="cell-checkbox"></th>
               <th></th>
               <th></th>
               <th></th>
@@ -400,7 +466,15 @@ export default function Users() {
           </thead>
           <tbody>
             {filteredAndSortedUsers.map(user => (
-              <tr key={user.id} className={user.banned ? 'row-banned' : ''}>
+              <tr key={user.id} className={`${user.banned ? 'row-banned' : ''}${selectedIds.has(user.id) ? ' row-selected' : ''}`}>
+                <td className="cell-checkbox" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    className="bulk-checkbox"
+                    checked={selectedIds.has(user.id)}
+                    onChange={() => toggleSelected(user.id)}
+                  />
+                </td>
                 <td>
                   <Link to={`/users/${user.id}`} className="user-cell-link">
                     <div className="user-cell">
@@ -444,7 +518,7 @@ export default function Users() {
             ))}
             {filteredAndSortedUsers.length === 0 && !loading && (
               <tr>
-                <td colSpan="3" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+                <td colSpan="4" style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
                   Пользователи не найдены
                 </td>
               </tr>
@@ -513,6 +587,44 @@ export default function Users() {
                 disabled={deleteTagSaving}
               >
                 {deleteTagSaving ? 'Удаление...' : 'Удалить у всех'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модал массовых действий с тегами */}
+      {bulkModal && (
+        <div className="tag-modal-overlay" onClick={() => setBulkModal(null)}>
+          <div className="tag-modal" onClick={e => e.stopPropagation()}>
+            <button className="tag-modal-close" onClick={() => setBulkModal(null)}><X size={18} /></button>
+            <h3>{bulkModal.mode === 'add' ? 'Добавить тег' : 'Удалить тег'}</h3>
+            <p className="tag-modal-desc">
+              {bulkModal.mode === 'add' ? 'Тег будет добавлен' : 'Тег будет удалён у'} у <strong>{selectedIds.size}</strong> пользователей
+            </p>
+            <div className="tag-modal-field">
+              <label>Тег</label>
+              <input
+                list="bulk-tags-list"
+                type="text"
+                value={bulkModal.value}
+                placeholder="Введите или выберите..."
+                onChange={e => setBulkModal({ ...bulkModal, value: e.target.value })}
+                onKeyDown={e => e.key === 'Enter' && submitBulk()}
+                autoFocus
+              />
+              <datalist id="bulk-tags-list">
+                {allTags.map(t => <option key={t} value={t} />)}
+              </datalist>
+            </div>
+            <div className="tag-modal-actions">
+              <button className="tag-modal-cancel" onClick={() => setBulkModal(null)}>Отмена</button>
+              <button
+                className={`tag-modal-submit${bulkModal.mode === 'remove' ? ' tag-modal-danger' : ''}`}
+                onClick={submitBulk}
+                disabled={bulkSaving || !bulkModal.value.trim()}
+              >
+                {bulkSaving ? 'Сохранение...' : (bulkModal.mode === 'add' ? 'Добавить' : 'Удалить')}
               </button>
             </div>
           </div>

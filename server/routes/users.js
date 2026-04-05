@@ -156,6 +156,49 @@ router.put('/tags/rename', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/users/tags/bulk — добавить/удалить теги у списка пользователей
+router.post('/tags/bulk', async (req, res, next) => {
+  try {
+    const { userIds, add = [], remove = [] } = req.body || {};
+    if (!Array.isArray(userIds) || !userIds.length) {
+      return res.status(400).json({ error: 'userIds required' });
+    }
+    const ids = userIds.map(Number).filter(Boolean);
+    const addTags = (Array.isArray(add) ? add : []).map(t => String(t || '').trim()).filter(Boolean);
+    const removeTags = (Array.isArray(remove) ? remove : []).map(t => String(t || '').trim()).filter(Boolean);
+    if (!ids.length || (!addTags.length && !removeTags.length)) {
+      return res.status(400).json({ error: 'nothing to do' });
+    }
+
+    if (removeTags.length) {
+      await dbPool.query(
+        'DELETE FROM wl_admin_user_tags WHERE user_id IN (?) AND tag IN (?)',
+        [ids, removeTags]
+      );
+    }
+
+    if (addTags.length) {
+      // Drop existing to avoid unique violation, then re-insert — idempotent
+      await dbPool.query(
+        'DELETE FROM wl_admin_user_tags WHERE user_id IN (?) AND tag IN (?)',
+        [ids, addTags]
+      );
+      const values = [];
+      for (const uid of ids) for (const t of addTags) values.push([uid, t]);
+      await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES ?', [values]);
+    }
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(
+      req.user.id, userName, 'update', 'user_tags',
+      `bulk:${ids.length}`, `bulk (${ids.length} users)`,
+      null, { userIds: ids, add: addTags, remove: removeTags }
+    );
+
+    res.json({ ok: true, affected: ids.length });
+  } catch (err) { next(err); }
+});
+
 // DELETE /api/users/tags/bulk-delete — удалить тег у всех носителей
 router.delete('/tags/bulk-delete', async (req, res, next) => {
   try {
