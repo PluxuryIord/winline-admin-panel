@@ -8,14 +8,19 @@ let schemaReady = false;
 async function ensureSchema() {
   if (schemaReady) return;
   try {
-    const [idx] = await dbPool.query(
-      `SELECT COUNT(*) AS c FROM information_schema.statistics
+    // Find any UNIQUE index on wl_admin_snapshots that constrains snapshot_date/entity_type
+    const [rows] = await dbPool.query(
+      `SELECT DISTINCT index_name FROM information_schema.statistics
        WHERE table_schema = DATABASE() AND table_name = 'wl_admin_snapshots'
-         AND index_name = 'uq_date_type'`
+         AND non_unique = 0 AND index_name <> 'PRIMARY'`
     );
-    if (idx[0]?.c) {
-      await dbPool.query('ALTER TABLE wl_admin_snapshots DROP INDEX uq_date_type');
-      console.log('[snapshots] dropped legacy uq_date_type index');
+    for (const r of rows) {
+      try {
+        await dbPool.query(`ALTER TABLE wl_admin_snapshots DROP INDEX \`${r.index_name}\``);
+        console.log('[snapshots] dropped unique index', r.index_name);
+      } catch (e) {
+        console.error('[snapshots] drop index failed', r.index_name, e.message);
+      }
     }
   } catch (err) {
     console.error('[snapshots] schema check failed:', err.message);
@@ -42,6 +47,7 @@ async function collectAll() {
  * Debounces: if the most recent snapshot is < 30 seconds old, skip (so auto-saves don't spam).
  */
 export async function createDailySnapshot(_entityType, userId, userName, opts = {}) {
+  const silent = !opts.force;
   try {
     await ensureSchema();
 
@@ -67,6 +73,7 @@ export async function createDailySnapshot(_entityType, userId, userName, opts = 
     );
   } catch (err) {
     console.error('[snapshots] Failed to create snapshot:', err.message);
+    if (!silent) throw err;
   }
 }
 
