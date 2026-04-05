@@ -92,14 +92,14 @@
 .chat-item--unread::after {
   content: '';
   position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 44px;
+  top: 12px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--color-orange);
   box-shadow: 0 0 8px rgba(255, 126, 0, 0.5);
+  border: 2px solid #1a1a1a;
 }
 
 .chat-item:hover {
