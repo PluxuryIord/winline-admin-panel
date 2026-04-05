@@ -284,7 +284,18 @@ const SEED_DATA = {
 
 router.get('/', async (req, res, next) => {
   try {
-    const { data } = await loadScenarios();
+    const { dbId, data } = await loadScenarios();
+    // Auto-merge missing system screens from SEED_DATA (idempotent)
+    if (dbId && data && data.screens) {
+      let changed = false;
+      for (const [id, screen] of Object.entries(SEED_DATA.screens)) {
+        if (!data.screens[id]) {
+          data.screens[id] = screen;
+          changed = true;
+        }
+      }
+      if (changed) await saveScenarios(data, dbId);
+    }
     res.json(data || { screens: {} });
   } catch (err) { next(err); }
 });
