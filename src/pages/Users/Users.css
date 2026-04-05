@@ -719,3 +719,22 @@
     max-width: 160px;
   }
 }
+
+/* Active chat indicator — user has written to the bot at least once */
+.btn-chat {
+  position: relative;
+}
+.btn-chat--active {
+  border-color: rgba(255, 126, 0, 0.55);
+  background-color: rgba(255, 126, 0, 0.10);
+}
+.btn-chat-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-orange, #ff7e00);
+  box-shadow: 0 0 6px rgba(255, 126, 0, 0.7);
+}

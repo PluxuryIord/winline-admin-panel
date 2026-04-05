@@ -41,9 +41,8 @@ export default function Chats() {
 
   // SSE — реалтайм обновление списка чатов
   useEffect(() => {
-    const token = localStorage.getItem('wl_admin_token');
-    const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
-    const es = new EventSource(url);
+    // Cookie-based auth — EventSource sends wl_token cookie automatically on same-origin
+    const es = new EventSource('/api/chats/stream', { withCredentials: true });
 
     es.onmessage = (e) => {
       try {

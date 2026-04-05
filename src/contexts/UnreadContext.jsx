@@ -40,17 +40,14 @@ export function UnreadProvider({ children }) {
 
   // Global SSE listener with reconnection
   useEffect(() => {
-    const token = localStorage.getItem('wl_admin_token');
-    if (!token) return;
-
     let es = null;
     let reconnectTimer = null;
     let closed = false;
 
     function connect() {
       if (closed) return;
-      const url = `/api/chats/stream?token=${token}`;
-      es = new EventSource(url);
+      // Cookie-based auth — wl_token cookie is sent automatically on same-origin
+      es = new EventSource('/api/chats/stream', { withCredentials: true });
 
       es.onmessage = (e) => {
         try {

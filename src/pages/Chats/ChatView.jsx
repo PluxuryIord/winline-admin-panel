@@ -50,6 +50,8 @@ function groupByDate(messages) {
 /** Нормализуем media: всегда возвращаем массив */
 function getMediaList(msg) {
   if (!msg.media) return [];
+  // Polls are rendered separately, not as a media file
+  if (!Array.isArray(msg.media) && msg.media.type === 'poll') return [];
   return Array.isArray(msg.media) ? msg.media : [msg.media];
 }
 
@@ -150,9 +152,7 @@ export default function ChatView() {
     let es;
     let reconnectTimer;
     const connect = () => {
-      const token = localStorage.getItem('wl_admin_token');
-      const url = `/api/chats/stream${token ? `?token=${token}` : ''}`;
-      es = new EventSource(url);
+      es = new EventSource('/api/chats/stream', { withCredentials: true });
       es.onmessage = (e) => {
         if (!e.data || e.data.startsWith(':')) return;
         try {
@@ -324,10 +324,26 @@ export default function ChatView() {
               const ml = getMediaList(item);
               const hasImages = ml.some(m => m.mimeType?.startsWith('image/'));
               const hasMedia = ml.length > 0;
+              const poll = item.media && !Array.isArray(item.media) && item.media.type === 'poll' ? item.media : null;
 
               return (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
                   <div className={`chatview-bubble ${hasImages ? 'chatview-bubble--photo' : hasMedia ? 'chatview-bubble--media' : ''}`}>
+                    {poll && (
+                      <div className="chatview-poll">
+                        <div className="chatview-poll-header">
+                          📊 {poll.pollType === 'quiz' ? 'Викторина' : 'Опрос'}
+                          {poll.isAnonymous ? ' · анонимный' : ''}
+                          {poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}
+                        </div>
+                        <div className="chatview-poll-question">{poll.question}</div>
+                        <ul className="chatview-poll-options">
+                          {(poll.options || []).map((opt, oi) => (
+                            <li key={oi}>{opt}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {/* Альбом / одно фото */}
                     {hasImages && (
                       <div className={`chatview-album ${albumGridClass(ml.filter(m => m.mimeType?.startsWith('image/')).length)}`}>

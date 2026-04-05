@@ -19,10 +19,18 @@ function mapUserRow(r, userTags, comment = '') {
     registered: !!r.registered,
     personalLabel: !!r.personal_label,
     showQr: !!r.show_qr,
+    hasUserChat: !!r.has_user_chat,
     tags: userTags,
     comment,
   };
 }
+
+// User counts as "active chat" only if they sent at least one DM themselves
+const HAS_USER_CHAT_EXPR = `(EXISTS (
+  SELECT 1 FROM wl_admin_chat_messages m
+  INNER JOIN wl_admin_chats c ON c.id = m.chat_id
+  WHERE c.user_id = u.user_id AND m.sender = 'user'
+))`;
 
 // Получить теги, комментарии и editedIds для массива user_id из MySQL (один запрос вместо двух)
 async function getTagsAndComments(userIds) {
@@ -106,7 +114,7 @@ router.get('/', async (req, res, next) => {
     const fromClause = `FROM users u ${tagJoin} ${where}`;
     const [[{ total }]] = await dbPool.query(`SELECT COUNT(*) as total ${fromClause}`, params);
     const [rows] = await dbPool.query(
-      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')} ${fromClause} ORDER BY u.date_reg DESC LIMIT ? OFFSET ?`,
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${HAS_USER_CHAT_EXPR} AS has_user_chat ${fromClause} ORDER BY u.date_reg DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
@@ -163,7 +171,7 @@ router.get('/:id', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
     const [rows] = await dbPool.query(
-      `SELECT ${USER_COLUMNS} FROM users WHERE user_id = ?`,
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${HAS_USER_CHAT_EXPR} AS has_user_chat FROM users u WHERE u.user_id = ?`,
       [Number(req.params.id)]
     );
     if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });

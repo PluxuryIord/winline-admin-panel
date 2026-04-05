@@ -21,6 +21,62 @@ function verifyWebhook(req) {
 
 const router = Router();
 
+// ============ Chat dedup helpers (app-level because we can't ALTER to add UNIQUE) ============
+const userChatLocks = new Map(); // user_id -> Promise chain
+function withUserLock(userId, fn) {
+  const prev = userChatLocks.get(userId) || Promise.resolve();
+  const next = prev.catch(() => {}).then(fn);
+  userChatLocks.set(userId, next.finally(() => {
+    if (userChatLocks.get(userId) === next) userChatLocks.delete(userId);
+  }));
+  return next;
+}
+
+/**
+ * Return the single canonical chat.id for a user, creating it if missing.
+ * If duplicates exist (legacy state), merge all messages into the oldest chat
+ * and delete the duplicates.
+ */
+async function getOrCreateSingleChat(userId) {
+  return withUserLock(userId, async () => {
+    const [rows] = await dbPool.query(
+      'SELECT id FROM wl_admin_chats WHERE user_id = ? ORDER BY id ASC',
+      [userId]
+    );
+    if (rows.length === 0) {
+      const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [userId]);
+      return ins.insertId;
+    }
+    const canonical = rows[0].id;
+    if (rows.length > 1) {
+      const dupIds = rows.slice(1).map(r => r.id);
+      // Move any messages from dups into canonical
+      await dbPool.query(
+        'UPDATE wl_admin_chat_messages SET chat_id = ? WHERE chat_id IN (?)',
+        [canonical, dupIds]
+      );
+      await dbPool.query('DELETE FROM wl_admin_chats WHERE id IN (?)', [dupIds]);
+      console.log(`[chats] merged ${dupIds.length} duplicate chat(s) for user ${userId} into chat #${canonical}`);
+    }
+    return canonical;
+  });
+}
+
+/** One-shot cleanup on startup: consolidate any existing duplicates. */
+export async function cleanupDuplicateChats() {
+  try {
+    const [dups] = await dbPool.query(
+      `SELECT user_id FROM wl_admin_chats GROUP BY user_id HAVING COUNT(*) > 1`
+    );
+    for (const r of dups) {
+      await getOrCreateSingleChat(r.user_id);
+    }
+    if (dups.length) console.log(`[chats] startup cleanup: consolidated ${dups.length} user(s) with duplicate chats`);
+  } catch (err) {
+    console.error('[chats] startup cleanup failed:', err.message);
+  }
+}
+
 async function markBlockedIfNeeded(userId, errorText) {
   if (errorText && (errorText.includes('blocked by the user') || errorText.includes('Forbidden'))) {
     try {
@@ -64,8 +120,8 @@ function broadcast(event) {
 // SSE stream — exported separately, mounted before JWT middleware (EventSource can't send headers)
 export const streamRouter = Router();
 streamRouter.get('/', (req, res) => {
-  // Validate JWT token from query param
-  const token = req.query.token;
+  // Accept JWT via httpOnly cookie (preferred) or query param (legacy)
+  const token = req.cookies?.wl_token || req.query.token;
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
     jwt.verify(token, JWT_SECRET);
@@ -108,18 +164,17 @@ async function handleWebhook(req, res, next) {
   }
 
   try {
-    const { user_id, text, username, full_name, media, photo, document: doc, video, voice, audio, sticker } = req.body;
-    console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video);
+    const { user_id, text, username, full_name, media, photo, document: doc, video, voice, audio, sticker, poll } = req.body;
+    console.log('[webhook] body keys:', Object.keys(req.body), 'user_id:', user_id, 'hasMedia:', !!media, 'hasPhoto:', !!photo, 'hasDoc:', !!doc, 'hasVideo:', !!video, 'hasPoll:', !!poll);
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
 
-    // Находим или создаём чат (upsert to avoid race condition)
-    await dbPool.query(
-      'INSERT INTO wl_admin_chats (user_id) VALUES (?) ON DUPLICATE KEY UPDATE id = id', [user_id]
-    );
-    const [chatRows] = await dbPool.query(
-      'SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [user_id]
-    );
-    const chatId = chatRows[0].id;
+    // Reject totally empty webhooks (no text, no media, no poll) — prevents phantom chats
+    const hasAnyContent = !!(text && text.trim()) || !!media || !!photo || !!doc || !!video || !!voice || !!audio || !!sticker || !!poll;
+    if (!hasAnyContent) {
+      return res.status(400).json({ error: 'empty payload' });
+    }
+
+    const chatId = await getOrCreateSingleChat(Number(user_id));
 
     // Обработка медиа от бота — поддержка разных форматов
     // media: массив (альбом) ИЛИ photo/document/video/voice/audio (одиночное)
@@ -171,6 +226,18 @@ async function handleWebhook(req, res, next) {
       } catch (e) {
         console.error('[webhook] Failed to download/upload media:', e.message);
       }
+    }
+
+    // Poll: store as a synthetic media object with type='poll'
+    if (!mediaObj && poll) {
+      mediaObj = {
+        type: 'poll',
+        question: poll.question || '',
+        options: Array.isArray(poll.options) ? poll.options.map(o => (typeof o === 'string' ? o : (o?.text || ''))) : [],
+        isAnonymous: poll.is_anonymous !== false,
+        allowsMultipleAnswers: !!poll.allows_multiple_answers,
+        pollType: poll.type || 'regular',
+      };
     }
 
     // Сохраняем сообщение
@@ -250,15 +317,8 @@ router.get('/by-user/:userId', async (req, res, next) => {
   try {
     const userId = Number(req.params.userId);
 
-    // Находим или создаём чат
-    const [existing] = await dbPool.query('SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [userId]);
-    let chatIdResolved;
-    if (existing.length) {
-      chatIdResolved = existing[0].id;
-    } else {
-      const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [userId]);
-      chatIdResolved = ins.insertId;
-    }
+    // Dedup-aware lookup/create
+    const chatIdResolved = await getOrCreateSingleChat(userId);
 
     let [chats] = await dbPool.query('SELECT id, user_id AS userId FROM wl_admin_chats WHERE id = ?', [chatIdResolved]);
 
