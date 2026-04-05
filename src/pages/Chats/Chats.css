@@ -193,3 +193,90 @@
 .chat-item-delete:hover {
   background-color: rgba(255, 68, 68, 0.2);
 }
+
+/* Chat folders */
+.chats-folders {
+  display: flex;
+  gap: 6px;
+  padding: 10px 0 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 10px;
+}
+.chats-folder-tab,
+.chats-folder-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cfcfcf;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chats-folder-tab:hover,
+.chats-folder-add:hover {
+  border-color: rgba(255, 126, 0, 0.4);
+  color: #fff;
+}
+.chats-folder-tab-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 16px;
+}
+.chats-folder-tab-wrap.active .chats-folder-tab,
+.chats-folder-tab.active {
+  background: linear-gradient(135deg, rgba(255, 126, 0, 0.25), rgba(255, 126, 0, 0.12));
+  border-color: rgba(255, 126, 0, 0.6);
+  color: #fff;
+}
+.chats-folder-edit {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: inline-flex;
+}
+.chats-folder-edit:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+
+.chats-folder-add {
+  border-style: dashed;
+  color: #aaa;
+}
+
+/* Folder editor modal extras */
+.folder-editor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+.folder-editor-mode {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #bbb;
+}
+.folder-editor-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #ccc;
+}
+.folder-editor-checks label { display: flex; align-items: center; gap: 8px; cursor: pointer; }

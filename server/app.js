@@ -114,6 +114,8 @@ import auditLogRouter from './routes/auditLog.js';
 import snapshotsRouter from './routes/snapshots.js';
 app.use('/api/audit-log', auditLogRouter);
 app.use('/api/snapshots', snapshotsRouter);
+import chatFoldersRouter from './routes/chatFolders.js';
+app.use('/api/chat-folders', chatFoldersRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {
