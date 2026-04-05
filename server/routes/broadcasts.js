@@ -831,21 +831,19 @@ function commentsTable(entity) {
   return entity === 'groups' ? 'wl_admin_group_comments' : 'wl_admin_channel_comments';
 }
 
-router.get('/:entity(channels|groups)/:chatId/comment', async (req, res, next) => {
+async function getComment(entity, chatId, res, next) {
   try {
-    const { entity, chatId } = req.params;
     const [rows] = await dbPool.query(
       `SELECT comment FROM ${commentsTable(entity)} WHERE chat_id = ?`,
       [chatId]
     );
     res.json({ comment: rows[0]?.comment || '' });
   } catch (err) { next(err); }
-});
+}
 
-router.put('/:entity(channels|groups)/:chatId/comment', async (req, res, next) => {
+async function putComment(entity, chatId, body, res, next) {
   try {
-    const { entity, chatId } = req.params;
-    const comment = typeof req.body?.comment === 'string' ? req.body.comment : '';
+    const comment = typeof body?.comment === 'string' ? body.comment : '';
     const table = commentsTable(entity);
     if (!comment.trim()) {
       await dbPool.query(`DELETE FROM ${table} WHERE chat_id = ?`, [chatId]);
@@ -858,7 +856,12 @@ router.put('/:entity(channels|groups)/:chatId/comment', async (req, res, next) =
     }
     res.json({ ok: true, comment });
   } catch (err) { next(err); }
-});
+}
+
+router.get('/channels/:chatId/comment', (req, res, next) => getComment('channels', req.params.chatId, res, next));
+router.put('/channels/:chatId/comment', (req, res, next) => putComment('channels', req.params.chatId, req.body, res, next));
+router.get('/groups/:chatId/comment', (req, res, next) => getComment('groups', req.params.chatId, res, next));
+router.put('/groups/:chatId/comment', (req, res, next) => putComment('groups', req.params.chatId, req.body, res, next));
 
 // ===================== ЧЕРНОВИКИ И ЗАПЛАНИРОВАННЫЕ =====================
 
