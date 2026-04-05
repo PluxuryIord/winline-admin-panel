@@ -1,32 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, List, LayoutGrid, Plus, Pencil, Folder } from 'lucide-react';
+import { X, List, LayoutGrid, Plus, Folder, FolderInput, MoreVertical } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
-import FolderEditor from './FolderEditor.jsx';
 import './Chats.css';
-
-function chatMatchesFolder(chat, user, filters, unreadSet) {
-  if (!filters) return true;
-  const f = filters;
-  if (f.unreadOnly && !unreadSet.has(chat.id)) return false;
-  if (f.activeOnly) {
-    const hasUserMsg = chat.messages?.some(m => m.from === 'user');
-    if (!hasUserMsg) return false;
-  }
-  if (f.bannedOnly && !chat.banned && !user?.banned) return false;
-  if (Array.isArray(f.tags) && f.tags.length) {
-    const userTags = user?.tags || [];
-    const mode = f.tagMode === 'all' ? 'all' : 'any';
-    if (mode === 'all') {
-      if (!f.tags.every(t => userTags.includes(t))) return false;
-    } else {
-      if (!f.tags.some(t => userTags.includes(t))) return false;
-    }
-  }
-  return true;
-}
 
 /** Strip HTML tags for preview, keep text only */
 function stripTgHtml(html) {
@@ -55,40 +33,26 @@ export default function Chats() {
   const [viewMode, setViewMode] = useState('list');
   const [deleteModal, setDeleteModal] = useState(null);
   const { unreadChats } = useUnread();
+
   const [folders, setFolders] = useState([]);
-  const [activeFolderId, setActiveFolderId] = useState(null); // null = All
-  const [folderEditor, setFolderEditor] = useState(null); // {id?, name, filters}
-  const [allTags, setAllTags] = useState([]);
+  const [activeFolderId, setActiveFolderId] = useState(null); // null = All, 0 = "Без папки"
+  const [createPrompt, setCreatePrompt] = useState(false);
+  const [renamePrompt, setRenamePrompt] = useState(null); // folder obj
+  const [deleteFolderPrompt, setDeleteFolderPrompt] = useState(null);
+  const [moveMenu, setMoveMenu] = useState(null); // { chatId, x, y }
+  const moveMenuRef = useRef(null);
 
   useEffect(() => {
     api.get('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
     api.get('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
-    api.get('/api/chat-folders').then(r => r.json()).then(setFolders).catch(() => {});
-    api.get('/api/users/all-tags').then(r => r.json()).then(setAllTags).catch(() => {});
+    reloadFolders();
   }, []);
 
   const reloadFolders = () => api.get('/api/chat-folders').then(r => r.json()).then(setFolders).catch(() => {});
 
-  const saveFolder = async (data) => {
-    if (data.id) {
-      await api.put(`/api/chat-folders/${data.id}`, { name: data.name, filters: data.filters });
-    } else {
-      await api.post('/api/chat-folders', { name: data.name, filters: data.filters });
-    }
-    setFolderEditor(null);
-    reloadFolders();
-  };
-  const deleteFolder = async (id) => {
-    await api.delete(`/api/chat-folders/${id}`);
-    if (activeFolderId === id) setActiveFolderId(null);
-    reloadFolders();
-  };
-
-  // SSE — реалтайм обновление списка чатов
+  // SSE — realtime
   useEffect(() => {
-    // Cookie-based auth — EventSource sends wl_token cookie automatically on same-origin
     const es = new EventSource('/api/chats/stream', { withCredentials: true });
-
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
@@ -96,29 +60,31 @@ export default function Chats() {
           setChats(prev => {
             const idx = prev.findIndex(c => c.id === data.chatId);
             if (idx >= 0) {
-              // Обновляем существующий чат — добавляем сообщение
               const updated = [...prev];
               const chat = { ...updated[idx] };
               if (!chat.messages.some(m => m.id === data.message.id)) {
                 chat.messages = [...chat.messages, data.message];
               }
               updated.splice(idx, 1);
-              return [chat, ...updated]; // Наверх
-            } else {
-              // Новый чат
-              return [{
-                id: data.chatId,
-                userId: data.userId,
-                messages: [data.message],
-              }, ...prev];
+              return [chat, ...updated];
             }
+            return [{ id: data.chatId, userId: data.userId, folderId: null, messages: [data.message] }, ...prev];
           });
         }
       } catch {}
     };
-
     return () => es.close();
   }, []);
+
+  // Close move menu on outside click
+  useEffect(() => {
+    if (!moveMenu) return;
+    const handler = (e) => {
+      if (moveMenuRef.current && !moveMenuRef.current.contains(e.target)) setMoveMenu(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [moveMenu]);
 
   const getUser = (userId) => users.find(u => u.id === userId);
 
@@ -134,15 +100,44 @@ export default function Chats() {
     setChats(prev => prev.filter(c => c.id !== chatId));
   };
 
+  const createFolder = async (name) => {
+    setCreatePrompt(false);
+    if (!name?.trim()) return;
+    await api.post('/api/chat-folders', { name: name.trim() });
+    reloadFolders();
+  };
+
+  const renameFolder = async (name) => {
+    const folder = renamePrompt;
+    setRenamePrompt(null);
+    if (!name?.trim()) return;
+    await api.put(`/api/chat-folders/${folder.id}`, { name: name.trim() });
+    reloadFolders();
+  };
+
+  const deleteFolder = async () => {
+    const folder = deleteFolderPrompt;
+    setDeleteFolderPrompt(null);
+    await api.delete(`/api/chat-folders/${folder.id}`);
+    if (activeFolderId === folder.id) setActiveFolderId(null);
+    // Drop folderId locally for any chat that was in it
+    setChats(prev => prev.map(c => c.folderId === folder.id ? { ...c, folderId: null } : c));
+    reloadFolders();
+  };
+
+  const assignChatToFolder = async (chatId, folderId) => {
+    setMoveMenu(null);
+    setChats(prev => prev.map(c => c.id === chatId ? { ...c, folderId } : c));
+    await api.put('/api/chat-folders/assign', { chatId, folderId });
+  };
+
   const lastMsg = (chat) => chat.messages.at(-1);
 
-  // Apply active folder filter
-  const activeFolder = folders.find(f => f.id === activeFolderId) || null;
-  const visibleChats = activeFolder
-    ? chats.filter(c => chatMatchesFolder(c, getUser(c.userId), activeFolder.filters, unreadChats))
-    : chats;
+  // Filter by active folder
+  const visibleChats = activeFolderId === null
+    ? chats
+    : chats.filter(c => (c.folderId || null) === activeFolderId);
 
-  // Sort by last message time (newest first)
   const sortedChats = [...visibleChats].sort((a, b) => {
     const timeA = lastMsg(a)?.time ? new Date(lastMsg(a).time).getTime() : 0;
     const timeB = lastMsg(b)?.time ? new Date(lastMsg(b).time).getTime() : 0;
@@ -163,22 +158,23 @@ export default function Chats() {
             <button
               className="chats-folder-tab"
               onClick={() => setActiveFolderId(f.id)}
-              title={f.name}
+              onDoubleClick={() => setRenamePrompt(f)}
+              title="Двойной клик — переименовать"
             >
               <Folder size={14} /> {f.name}
             </button>
             <button
               className="chats-folder-edit"
-              onClick={(e) => { e.stopPropagation(); setFolderEditor({ ...f }); }}
-              title="Изменить"
+              onClick={(e) => { e.stopPropagation(); setDeleteFolderPrompt(f); }}
+              title="Удалить папку"
             >
-              <Pencil size={12} />
+              <X size={12} />
             </button>
           </div>
         ))}
         <button
           className="chats-folder-add"
-          onClick={() => setFolderEditor({ name: '', filters: { tags: [], tagMode: 'any', activeOnly: false, bannedOnly: false, unreadOnly: false } })}
+          onClick={() => setCreatePrompt(true)}
           title="Новая папка"
         >
           <Plus size={14} /> Папка
@@ -203,7 +199,7 @@ export default function Chats() {
       </div>
 
       <div className={`chats-list${viewMode === 'columns' ? ' chats-list--columns' : ''}`}>
-        {chats.length === 0 && (
+        {sortedChats.length === 0 && (
           <p className="chats-empty">Чатов пока нет</p>
         )}
         {sortedChats.map(chat => {
@@ -216,9 +212,7 @@ export default function Chats() {
               className={`chat-item${unreadChats.has(chat.id) ? ' chat-item--unread' : ''}`}
               onClick={() => navigate(`/chats/${chat.id}`)}
             >
-              <div className="chat-item-avatar">
-                {chatName.charAt(0)}
-              </div>
+              <div className="chat-item-avatar">{chatName.charAt(0)}</div>
               <div className="chat-item-info">
                 <span className="chat-item-name">
                   {chatName}
@@ -234,6 +228,17 @@ export default function Chats() {
                 <span className="chat-item-time">{formatTime(msg.time)}</span>
               )}
               <button
+                className="chat-item-move"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setMoveMenu({ chatId: chat.id, x: rect.right, y: rect.bottom });
+                }}
+                title="Переместить в папку"
+              >
+                <FolderInput size={14} />
+              </button>
+              <button
                 className="chat-item-delete"
                 onClick={(e) => handleDelete(e, chat.id, user ? user.fullName : `#${chat.userId}`)}
                 title="Удалить чат"
@@ -245,13 +250,52 @@ export default function Chats() {
         })}
       </div>
 
-      {folderEditor && (
-        <FolderEditor
-          value={folderEditor}
-          allTags={allTags}
-          onSave={saveFolder}
-          onDelete={folderEditor.id ? () => deleteFolder(folderEditor.id) : null}
-          onCancel={() => setFolderEditor(null)}
+      {moveMenu && (
+        <div
+          ref={moveMenuRef}
+          className="chats-move-menu"
+          style={{ top: moveMenu.y + 4, left: Math.max(8, moveMenu.x - 180) }}
+        >
+          <div className="chats-move-menu-title">Переместить в…</div>
+          <button onClick={() => assignChatToFolder(moveMenu.chatId, null)}>
+            <Folder size={12} /> Без папки
+          </button>
+          {folders.map(f => (
+            <button key={f.id} onClick={() => assignChatToFolder(moveMenu.chatId, f.id)}>
+              <Folder size={12} /> {f.name}
+            </button>
+          ))}
+          {folders.length === 0 && (
+            <div className="chats-move-menu-empty">Сначала создайте папку</div>
+          )}
+        </div>
+      )}
+
+      {createPrompt && (
+        <PromptModal
+          title="Новая папка"
+          placeholder="Название"
+          onConfirm={createFolder}
+          onCancel={() => setCreatePrompt(false)}
+        />
+      )}
+
+      {renamePrompt && (
+        <PromptModal
+          title="Переименовать папку"
+          placeholder="Название"
+          defaultValue={renamePrompt.name}
+          onConfirm={renameFolder}
+          onCancel={() => setRenamePrompt(null)}
+        />
+      )}
+
+      {deleteFolderPrompt && (
+        <PromptModal
+          title={`Удалить папку «${deleteFolderPrompt.name}»?`}
+          isConfirm
+          onConfirm={deleteFolder}
+          onCancel={() => setDeleteFolderPrompt(null)}
         />
       )}
 

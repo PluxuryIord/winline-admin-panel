@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function PromptModal({ title, placeholder, isConfirm, onConfirm, onCancel }) {
-  const [value, setValue] = useState('');
+export default function PromptModal({ title, placeholder, isConfirm, onConfirm, onCancel, defaultValue = '' }) {
+  const [value, setValue] = useState(defaultValue);
   const inputRef = useRef(null);
 
   useEffect(() => {

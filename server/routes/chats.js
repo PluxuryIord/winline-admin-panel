@@ -282,9 +282,11 @@ router.get('/', async (req, res, next) => {
     const [chats] = await dbPool.query(`
       SELECT c.id, c.user_id AS userId, c.created_at,
         u.full_name AS fullName, u.username AS telegram,
-        COALESCE(u.banned, 0) AS banned
+        COALESCE(u.banned, 0) AS banned,
+        fm.folder_id AS folderId
       FROM wl_admin_chats c
       LEFT JOIN users u ON u.user_id = c.user_id
+      LEFT JOIN wl_admin_chat_folder_map fm ON fm.chat_id = c.id
       ORDER BY c.created_at DESC
     `);
     const chatIds = chats.map(c => c.id);
@@ -307,6 +309,7 @@ router.get('/', async (req, res, next) => {
       fullName: c.fullName || null,
       telegram: c.telegram || null,
       banned: !!c.banned,
+      folderId: c.folderId || null,
       messages: messagesMap[c.id] || [],
     })));
   } catch (err) { next(err); }
