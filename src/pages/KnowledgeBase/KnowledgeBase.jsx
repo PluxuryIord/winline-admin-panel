@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { api, getToken } from '../../utils/api.js';
 import './KnowledgeBase.css';
-import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
+import TgHtmlEditor, { tgHtmlToEditable } from '../../components/TgHtmlEditor/TgHtmlEditor';
 
 export default function KnowledgeBase() {
   const [articles, setArticles] = useState([]);
@@ -214,27 +214,8 @@ export default function KnowledgeBase() {
   };
 
   /** Telegram HTML → safe display HTML */
-  function tgHtmlToDisplay(text) {
-    if (!text) return '';
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>')
-      .replace(/&lt;i&gt;/g, '<i>').replace(/&lt;\/i&gt;/g, '</i>')
-      .replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>')
-      .replace(/&lt;s&gt;/g, '<s>').replace(/&lt;\/s&gt;/g, '</s>')
-      .replace(/&lt;code&gt;/g, '<code>').replace(/&lt;\/code&gt;/g, '</code>')
-      .replace(/&lt;pre&gt;/g, '<pre>').replace(/&lt;\/pre&gt;/g, '</pre>')
-      .replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
-      .replace(/&lt;a href="([^"]*)"&gt;/g, '<a href="$1" target="_blank" rel="noopener">')
-      .replace(/&lt;\/a&gt;/g, '</a>')
-      .replace(/&lt;tg-emoji emoji-id=&quot;(\d+)&quot;&gt;[^&]*&lt;\/tg-emoji&gt;/g,
-        '<img src="/emoji/$1.webp" class="tg-emoji-inline" alt="emoji" />')
-      .replace(/&lt;tg-emoji emoji-id="(\d+)"&gt;[^<]*&lt;\/tg-emoji&gt;/g,
-        '<img src="/emoji/$1.webp" class="tg-emoji-inline" alt="emoji" />')
-      .replace(/\n/g, '<br>');
-  }
+  // Reuse editor's conversion so display matches edit mode exactly
+  const tgHtmlToDisplay = tgHtmlToEditable;
 
   if (loading) {
     return (

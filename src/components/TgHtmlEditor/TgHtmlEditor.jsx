@@ -5,7 +5,7 @@ import EmojiManageModal from '../EmojiPicker/EmojiManageModal.jsx';
 import './TgHtmlEditor.css';
 
 /* ── Telegram HTML  ->  contentEditable safe HTML ─────────────────────── */
-function tgHtmlToEditable(tgHtml) {
+export function tgHtmlToEditable(tgHtml) {
   if (!tgHtml) return '';
 
   let html = tgHtml;
