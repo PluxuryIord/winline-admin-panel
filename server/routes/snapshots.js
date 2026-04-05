@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import requireAdmin from '../middleware/requireAdmin.js';
-import { listSnapshots, getSnapshot, rollbackSnapshot, createDailySnapshot } from '../services/snapshots.js';
+import { listSnapshots, getSnapshot, rollbackSnapshot, createDailySnapshot, setSnapshotNote } from '../services/snapshots.js';
 
 const router = Router();
 
@@ -38,6 +38,14 @@ router.post('/:id/rollback', requireAdmin, async (req, res, next) => {
     const userName = req.user.displayName || req.user.username;
     const snapshot = await rollbackSnapshot(Number(req.params.id), userId, userName);
     res.json({ ok: true, snapshot_id: snapshot.id, entity_type: snapshot.entity_type });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/snapshots/:id/note — set/update note
+router.put('/:id/note', requireAdmin, async (req, res, next) => {
+  try {
+    await setSnapshotNote(Number(req.params.id), req.body?.note || '');
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader, X, RotateCcw, Plus } from 'lucide-react';
+import { Loader, X, RotateCcw, Plus, Pencil, Check } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import './VersionHistory.css';
@@ -11,6 +11,16 @@ export default function VersionHistory() {
   const [rollbackTarget, setRollbackTarget] = useState(null);
   const [rolling, setRolling] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteDraft, setNoteDraft] = useState('');
+
+  const saveNote = async (snapId) => {
+    try {
+      await api.put(`/api/snapshots/${snapId}/note`, { note: noteDraft });
+      setSnapshots(prev => prev.map(s => s.id === snapId ? { ...s, note: noteDraft.trim() || null } : s));
+    } catch {}
+    setEditingNoteId(null);
+  };
 
   const fetchSnapshots = useCallback(async () => {
     setLoading(true);
@@ -94,6 +104,32 @@ export default function VersionHistory() {
                   {idx === 0 && <span className="version-current-badge">Текущая</span>}
                   <span className="version-date">{formatDate(snap.created_at)}</span>
                   <span className="version-author">{snap.user_display_name || snap.username || '—'}</span>
+                  {editingNoteId === snap.id ? (
+                    <span className="version-note-edit">
+                      <input
+                        className="version-note-input"
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveNote(snap.id);
+                          if (e.key === 'Escape') setEditingNoteId(null);
+                        }}
+                        placeholder="Пометка..."
+                        autoFocus
+                      />
+                      <button className="icon-btn" onClick={() => saveNote(snap.id)} title="Сохранить"><Check size={14} /></button>
+                      <button className="icon-btn" onClick={() => setEditingNoteId(null)} title="Отмена"><X size={14} /></button>
+                    </span>
+                  ) : (
+                    <span
+                      className={`version-note ${snap.note ? '' : 'version-note--empty'}`}
+                      onClick={isAdmin ? () => { setEditingNoteId(snap.id); setNoteDraft(snap.note || ''); } : undefined}
+                      title={isAdmin ? 'Редактировать пометку' : ''}
+                    >
+                      {snap.note || (isAdmin ? '+ пометка' : '')}
+                      {isAdmin && snap.note && <Pencil size={11} className="version-note-edit-icon" />}
+                    </span>
+                  )}
                 </div>
                 {idx !== 0 && isAdmin && (
                   <button

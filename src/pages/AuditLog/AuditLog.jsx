@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Loader } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import './AuditLog.css';
 
 const ACTION_LABELS = {
@@ -114,6 +115,7 @@ function truncate(s, max) {
 }
 
 export default function AuditLog() {
+  const { user, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -144,7 +146,10 @@ export default function AuditLog() {
     }
   }, [page, entityType, dateFrom, dateTo]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    if (authLoading || !user) return;
+    fetchLogs();
+  }, [fetchLogs, authLoading, user]);
 
   const totalPages = Math.ceil(total / limit) || 1;
 

@@ -26,8 +26,11 @@ router.get('/', async (req, res, next) => {
       id: r.id,
       username: r.username,
       displayName: r.display_name,
+      display_name: r.display_name,
       role: r.role,
       isActive: r.is_active,
+      is_active: r.is_active,
+      created_at: r.profile_created_at,
     })));
   } catch (err) { next(err); }
 });

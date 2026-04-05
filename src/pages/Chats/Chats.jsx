@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, List, LayoutGrid, Plus, Folder, FolderInput, MoreVertical } from 'lucide-react';
+import { X, List, LayoutGrid, Plus, Folder, FolderInput, Trash2 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -154,23 +154,15 @@ export default function Chats() {
           <Folder size={14} /> Все
         </button>
         {folders.map(f => (
-          <div key={f.id} className={`chats-folder-tab-wrap${activeFolderId === f.id ? ' active' : ''}`}>
-            <button
-              className="chats-folder-tab"
-              onClick={() => setActiveFolderId(f.id)}
-              onDoubleClick={() => setRenamePrompt(f)}
-              title="Двойной клик — переименовать"
-            >
-              <Folder size={14} /> {f.name}
-            </button>
-            <button
-              className="chats-folder-edit"
-              onClick={(e) => { e.stopPropagation(); setDeleteFolderPrompt(f); }}
-              title="Удалить папку"
-            >
-              <X size={12} />
-            </button>
-          </div>
+          <button
+            key={f.id}
+            className={`chats-folder-tab${activeFolderId === f.id ? ' active' : ''}`}
+            onClick={() => setActiveFolderId(f.id)}
+            onDoubleClick={() => setRenamePrompt(f)}
+            title="Двойной клик — переименовать"
+          >
+            <Folder size={14} /> {f.name}
+          </button>
         ))}
         <button
           className="chats-folder-add"
@@ -182,6 +174,19 @@ export default function Chats() {
       </div>
 
       <div className="chats-header">
+        {activeFolderId !== null && (() => {
+          const f = folders.find(x => x.id === activeFolderId);
+          if (!f) return null;
+          return (
+            <button
+              className="chats-folder-delete-inline"
+              onClick={() => setDeleteFolderPrompt(f)}
+              title={`Удалить папку «${f.name}»`}
+            >
+              <Trash2 size={14} /> Удалить папку «{f.name}»
+            </button>
+          );
+        })()}
         <div className="chats-view-toggle">
           <button
             className={`chats-view-btn${viewMode === 'list' ? ' active' : ''}`}

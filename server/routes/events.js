@@ -293,7 +293,14 @@ export async function scanHandler(req, res, next) {
     const eventCode = codes[0];
     const userName = eventCode.rl_full_name || eventCode.full_name || eventCode.label || eventCode.code;
 
-    if (eventCode.status === 'used') {
+    // Atomic claim: only the caller whose UPDATE flips status='active'→'used' wins.
+    // Protects against double-scans from retries on flaky network.
+    const [updateResult] = await dbPool.query(
+      "UPDATE wl_event_codes SET status = 'used', used_at = NOW() WHERE id = ? AND status = 'active'",
+      [eventCode.id]
+    );
+
+    if (updateResult.affectedRows === 0) {
       return res.json({
         status: 'already',
         user_name: userName,
@@ -301,13 +308,7 @@ export async function scanHandler(req, res, next) {
       });
     }
 
-    // Mark as used
-    await dbPool.query(
-      'UPDATE wl_event_codes SET status = ?, used_at = NOW() WHERE id = ?',
-      ['used', eventCode.id]
-    );
-
-    // Record scan log
+    // Record scan log (only the winning caller reaches here)
     await dbPool.query(
       'INSERT INTO wl_admin_event_scans (code, prize_given) VALUES (?, 1)',
       [scannedValue]

@@ -690,11 +690,12 @@ input[type="checkbox"]:checked {
   border-radius: 14px;
   backdrop-filter: blur(6px);
 }
-.bc-filter-group {
+.bc-history-filters .bc-filter-group {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  flex-direction: row;
 }
 .bc-filter-label {
   font-size: 0.72rem;

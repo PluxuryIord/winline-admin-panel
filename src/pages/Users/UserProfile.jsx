@@ -316,7 +316,7 @@ export default function UserProfile() {
                 )
               ))}
               {user.banned && (
-                <span className="profile-tag profile-tag--banned">Забанен</span>
+                <span className="profile-tag profile-tag--banned">Заблокировал бота</span>
               )}
 
               <div className="profile-tag-add-wrapper" ref={tagDropdownRef}>
@@ -405,7 +405,7 @@ export default function UserProfile() {
 
             {/* Переключатели */}
             <div className="info-row">
-              <span className="info-label">Забанен</span>
+              <span className="info-label">Заблокировал бота</span>
               <button className={`info-toggle ${user.banned ? 'info-toggle--on' : ''}`} onClick={toggleBanned}>
                 {user.banned ? 'Да' : 'Нет'}
               </button>

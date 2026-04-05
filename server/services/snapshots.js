@@ -1,6 +1,37 @@
 import dbPool from '../config/db.js';
 import { logAudit } from './auditLog.js';
 
+let notesSchemaReady = false;
+async function ensureNotesSchema() {
+  if (notesSchemaReady) return;
+  try {
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS wl_admin_snapshot_notes (
+        snapshot_id INT NOT NULL PRIMARY KEY,
+        note TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    notesSchemaReady = true;
+  } catch (err) {
+    console.error('[snapshots] notes schema init failed:', err.message);
+  }
+}
+
+export async function setSnapshotNote(id, note) {
+  await ensureNotesSchema();
+  const trimmed = (note || '').trim();
+  if (!trimmed) {
+    await dbPool.query('DELETE FROM wl_admin_snapshot_notes WHERE snapshot_id = ?', [id]);
+  } else {
+    await dbPool.query(
+      `INSERT INTO wl_admin_snapshot_notes (snapshot_id, note) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE note = VALUES(note), updated_at = NOW()`,
+      [id, trimmed]
+    );
+  }
+}
+
 // DB user has no ALTER privilege, so we can't drop the legacy
 // UNIQUE (snapshot_date, entity_type) index. Instead we encode a per-snapshot
 // suffix into entity_type ('all_<timestamp>') so every row is unique, and we
@@ -60,12 +91,15 @@ export async function createDailySnapshot(_entityType, userId, userName, opts = 
  * List all unified snapshots (newest first).
  */
 export async function listSnapshots(_entityType) {
+  await ensureNotesSchema();
   const [rows] = await dbPool.query(
     `SELECT s.id, s.entity_type, s.snapshot_date, s.created_by_name, s.created_at,
-            u.username, COALESCE(p.display_name, u.display_name) AS user_display_name
+            u.username, COALESCE(p.display_name, u.display_name) AS user_display_name,
+            n.note
      FROM wl_admin_snapshots s
      LEFT JOIN wl_admin_users u ON u.id = s.created_by
      LEFT JOIN wl_admin_user_profiles p ON p.user_id = s.created_by
+     LEFT JOIN wl_admin_snapshot_notes n ON n.snapshot_id = s.id
      WHERE s.entity_type LIKE 'all%'
      ORDER BY s.created_at DESC`
   );

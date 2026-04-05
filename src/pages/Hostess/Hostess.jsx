@@ -6,19 +6,61 @@ const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgen
 
 const API_BASE = window.location.origin;
 
-async function serverScan(userId) {
+const GIVEN_IDS_KEY = 'hostess_given_ids_v1';
+const OFFLINE_QUEUE_KEY = 'hostess_offline_queue_v1';
+
+function loadGivenIds() {
   try {
-    const res = await fetch(`${API_BASE}/api/events/scan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (e) {
-    console.warn('[hostess] Server scan failed:', e.message);
-    return null;
+    const raw = localStorage.getItem(GIVEN_IDS_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch { return new Set(); }
+}
+function persistGivenIds(set) {
+  try { localStorage.setItem(GIVEN_IDS_KEY, JSON.stringify([...set])); } catch {}
+}
+function loadQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'); } catch { return []; }
+}
+function saveQueue(q) {
+  try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q)); } catch {}
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Retry with exponential backoff — 3 attempts (0ms, 400ms, 1200ms).
+async function serverScan(userId) {
+  const delays = [0, 400, 1200];
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i]) await sleep(delays[i]);
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(`${API_BASE}/api/events/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      console.warn(`[hostess] scan attempt ${i + 1} failed:`, e.message);
+    }
   }
+  return null;
+}
+
+async function flushOfflineQueue() {
+  const q = loadQueue();
+  if (!q.length) return;
+  const remaining = [];
+  for (const id of q) {
+    const r = await serverScan(id);
+    if (!r) remaining.push(id);
+  }
+  saveQueue(remaining);
 }
 
 export default function Hostess() {
@@ -40,7 +82,15 @@ export default function Hostess() {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  const givenIds  = useRef(new Set()); // fallback for offline mode
+  // Flush any queued offline scans on mount + whenever we come back online
+  useEffect(() => {
+    flushOfflineQueue().then(fetchStats);
+    const onOnline = () => { flushOfflineQueue().then(fetchStats); };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [fetchStats]);
+
+  const givenIds  = useRef(loadGivenIds()); // persisted fallback for offline mode
   const inputRef  = useRef(null);
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
@@ -79,14 +129,18 @@ export default function Hostess() {
         message: serverResult.message || '',
       });
     } else {
-      // Fallback: local mode
+      // Fallback: offline mode — persist locally, queue for later sync
       const status = givenIds.current.has(id) ? 'already' : 'give';
+      if (status === 'give') {
+        const q = loadQueue();
+        if (!q.includes(id)) { q.push(id); saveQueue(q); }
+      }
       setResult({
         id,
         status,
         userName: null,
         scanCount: 0,
-        message: status === 'give' ? 'Выдайте гостю приз' : 'Гость уже получил приз',
+        message: status === 'give' ? 'Выдайте гостю приз (офлайн)' : 'Гость уже получил приз',
       });
     }
 
@@ -176,6 +230,7 @@ export default function Hostess() {
   const handleNext = () => {
     if (result?.status === 'give') {
       givenIds.current.add(result.id);
+      persistGivenIds(givenIds.current);
     }
     setScannedCount(prev => prev + 1);
     setResult(null);
