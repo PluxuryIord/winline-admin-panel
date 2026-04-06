@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dbPool from '../config/db.js';
+import { validateImageFile } from '../services/fileValidation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Save to both public/ (source) and dist/ (served in production)
@@ -56,6 +57,8 @@ router.post('/', upload.single('file'), async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ error: 'File required (.webp)' });
     }
+    const imgCheck = await validateImageFile(req.file.buffer, req.file.originalname);
+    if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.reason });
 
     const eid = emoji_id.trim();
     const filename = `${eid}.webp`;

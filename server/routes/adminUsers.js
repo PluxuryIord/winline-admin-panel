@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import dbPool from '../config/db.js';
 import requireAdmin from '../middleware/requireAdmin.js';
+import { invalidateProfileCache } from '../middleware/auth.js';
 import { logAudit } from '../services/auditLog.js';
 
 const actorName = (req) => req.user?.displayName || req.user?.username || 'unknown';
@@ -41,6 +42,22 @@ router.post('/', async (req, res, next) => {
     const { username, password, displayName, role } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'username и password обязательны' });
+    }
+    const uname = username.trim();
+    if (uname.length < 3 || uname.length > 50) {
+      return res.status(400).json({ error: 'Логин должен быть от 3 до 50 символов' });
+    }
+    if (!/^[a-zA-Z0-9_.\-]+$/.test(uname)) {
+      return res.status(400).json({ error: 'Логин может содержать только латиницу, цифры, _ . -' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
+    }
+    if (password.length > 128) {
+      return res.status(400).json({ error: 'Пароль слишком длинный' });
+    }
+    if (displayName && displayName.length > 100) {
+      return res.status(400).json({ error: 'Имя не более 100 символов' });
     }
     const validRoles = ['admin', 'editor'];
     const userRole = validRoles.includes(role) ? role : 'editor';
@@ -113,6 +130,8 @@ router.put('/:id', async (req, res, next) => {
 
     // Reset password if provided
     if (password) {
+      if (password.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
+      if (password.length > 128) return res.status(400).json({ error: 'Пароль слишком длинный' });
       const hash = await bcrypt.hash(password, 10);
       await dbPool.query('UPDATE wl_admin_users SET password_hash = ? WHERE id = ?', [hash, userId]);
     }
@@ -122,6 +141,7 @@ router.put('/:id', async (req, res, next) => {
       role: role !== undefined ? role : oldState?.role,
       passwordChanged: !!password,
     };
+    invalidateProfileCache(userId);
     logAudit(req.user.id, actorName(req), 'update', 'admin_user', userId,
       oldState?.username || String(userId), oldState, newState);
 
@@ -147,6 +167,7 @@ router.delete('/:id', async (req, res, next) => {
       [userId]
     );
 
+    invalidateProfileCache(userId);
     const [nameRows] = await dbPool.query('SELECT username FROM wl_admin_users WHERE id = ?', [userId]);
     logAudit(req.user.id, actorName(req), 'delete', 'admin_user', userId,
       nameRows[0]?.username || String(userId), { is_active: 1 }, { is_active: 0 });

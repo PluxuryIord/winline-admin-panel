@@ -7,6 +7,7 @@ import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 import { logAudit } from '../services/auditLog.js';
+import { validateUploadedFile } from '../services/fileValidation.js';
 
 function isValidChatId(chatId) {
   const s = String(chatId);
@@ -221,9 +222,10 @@ async function sendToChat(chatId, text, media, poll, targetType, pollId) {
 // POST /api/broadcasts/upload
 router.post('/upload', upload.single('file'), async (req, res, next) => {
   try {
-    console.log('[upload] file:', req.file?.originalname, req.file?.mimetype, req.file?.size, 'bytes');
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-    const { key, url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype);
+    const validation = await validateUploadedFile(req.file.buffer, req.file.originalname);
+    if (!validation.ok) return res.status(400).json({ error: validation.reason });
+    const { key, url } = await uploadToS3(req.file.buffer, req.file.originalname, validation.detectedMime || req.file.mimetype);
     console.log('[upload] S3 ok:', key, url);
     res.json({
       filename: key,

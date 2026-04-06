@@ -54,11 +54,40 @@ const broadcastLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const adminOpsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 20,
+  message: { error: 'Слишком много операций, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const snapshotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Слишком много снапшотов, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  message: { error: 'Слишком много загрузок, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/broadcasts/groups/send', broadcastLimiter);
 app.use('/api/broadcasts/users', broadcastLimiter);
 app.use('/api/broadcasts/drafts/:id/send', broadcastLimiter);
 app.post('/api/broadcasts', broadcastLimiter);
+app.use('/api/admin-users', adminOpsLimiter);
+app.post('/api/snapshots', snapshotLimiter);
+app.put('/api/snapshots', snapshotLimiter);
+app.post('/api/broadcasts/upload', uploadLimiter);
+app.post('/api/knowledge/photo', uploadLimiter);
 app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '5mb' }));

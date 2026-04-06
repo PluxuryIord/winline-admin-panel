@@ -5,6 +5,7 @@ import { BOT_TOKEN, TG_ADMIN_CHAT_ID } from '../config/env.js';
 import { uploadToS3 } from '../services/s3.js';
 import { logAudit } from '../services/auditLog.js';
 import { createDailySnapshot } from '../services/snapshots.js';
+import { validateImageFile } from '../services/fileValidation.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -173,8 +174,11 @@ router.post('/photo/:photoKey', upload.single('photo'), async (req, res, next) =
     const { photoKey } = req.params;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
+    const validation = await validateImageFile(req.file.buffer, req.file.originalname);
+    if (!validation.ok) return res.status(400).json({ error: validation.reason });
+
     // 1. Upload to S3
-    const { url: s3Url } = await uploadToS3(req.file.buffer, req.file.originalname, req.file.mimetype, 'knowledge');
+    const { url: s3Url } = await uploadToS3(req.file.buffer, req.file.originalname, validation.detectedMime || req.file.mimetype, 'knowledge');
 
     // 2. Send to Telegram to get file_id
     let fileId = null;
