@@ -33,7 +33,7 @@ async function loadProfile(userId) {
     await dbPool.query(
       'INSERT IGNORE INTO wl_admin_user_profiles (user_id, role) VALUES (?, ?)',
       [userId, autoRole]
-    ).catch(() => {});
+    ).catch(err => console.error('[auth] auto-create profile failed:', err.message));
     const entry = { role: autoRole, displayName: null, isActive: true, ts: Date.now() };
     profileCache.set(userId, entry);
     return entry;

@@ -20,6 +20,7 @@ export default async function seedAdmin(pool) {
 
   console.log('[seed] ✓ Created admin user:');
   console.log(`  username: ${username}`);
-  console.log(`  password: ${password}`);
-  console.log('  ⚠ Запишите пароль — он не будет показан повторно!');
+  console.log(`  password: ${password.slice(0, 3)}${'*'.repeat(password.length - 3)}`);
+  console.log('  ⚠ Полный пароль записан в /tmp/.wl_admin_seed_pw (удалите после прочтения)');
+  try { (await import('fs')).writeFileSync('/tmp/.wl_admin_seed_pw', `${username}:${password}\n`, { mode: 0o600 }); } catch {}
 }

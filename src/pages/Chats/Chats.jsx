@@ -50,30 +50,51 @@ export default function Chats() {
 
   const reloadFolders = () => api.get('/api/chat-folders').then(r => r.json()).then(setFolders).catch(() => {});
 
-  // SSE — realtime
+  // SSE — realtime with auto-reconnect
   useEffect(() => {
-    const es = new EventSource('/api/chats/stream', { withCredentials: true });
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'new_message') {
-          setChats(prev => {
-            const idx = prev.findIndex(c => c.id === data.chatId);
-            if (idx >= 0) {
-              const updated = [...prev];
-              const chat = { ...updated[idx] };
-              if (!chat.messages.some(m => m.id === data.message.id)) {
-                chat.messages = [...chat.messages, data.message];
+    let es = null;
+    let reconnectTimer = null;
+    let closed = false;
+
+    function connect() {
+      if (closed) return;
+      es = new EventSource('/api/chats/stream', { withCredentials: true });
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'new_message') {
+            setChats(prev => {
+              const idx = prev.findIndex(c => c.id === data.chatId);
+              if (idx >= 0) {
+                const updated = [...prev];
+                const chat = { ...updated[idx] };
+                if (!chat.messages.some(m => m.id === data.message.id)) {
+                  chat.messages = [...chat.messages, data.message];
+                }
+                updated.splice(idx, 1);
+                return [chat, ...updated];
               }
-              updated.splice(idx, 1);
-              return [chat, ...updated];
-            }
-            return [{ id: data.chatId, userId: data.userId, folderId: null, messages: [data.message] }, ...prev];
-          });
+              return [{ id: data.chatId, userId: data.userId, folderId: null, messages: [data.message] }, ...prev];
+            });
+          }
+        } catch (err) {
+          console.error('[SSE] parse error:', err);
         }
-      } catch {}
+      };
+      es.onerror = () => {
+        es.close();
+        if (!closed) {
+          reconnectTimer = setTimeout(connect, 3000);
+        }
+      };
+    }
+
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(reconnectTimer);
+      if (es) es.close();
     };
-    return () => es.close();
   }, []);
 
   // Close move menu on outside click

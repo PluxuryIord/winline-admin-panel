@@ -1,6 +1,6 @@
 import { execSync } from 'child_process';
 import app from './app.js';
-import { API_PORT, BOT_TOKEN, JWT_SECRET, MYSQL_HOST } from './config/env.js';
+import { API_PORT, BOT_TOKEN, JWT_SECRET, MYSQL_HOST, WEBHOOK_SECRET } from './config/env.js';
 import { startAuditLogRetention } from './services/auditLog.js';
 import { cleanupDuplicateChats } from './routes/chats.js';
 
@@ -19,6 +19,7 @@ console.log('[env] node:', process.version);
 console.log('[bot] BOT_TOKEN:', BOT_TOKEN ? 'set' : 'NOT SET');
 console.log('[auth] JWT_SECRET:', JWT_SECRET ? 'set' : 'NOT SET (auth disabled)');
 console.log('[db] MySQL:', MYSQL_HOST || 'NOT SET');
+if (!WEBHOOK_SECRET) console.warn('[WARN] WEBHOOK_SECRET not set — bot webhooks will be rejected');
 
 const server = app.listen(API_PORT, () => {
   console.log(`API server running on http://localhost:${API_PORT}`);

@@ -50,7 +50,7 @@ router.post('/login', async (req, res, next) => {
       await dbPool.query(
         'INSERT IGNORE INTO wl_admin_user_profiles (user_id, role, display_name) VALUES (?, ?, ?)',
         [user.id, autoRole, user.display_name]
-      ).catch(() => {});
+      ).catch(err => console.error('[auth] auto-create profile failed:', err.message));
       user.role = autoRole;
     }
 
