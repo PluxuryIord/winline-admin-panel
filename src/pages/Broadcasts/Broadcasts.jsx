@@ -881,7 +881,6 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{ch.title}</span>
-                  <span className="bc-list-id">{ch.chatId}</span>
                 </label>
                 <CommentEditor chatId={ch.chatId} entityType="channels" />
                 <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
@@ -906,8 +905,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <Hash size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{ch.title}</span>
-                      <span className="bc-list-id">{ch.chatId}</span>
-                    </div>
+                        </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(ch.id)} title="Восстановить">
                       <RotateCcw size={14} />
                     </button>
@@ -1399,7 +1397,6 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{g.title}</span>
-                  <span className="bc-list-id">{g.chatId}</span>
                 </label>
                 <CommentEditor chatId={g.chatId} entityType="groups" />
                 <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
@@ -1423,8 +1420,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <MessageCircle size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{g.title}</span>
-                      <span className="bc-list-id">{g.chatId}</span>
-                    </div>
+                        </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(g.id)} title="Восстановить">
                       <RotateCcw size={14} />
                     </button>

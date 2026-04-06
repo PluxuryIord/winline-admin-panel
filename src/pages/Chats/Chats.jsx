@@ -172,7 +172,7 @@ export default function Chats() {
           className={`chats-folder-tab${activeFolderId === null ? ' active' : ''}`}
           onClick={() => setActiveFolderId(null)}
         >
-          <Folder size={14} /> Все
+          <Folder size={18} /> Все
         </button>
         {folders.map(f => (
           <button
@@ -182,7 +182,7 @@ export default function Chats() {
             onDoubleClick={() => setRenamePrompt(f)}
             title="Двойной клик — переименовать"
           >
-            <Folder size={14} /> {f.name}
+            <Folder size={18} /> {f.name}
           </button>
         ))}
         <button
