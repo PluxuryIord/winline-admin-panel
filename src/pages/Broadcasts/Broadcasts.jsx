@@ -479,6 +479,12 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
               className="broadcasts-create-btn bc-schedule-send-btn"
               disabled={sending || !(canSend && isValid()) || !scheduledAt}
               onClick={() => {
+                // Проверка: минимум +2 минуты от текущего времени
+                const minTime = new Date(Date.now() + 2 * 60 * 1000);
+                if (new Date(scheduledAt) < minTime) {
+                  alert('Время отправки должно быть минимум на 2 минуты вперёд');
+                  return;
+                }
                 const body = getComposeBody();
                 if (body && onSaveDraft) {
                   onSaveDraft({ ...body, _schedule: true, _scheduledAt: scheduledAt }, () => {

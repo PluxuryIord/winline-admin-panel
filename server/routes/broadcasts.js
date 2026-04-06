@@ -1088,8 +1088,9 @@ router.post('/drafts/:id/schedule', async (req, res, next) => {
     if (!scheduledAt) return res.status(400).json({ error: 'scheduledAt is required' });
 
     const schedDate = new Date(scheduledAt);
-    if (isNaN(schedDate.getTime()) || schedDate <= new Date()) {
-      return res.status(400).json({ error: 'Дата должна быть в будущем' });
+    const minTime = new Date(Date.now() + 2 * 60 * 1000); // +2 минуты
+    if (isNaN(schedDate.getTime()) || schedDate < minTime) {
+      return res.status(400).json({ error: 'Время отправки должно быть минимум на 2 минуты вперёд' });
     }
 
     // Check draft exists
