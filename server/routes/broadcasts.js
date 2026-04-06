@@ -475,7 +475,7 @@ router.get('/', async (req, res, next) => {
 
     // Also fetch pending scheduled broadcasts
     const [scheduled] = await dbPool.query(
-      `SELECT s.id AS schedule_id, s.scheduled_at, d.name, d.text, d.media_json, d.poll_json, d.target_type, d.target_filter
+      `SELECT s.id AS schedule_id, s.draft_id, s.scheduled_at, d.name, d.text, d.media_json, d.poll_json, d.target_type, d.target_filter
        FROM wl_admin_scheduled_broadcasts s
        JOIN wl_admin_broadcast_drafts d ON d.id = s.draft_id
        WHERE s.status = 'pending'
@@ -484,11 +484,14 @@ router.get('/', async (req, res, next) => {
     const scheduledItems = scheduled.map(s => ({
       id: `sched_${s.schedule_id}`,
       scheduleId: s.schedule_id,
+      draftId: s.draft_id,
       text: s.text || (s.poll_json ? `[Опрос] ${safeJsonParse(s.poll_json, {}).question || ''}` : s.name),
       type: s.target_type || 'channels',
       channels: [],
       total: 0, success: 0, failed: 0, results: [],
       media: safeJsonParse(s.media_json, null),
+      poll: safeJsonParse(s.poll_json, null),
+      targetFilter: safeJsonParse(s.target_filter, null),
       date: s.scheduled_at,
       status: 'scheduled',
     }));

@@ -1748,6 +1748,22 @@ export default function Broadcasts() {
     setMounted(prev => ({ ...prev, [targetSection]: true }));
   };
 
+  const handleEditScheduled = (b) => {
+    // Convert scheduled broadcast from history into a draft-like object for editing
+    const draftLike = {
+      id: b.draftId,
+      text: b.text || '',
+      media: b.media || null,
+      poll: b.poll || null,
+      targetType: b.type || 'channels',
+      targetFilter: b.targetFilter || null,
+      scheduledAt: b.date,
+      scheduleStatus: 'pending',
+      scheduleId: b.scheduleId,
+    };
+    handleEditDraft(draftLike);
+  };
+
   const filtered = broadcasts.filter(b => {
     if (search && !(b.text || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (filterType && b.type !== filterType) return false;
@@ -1885,6 +1901,11 @@ export default function Broadcasts() {
                     {new Date(b.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="bc-actions">
+                    {b.status === 'scheduled' && b.draftId && (
+                      <button className="bc-action-btn bc-action-edit" title="Редактировать" onClick={() => handleEditScheduled(b)}>
+                        <Edit3 size={14} />
+                      </button>
+                    )}
                     {b.pollId && (
                       <button className="bc-action-btn bc-action-stats" title="Статистика опроса" onClick={() => loadPollStats(b.pollId)}>
                         <BarChart2 size={14} />
