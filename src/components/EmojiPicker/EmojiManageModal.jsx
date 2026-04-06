@@ -36,18 +36,17 @@ export default function EmojiManageModal({ open, onClose, onChanged }) {
 
   const handleAdd = async () => {
     const id = newId.trim();
-    if (!id) { setError('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 emoji ID'); return; }
-    if (!newFile) { setError('\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 .webp \u0444\u0430\u0439\u043b'); return; }
+    if (!id) { setError('Введите emoji ID'); return; }
     setError('');
     setAdding(true);
     try {
       const formData = new FormData();
       formData.append('emoji_id', id);
-      formData.append('file', newFile);
+      if (newFile) formData.append('file', newFile);
       const res = await fetch('/api/emojis', { method: 'POST', body: formData });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || '\u041e\u0448\u0438\u0431\u043a\u0430');
+        setError(data.error || 'Ошибка');
         setAdding(false);
         return;
       }
@@ -57,7 +56,7 @@ export default function EmojiManageModal({ open, onClose, onChanged }) {
       await loadEmojis();
       onChanged?.();
     } catch {
-      setError('\u041e\u0448\u0438\u0431\u043a\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u044f');
+      setError('Ошибка добавления');
     }
     setAdding(false);
   };
@@ -98,7 +97,7 @@ export default function EmojiManageModal({ open, onClose, onChanged }) {
           <div className="emoji-manage-add-row">
             <label className="emoji-manage-file-btn" onClick={() => fileRef.current?.click()}>
               <Upload size={14} />
-              {newFile ? newFile.name : '\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c .webp'}
+              {newFile ? newFile.name : '.webp (необязательно)'}
             </label>
             <input
               ref={fileRef}

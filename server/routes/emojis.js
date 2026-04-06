@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dbPool from '../config/db.js';
+import { BOT_TOKEN } from '../config/env.js';
 import { validateImageFile } from '../services/fileValidation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,23 +48,71 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/emojis — multipart: emoji_id + file (.webp)
+/**
+ * Download custom emoji .webp from Telegram by custom_emoji_id.
+ * Uses getCustomEmojiStickers → getFile → download.
+ */
+async function downloadEmojiFromTelegram(emojiId) {
+  if (!BOT_TOKEN) throw new Error('BOT_TOKEN не настроен');
+
+  // 1. Get sticker info
+  const stickersRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getCustomEmojiStickers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ custom_emoji_ids: [emojiId] }),
+  });
+  const stickersData = await stickersRes.json();
+  if (!stickersData.ok || !stickersData.result?.length) {
+    throw new Error('Эмодзи не найден в Telegram. Проверьте ID.');
+  }
+  const sticker = stickersData.result[0];
+
+  // Prefer thumbnail (static webp) over animated sticker
+  const fileId = sticker.thumbnail?.file_id || sticker.file_id;
+
+  // 2. Get file path
+  const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+  const fileData = await fileRes.json();
+  if (!fileData.ok || !fileData.result?.file_path) {
+    throw new Error('Не удалось получить файл из Telegram');
+  }
+
+  // 3. Download file
+  const dlRes = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`);
+  if (!dlRes.ok) throw new Error('Не удалось скачать файл из Telegram');
+  const buffer = Buffer.from(await dlRes.arrayBuffer());
+  return buffer;
+}
+
+// POST /api/emojis — multipart: emoji_id + optional file (.webp)
+// If no file provided, auto-downloads from Telegram by emoji_id
 router.post('/', upload.single('file'), async (req, res, next) => {
   try {
     const { emoji_id } = req.body;
     if (!emoji_id || !/^\d{5,30}$/.test(emoji_id.trim())) {
       return res.status(400).json({ error: 'Invalid emoji_id' });
     }
-    if (!req.file) {
-      return res.status(400).json({ error: 'File required (.webp)' });
-    }
-    const imgCheck = await validateImageFile(req.file.buffer, req.file.originalname);
-    if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.reason });
 
     const eid = emoji_id.trim();
+    let buffer;
+
+    if (req.file) {
+      // Manual upload
+      const imgCheck = await validateImageFile(req.file.buffer, req.file.originalname);
+      if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.reason });
+      buffer = req.file.buffer;
+    } else {
+      // Auto-download from Telegram
+      try {
+        buffer = await downloadEmojiFromTelegram(eid);
+      } catch (e) {
+        return res.status(400).json({ error: e.message });
+      }
+    }
+
     const filename = `${eid}.webp`;
-    fs.writeFileSync(path.join(publicEmojiDir, filename), req.file.buffer);
-    fs.writeFileSync(path.join(distEmojiDir, filename), req.file.buffer);
+    fs.writeFileSync(path.join(publicEmojiDir, filename), buffer);
+    fs.writeFileSync(path.join(distEmojiDir, filename), buffer);
 
     const image_url = `/emoji/${filename}`;
     const [result] = await dbPool.query(
