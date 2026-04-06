@@ -78,8 +78,7 @@ export default function UserProfile() {
   // Загрузка аватарки
   useEffect(() => {
     if (!id) return;
-    const token = localStorage.getItem('wl_admin_token');
-    setAvatarUrl(`/api/users/${id}/avatar?t=${token}`);
+    setAvatarUrl(`/api/users/${id}/avatar`);
   }, [id]);
 
   const handleAvatarError = () => setAvatarUrl(null);
@@ -340,12 +339,9 @@ export default function UserProfile() {
                       .map(tag => (
                         <div key={tag} className="profile-tag-dropdown-item" onClick={() => { handleAddExistingTag(tag); setNewTagInput(''); }}>
                           {newTagInput.trim() ? (
-                            <span dangerouslySetInnerHTML={{
-                              __html: tag.replace(
-                                new RegExp(`(${newTagInput.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'),
-                                '<b>$1</b>'
-                              )
-                            }} />
+                            <span>{tag.split(new RegExp(`(${newTagInput.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part, i) =>
+                              part.toLowerCase() === newTagInput.trim().toLowerCase() ? <b key={i}>{part}</b> : part
+                            )}</span>
                           ) : tag}
                         </div>
                       ))

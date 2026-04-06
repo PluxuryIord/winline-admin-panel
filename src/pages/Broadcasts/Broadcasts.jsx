@@ -6,6 +6,7 @@ import {
   Save, Clock, Calendar, Play, Edit3, FileBox
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import { sanitizeHtml } from '../../utils/sanitize.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import './Broadcasts.css';
@@ -128,10 +129,9 @@ function MediaAttach({ media, onChange }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const token = localStorage.getItem('wl_admin_token');
       const res = await fetch('/api/broadcasts/upload', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
         body: formData,
       });
       const data = await res.json();
@@ -1546,7 +1546,7 @@ function DraftsTab({ onSendResult, onEditDraft }) {
                 {d.poll ? (
                   <span>[{d.poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] {d.poll.question}</span>
                 ) : (
-                  <span dangerouslySetInnerHTML={{ __html: renderTgHtml((d.text || '').substring(0, 120)) }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml((d.text || '').substring(0, 120))) }} />
                 )}
               </div>
               <div className="bc-draft-footer">
@@ -1848,7 +1848,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span dangerouslySetInnerHTML={{ __html: (b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '') }} />
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}

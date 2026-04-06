@@ -3,7 +3,8 @@ import {
   FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2,
   Plus, MoreHorizontal, Pencil
 } from 'lucide-react';
-import { api, getToken } from '../../utils/api.js';
+import { api } from '../../utils/api.js';
+import { sanitizeHtml } from '../../utils/sanitize.js';
 import './KnowledgeBase.css';
 import TgHtmlEditor, { tgHtmlToEditable } from '../../components/TgHtmlEditor/TgHtmlEditor';
 
@@ -103,11 +104,10 @@ export default function KnowledgeBase() {
     try {
       const formData = new FormData();
       formData.append('photo', file);
-      const token = getToken();
       const res = await fetch(`/api/knowledge/photo/${active.photoKey}`, {
         method: 'POST',
+        credentials: 'same-origin',
         body: formData,
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
       const data = await res.json();
@@ -388,7 +388,7 @@ export default function KnowledgeBase() {
             {!isEditing ? (
               <div
                 className="kb-article html-content"
-                dangerouslySetInnerHTML={{ __html: tgHtmlToDisplay(active.content) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(tgHtmlToDisplay(active.content)) }}
               />
             ) : (
               <div className="kb-editor-area">

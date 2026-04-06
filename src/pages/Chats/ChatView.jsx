@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Send, X, Plus, Paperclip, FileText, ChevronDown } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import { sanitizeHtml } from '../../utils/sanitize.js';
 import './ChatView.css';
 
 /** Sanitize Telegram HTML for safe rendering: allow b, i, a, code, tg-emoji → img */
@@ -193,14 +194,13 @@ export default function ChatView() {
     if (!files.length) return;
     setUploading(true);
     try {
-      const token = localStorage.getItem('wl_admin_token');
       const uploaded = [];
       for (const file of files) {
         const form = new FormData();
         form.append('file', file);
         const res = await fetch('/api/broadcasts/upload', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'same-origin',
           body: form,
         });
         if (!res.ok) throw new Error('Upload failed ' + res.status);
@@ -376,7 +376,7 @@ export default function ChatView() {
                         </a>
                       );
                     })}
-                    {item.text && <span className="chatview-text" dangerouslySetInnerHTML={{ __html: sanitizeTgHtml(item.text) }} />}
+                    {item.text && <span className="chatview-text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(sanitizeTgHtml(item.text)) }} />}
                     <span className="chatview-meta">
                       <span className="chatview-time">{formatTime(item.time)}</span>
                     </span>

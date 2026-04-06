@@ -96,7 +96,8 @@ function CodesSection() {
     try {
       await fetch(`/api/events/codes/${id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ status: newStatus }),
       });
       fetchCodes();

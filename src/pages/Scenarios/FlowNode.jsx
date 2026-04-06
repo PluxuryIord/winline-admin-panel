@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { sanitizeHtml } from '../../utils/sanitize.js';
 
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
@@ -134,7 +135,7 @@ export default function FlowNode({
           <span className="flow-node-title">{screen.title}</span>
         </div>
         {previewHtml && (
-          <div className="flow-node-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <div className="flow-node-preview" dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }} />
         )}
         {buttonOrder.length > 0 && (
           <div className="flow-node-buttons">
