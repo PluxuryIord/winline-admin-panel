@@ -235,6 +235,17 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
         setText(initialDraft.text || '');
         setMedia(initialDraft.media || null);
       }
+      // Restore schedule state if draft was scheduled
+      if (initialDraft.scheduledAt && initialDraft.scheduleStatus === 'pending') {
+        setScheduleMode(true);
+        // Convert to local datetime for inputs (YYYY-MM-DDTHH:MM)
+        const d = new Date(initialDraft.scheduledAt);
+        const local = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        setScheduledAt(local);
+      } else {
+        setScheduleMode(false);
+        setScheduledAt('');
+      }
     }
   }, [initialDraft]);
 
