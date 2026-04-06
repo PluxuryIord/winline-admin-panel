@@ -201,12 +201,31 @@ async function handleWebhook(req, res, next) {
       const buffer = await downloadBuffer(fileUrl);
       const { key, url } = await uploadToS3(buffer, originalName, mimeType);
       console.log('[webhook] Media uploaded to S3:', key);
-      return { filename: key, originalName, mimeType, url };
+      const result = { filename: key, originalName, mimeType, url };
+      if (src._isSticker) result.isSticker = true;
+      return result;
     }
 
     let mediaObj = null;
     const mediaSources = Array.isArray(media) ? media : null;
-    const singleSource = !mediaSources ? (photo || doc || video || voice || audio || sticker || null) : null;
+    // For stickers: use thumbnail for .tgs (Lottie), use file_id for .webm (video) and .webp (static)
+    let stickerSource = null;
+    if (sticker) {
+      if (sticker.is_animated && !sticker.is_video && sticker.thumbnail?.file_id) {
+        // .tgs Lottie sticker — download static thumbnail instead
+        stickerSource = { ...sticker.thumbnail, mime_type: 'image/webp', file_name: `sticker_${sticker.file_unique_id}.webp`, _isSticker: true };
+      } else {
+        stickerSource = { ...sticker, _isSticker: true };
+        if (sticker.is_video) {
+          stickerSource.mime_type = stickerSource.mime_type || 'video/webm';
+          stickerSource.file_name = stickerSource.file_name || `sticker_${sticker.file_unique_id}.webm`;
+        } else {
+          stickerSource.mime_type = stickerSource.mime_type || 'image/webp';
+          stickerSource.file_name = stickerSource.file_name || `sticker_${sticker.file_unique_id}.webp`;
+        }
+      }
+    }
+    const singleSource = !mediaSources ? (photo || doc || video || voice || audio || stickerSource || null) : null;
 
     if (mediaSources && mediaSources.length) {
       // Альбом: скачиваем все файлы параллельно

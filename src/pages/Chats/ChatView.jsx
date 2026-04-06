@@ -322,13 +322,27 @@ export default function ChatView() {
               }
 
               const ml = getMediaList(item);
-              const hasImages = ml.some(m => m.mimeType?.startsWith('image/'));
-              const hasMedia = ml.length > 0;
+              const sticker = ml.length === 1 && ml[0].isSticker ? ml[0] : null;
+              const hasImages = !sticker && ml.some(m => m.mimeType?.startsWith('image/'));
+              const hasMedia = !sticker && ml.length > 0;
               const poll = item.media && !Array.isArray(item.media) && item.media.type === 'poll' ? item.media : null;
 
               return (
                 <div key={item.id} className={`chatview-msg chatview-msg--${item.from}`}>
-                  <div className={`chatview-bubble ${hasImages ? 'chatview-bubble--photo' : hasMedia ? 'chatview-bubble--media' : ''}`}>
+                  <div className={`chatview-bubble ${sticker ? 'chatview-bubble--sticker' : hasImages ? 'chatview-bubble--photo' : hasMedia ? 'chatview-bubble--media' : ''}`}>
+                    {sticker && (() => {
+                      const url = sticker.url || `/uploads/${sticker.filename}`;
+                      const isVideo = sticker.mimeType?.includes('webm') || sticker.mimeType?.includes('video');
+                      return (
+                        <div className="chatview-sticker">
+                          {isVideo ? (
+                            <video src={url} autoPlay loop muted playsInline className="chatview-sticker-media" />
+                          ) : (
+                            <img src={url} alt="sticker" className="chatview-sticker-media" />
+                          )}
+                        </div>
+                      );
+                    })()}
                     {poll && (
                       <div className="chatview-poll">
                         <div className="chatview-poll-header">

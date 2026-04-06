@@ -240,6 +240,39 @@
   padding: 2px 6px;
 }
 
+/* ─── Sticker bubble ─── */
+.chatview-bubble--sticker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+}
+
+.chatview-sticker {
+  display: flex;
+}
+
+.chatview-sticker-media {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+.chatview-bubble--sticker .chatview-meta {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 10px;
+  padding: 2px 6px;
+  width: fit-content;
+  margin-left: auto;
+  margin-top: 2px;
+}
+
+.chatview-bubble--sticker .chatview-text {
+  padding: 4px 0 0;
+}
+
 /* Пузырь с файлом (не фото) */
 .chatview-bubble--media {
   padding: 4px;
