@@ -57,6 +57,54 @@ function getMediaList(msg) {
 }
 
 /** Класс CSS грида для альбома */
+/** Poll bubble with user vote indicator */
+function PollBubble({ poll, userId }) {
+  const [vote, setVote] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!poll.pollId || !userId) return;
+    setLoading(true);
+    api.get(`/api/broadcasts/poll/${poll.pollId}/user-vote/${userId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setVote(data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [poll.pollId, userId]);
+
+  const isQuiz = poll.pollType === 'quiz';
+  const options = poll.options || [];
+
+  return (
+    <div className="cv-poll">
+      <div className="cv-poll-icon">{isQuiz ? '🧠' : '📊'}</div>
+      <div className="cv-poll-question">{poll.question}</div>
+      <div className="cv-poll-meta">
+        {isQuiz ? 'Викторина' : 'Опрос'}
+        {poll.isAnonymous ? ' · анонимный' : ''}
+        {poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}
+      </div>
+      <div className="cv-poll-options">
+        {options.map((opt, i) => {
+          const isVoted = vote?.voted && vote.optionIndex === i;
+          return (
+            <div key={i} className={`cv-poll-opt${isVoted ? ' cv-poll-opt--voted' : ''}`}>
+              <span className="cv-poll-opt-text">{opt}</span>
+              {isVoted && <span className="cv-poll-opt-check">✓</span>}
+            </div>
+          );
+        })}
+      </div>
+      {vote?.voted && (
+        <div className="cv-poll-voted-label">Пользователь проголосовал за вариант {vote.optionIndex + 1}</div>
+      )}
+      {!loading && poll.pollId && !vote?.voted && (
+        <div className="cv-poll-voted-label cv-poll-no-vote">Пользователь ещё не голосовал</div>
+      )}
+    </div>
+  );
+}
+
 function albumGridClass(count) {
   if (count <= 1) return '';
   if (count === 2) return 'chatview-album--2';
@@ -349,21 +397,7 @@ export default function ChatView() {
                         </div>
                       );
                     })()}
-                    {poll && (
-                      <div className="chatview-poll">
-                        <div className="chatview-poll-header">
-                          📊 {poll.pollType === 'quiz' ? 'Викторина' : 'Опрос'}
-                          {poll.isAnonymous ? ' · анонимный' : ''}
-                          {poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}
-                        </div>
-                        <div className="chatview-poll-question">{poll.question}</div>
-                        <ul className="chatview-poll-options">
-                          {(poll.options || []).map((opt, oi) => (
-                            <li key={oi}>{opt}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {poll && <PollBubble poll={poll} userId={chat?.userId} />}
                     {/* Альбом / одно фото */}
                     {hasImages && (
                       <div className={`chatview-album ${albumGridClass(ml.filter(m => m.mimeType?.startsWith('image/')).length)}`}>

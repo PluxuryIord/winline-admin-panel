@@ -587,16 +587,27 @@ router.post('/users', async (req, res, next) => {
     // Prepare broadcast message text for chat storage
     const MEDIA_PREFIX = '__media__:';
     let chatMessageText = '';
-    if (poll) {
-      chatMessageText = `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}`;
-    } else if (media) {
+    // pollId created below, chatMessageText for poll set after createPoll
+    if (!poll && media) {
       chatMessageText = `${MEDIA_PREFIX}${JSON.stringify(media)}\n${text?.trim() || ''}`;
     } else {
       chatMessageText = text?.trim() || '';
     }
 
     let pollId = null;
-    if (poll) pollId = await createPoll(poll);
+    if (poll) {
+      pollId = await createPoll(poll);
+      const pollMedia = {
+        type: 'poll',
+        pollId,
+        question: poll.question || '',
+        options: Array.isArray(poll.options) ? poll.options : [],
+        isAnonymous: poll.is_anonymous !== false,
+        allowsMultipleAnswers: !!poll.allows_multiple_answers,
+        pollType: poll.type || 'regular',
+      };
+      chatMessageText = `${MEDIA_PREFIX}${JSON.stringify(pollMedia)}\n`;
+    }
 
     for (const row of rows) {
       try {
@@ -1382,6 +1393,19 @@ router.get('/poll/:id/voters/:optionIndex', async (req, res, next) => {
       fullName: v.full_name || '',
       votedAt: v.created_at,
     })));
+  } catch (err) { next(err); }
+});
+
+// GET /api/broadcasts/poll/:id/user-vote/:userId — get a specific user's vote
+router.get('/poll/:id/user-vote/:userId', async (req, res, next) => {
+  try {
+    const pollId = Number(req.params.id);
+    const userId = req.params.userId;
+    const [rows] = await dbPool.query(
+      'SELECT option_index FROM wl_admin_poll_votes WHERE poll_id = ? AND user_id = ? LIMIT 1',
+      [pollId, userId]
+    );
+    res.json({ voted: rows.length > 0, optionIndex: rows.length > 0 ? rows[0].option_index : null });
   } catch (err) { next(err); }
 });
 
