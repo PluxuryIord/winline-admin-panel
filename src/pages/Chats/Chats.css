@@ -4,6 +4,14 @@
   gap: 20px;
 }
 
+.chats-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 12px;
+}
 .chats-header {
   display: flex;
   align-items: center;
@@ -142,14 +150,24 @@
   gap: 6px;
 }
 
-.chat-blocked-badge {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  border-radius: 50%;
-  background: #ff4d4f;
-  flex-shrink: 0;
+/* Banned avatar — red diagonal line + dimmed */
+.chat-item-avatar--banned {
+  position: relative;
+  opacity: 0.5;
+  border-color: rgba(255, 70, 70, 0.4);
+  background-color: rgba(255, 70, 70, 0.08);
+  color: rgba(255, 100, 100, 0.7);
+}
+.chat-avatar-ban-line {
+  position: absolute;
+  top: 50%;
+  left: -2px;
+  right: -2px;
+  height: 2px;
+  background: #ef4444;
+  transform: rotate(-45deg);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 .chat-item-last {
@@ -198,11 +216,10 @@
 .chats-folders {
   display: flex;
   gap: 6px;
-  padding: 10px 0 12px;
   flex-wrap: wrap;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  margin-bottom: 10px;
+  flex: 1;
+  min-width: 0;
 }
 .chats-folder-tab,
 .chats-folder-add {

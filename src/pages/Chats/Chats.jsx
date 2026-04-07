@@ -167,47 +167,46 @@ export default function Chats() {
 
   return (
     <div className="chats-container">
-      <div className="chats-folders">
-        <button
-          className={`chats-folder-tab${activeFolderId === null ? ' active' : ''}`}
-          onClick={() => setActiveFolderId(null)}
-        >
-          <Folder size={18} /> Все
-        </button>
-        {folders.map(f => (
+      <div className="chats-toolbar">
+        <div className="chats-folders">
           <button
-            key={f.id}
-            className={`chats-folder-tab${activeFolderId === f.id ? ' active' : ''}`}
-            onClick={() => setActiveFolderId(f.id)}
-            onDoubleClick={() => setRenamePrompt(f)}
-            title="Двойной клик — переименовать"
+            className={`chats-folder-tab${activeFolderId === null ? ' active' : ''}`}
+            onClick={() => setActiveFolderId(null)}
           >
-            <Folder size={18} /> {f.name}
+            <Folder size={16} /> Все
           </button>
-        ))}
-        <button
-          className="chats-folder-add"
-          onClick={() => setCreatePrompt(true)}
-          title="Новая папка"
-        >
-          <Plus size={14} /> Папка
-        </button>
-      </div>
-
-      <div className="chats-header">
-        {activeFolderId !== null && (() => {
-          const f = folders.find(x => x.id === activeFolderId);
-          if (!f) return null;
-          return (
+          {folders.map(f => (
             <button
-              className="chats-folder-delete-inline"
-              onClick={() => setDeleteFolderPrompt(f)}
-              title={`Удалить папку «${f.name}»`}
+              key={f.id}
+              className={`chats-folder-tab${activeFolderId === f.id ? ' active' : ''}`}
+              onClick={() => setActiveFolderId(f.id)}
+              onDoubleClick={() => setRenamePrompt(f)}
+              title="Двойной клик — переименовать"
             >
-              <Trash2 size={14} /> Удалить папку «{f.name}»
+              <Folder size={16} /> {f.name}
             </button>
-          );
-        })()}
+          ))}
+          <button
+            className="chats-folder-add"
+            onClick={() => setCreatePrompt(true)}
+            title="Новая папка"
+          >
+            <Plus size={14} /> Папка
+          </button>
+          {activeFolderId !== null && (() => {
+            const f = folders.find(x => x.id === activeFolderId);
+            if (!f) return null;
+            return (
+              <button
+                className="chats-folder-delete-inline"
+                onClick={() => setDeleteFolderPrompt(f)}
+                title={`Удалить папку «${f.name}»`}
+              >
+                <Trash2 size={14} />
+              </button>
+            );
+          })()}
+        </div>
         <div className="chats-view-toggle">
           <button
             className={`chats-view-btn${viewMode === 'list' ? ' active' : ''}`}
@@ -238,11 +237,13 @@ export default function Chats() {
               className={`chat-item${unreadChats.has(chat.id) ? ' chat-item--unread' : ''}`}
               onClick={() => navigate(`/chats/${chat.id}`)}
             >
-              <div className="chat-item-avatar">{chatName.charAt(0)}</div>
+              <div className={`chat-item-avatar${chat.banned ? ' chat-item-avatar--banned' : ''}`}>
+                {chatName.charAt(0)}
+                {chat.banned && <div className="chat-avatar-ban-line" />}
+              </div>
               <div className="chat-item-info">
                 <span className="chat-item-name">
                   {chatName}
-                  {chat.banned && <span className="chat-blocked-badge" title="Заблокировал бота" />}
                 </span>
                 {msg && (
                   <span className="chat-item-last">
