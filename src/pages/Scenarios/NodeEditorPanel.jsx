@@ -98,8 +98,9 @@ function AnketaQuestionManager() {
   if (loading) return <div style={{ padding: 16, color: '#888' }}><Loader size={16} className="sc-spinner" /> Загрузка...</div>;
 
   return (
-    <div className="sc-section">
+    <div className="sc-section anketa-manager-section">
       <h3 className="sc-section-title"><ClipboardList size={16} /> Вопросы анкеты</h3>
+      <p className="anketa-manager-hint">Добавляйте вопросы, которые бот задаст пользователю при заполнении анкеты</p>
 
       {/* Question list */}
       <div className="anketa-questions-list">
@@ -294,6 +295,9 @@ export default function NodeEditorPanel({
         </div>
       </div>
 
+      {/* Anketa Questions — FIRST, only for event_anketa screen */}
+      {screenId === 'event_anketa' && <AnketaQuestionManager />}
+
       {/* Read-only notice */}
       {editData.readOnly && (
         <div className="sc-readonly-notice">
@@ -358,9 +362,6 @@ export default function NodeEditorPanel({
           })}
         </div>
       )}
-
-      {/* Anketa Questions (only for event_anketa screen) */}
-      {screenId === 'event_anketa' && <AnketaQuestionManager />}
 
       {/* Buttons */}
       <div className="sc-section">
