@@ -473,8 +473,10 @@ router.put('/toggle', async (req, res, next) => {
 
 // ─── Anketa Questions CRUD ──────────────────────────────────────────────────
 
-// Ensure table exists
-(async () => {
+// Ensure table exists (lazy, called before first query)
+let _tableReady = false;
+async function ensureQuestionsTable() {
+  if (_tableReady) return;
   try {
     await dbPool.query(`CREATE TABLE IF NOT EXISTS event_questions (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -484,14 +486,18 @@ router.put('/toggle', async (req, res, next) => {
       \`order\` INT NOT NULL DEFAULT 0,
       is_active TINYINT(1) NOT NULL DEFAULT 1
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    _tableReady = true;
+    console.log('[events] event_questions table ready');
   } catch (err) {
     console.error('[events] Failed to create event_questions table:', err.message);
+    throw err;
   }
-})();
+}
 
 // GET /api/events/questions
 router.get('/questions', async (req, res, next) => {
   try {
+    await ensureQuestionsTable();
     const [rows] = await dbPool.query('SELECT id, question_text, question_type, options, `order`, is_active FROM event_questions ORDER BY `order` ASC');
     res.json(rows.map(r => ({
       ...r,
@@ -504,6 +510,7 @@ router.get('/questions', async (req, res, next) => {
 // POST /api/events/questions
 router.post('/questions', async (req, res, next) => {
   try {
+    await ensureQuestionsTable();
     const { question_text, question_type = 'text', options = null } = req.body;
     if (!question_text?.trim()) return res.status(400).json({ error: 'question_text required' });
     const [maxRow] = await dbPool.query('SELECT COALESCE(MAX(`order`), 0) AS mx FROM event_questions');
@@ -519,6 +526,7 @@ router.post('/questions', async (req, res, next) => {
 // PUT /api/events/questions/:id
 router.put('/questions/:id', async (req, res, next) => {
   try {
+    await ensureQuestionsTable();
     const id = Number(req.params.id);
     const updates = [];
     const params = [];
@@ -537,6 +545,7 @@ router.put('/questions/:id', async (req, res, next) => {
 // DELETE /api/events/questions/:id
 router.delete('/questions/:id', async (req, res, next) => {
   try {
+    await ensureQuestionsTable();
     await dbPool.query('DELETE FROM event_questions WHERE id = ?', [Number(req.params.id)]);
     res.json({ ok: true });
   } catch (err) { next(err); }
