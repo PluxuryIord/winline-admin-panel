@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, List, LayoutGrid, Plus, Folder, FolderInput, Trash2 } from 'lucide-react';
+import { X, List, LayoutGrid, Plus, Folder, FolderInput } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
 import PromptModal from '../KnowledgeBase/PromptModal';
@@ -38,7 +38,6 @@ export default function Chats() {
   const [activeFolderId, setActiveFolderId] = useState(null); // null = All, 0 = "Без папки"
   const [createPrompt, setCreatePrompt] = useState(false);
   const [renamePrompt, setRenamePrompt] = useState(null); // folder obj
-  const [deleteFolderPrompt, setDeleteFolderPrompt] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null); // { chatId, x, y }
   const moveMenuRef = useRef(null);
 
@@ -136,13 +135,14 @@ export default function Chats() {
     reloadFolders();
   };
 
-  const deleteFolder = async () => {
-    const folder = deleteFolderPrompt;
+  const deleteFolder = async (folder) => {
+    const f = folder || deleteFolderPrompt;
     setDeleteFolderPrompt(null);
-    await api.delete(`/api/chat-folders/${folder.id}`);
-    if (activeFolderId === folder.id) setActiveFolderId(null);
-    // Drop folderId locally for any chat that was in it
-    setChats(prev => prev.map(c => c.folderId === folder.id ? { ...c, folderId: null } : c));
+    setRenamePrompt(null);
+    if (!f) return;
+    await api.delete(`/api/chat-folders/${f.id}`);
+    if (activeFolderId === f.id) setActiveFolderId(null);
+    setChats(prev => prev.map(c => c.folderId === f.id ? { ...c, folderId: null } : c));
     reloadFolders();
   };
 
@@ -157,7 +157,9 @@ export default function Chats() {
   // Filter by active folder
   const visibleChats = activeFolderId === null
     ? chats
-    : chats.filter(c => (c.folderId || null) === activeFolderId);
+    : activeFolderId === '__unread'
+      ? chats.filter(c => unreadChats.has(c.id))
+      : chats.filter(c => (c.folderId || null) === activeFolderId);
 
   const sortedChats = [...visibleChats].sort((a, b) => {
     const timeA = lastMsg(a)?.time ? new Date(lastMsg(a).time).getTime() : 0;
@@ -174,6 +176,13 @@ export default function Chats() {
             onClick={() => setActiveFolderId(null)}
           >
             <Folder size={16} /> Все
+          </button>
+          <button
+            className={`chats-folder-tab${activeFolderId === '__unread' ? ' active' : ''}`}
+            onClick={() => setActiveFolderId('__unread')}
+          >
+            <Folder size={16} /> Непрочитанные
+            {unreadChats.size > 0 && <span className="chats-folder-count">{unreadChats.size}</span>}
           </button>
           {folders.map(f => (
             <button
@@ -193,19 +202,6 @@ export default function Chats() {
           >
             <Plus size={14} /> Папка
           </button>
-          {activeFolderId !== null && (() => {
-            const f = folders.find(x => x.id === activeFolderId);
-            if (!f) return null;
-            return (
-              <button
-                className="chats-folder-delete-inline"
-                onClick={() => setDeleteFolderPrompt(f)}
-                title={`Удалить папку «${f.name}»`}
-              >
-                <Trash2 size={14} />
-              </button>
-            );
-          })()}
         </div>
         <div className="chats-view-toggle">
           <button
@@ -314,15 +310,7 @@ export default function Chats() {
           defaultValue={renamePrompt.name}
           onConfirm={renameFolder}
           onCancel={() => setRenamePrompt(null)}
-        />
-      )}
-
-      {deleteFolderPrompt && (
-        <PromptModal
-          title={`Удалить папку «${deleteFolderPrompt.name}»?`}
-          isConfirm
-          onConfirm={deleteFolder}
-          onCancel={() => setDeleteFolderPrompt(null)}
+          extraAction={{ label: 'Удалить папку', onClick: () => deleteFolder(renamePrompt) }}
         />
       )}
 

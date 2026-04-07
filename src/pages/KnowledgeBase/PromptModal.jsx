@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function PromptModal({ title, placeholder, isConfirm, onConfirm, onCancel, defaultValue = '' }) {
+export default function PromptModal({ title, placeholder, isConfirm, onConfirm, onCancel, defaultValue = '', extraAction = null }) {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef(null);
 
@@ -32,6 +32,10 @@ export default function PromptModal({ title, placeholder, isConfirm, onConfirm, 
           />
         )}
         <div className="prompt-actions">
+          {extraAction && (
+            <button type="button" className="prompt-btn prompt-btn-danger" onClick={extraAction.onClick}>{extraAction.label}</button>
+          )}
+          <div style={{ flex: 1 }} />
           <button type="button" className="prompt-btn prompt-btn-cancel" onClick={onCancel}>Отмена</button>
           <button
             type="submit"

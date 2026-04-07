@@ -213,15 +213,30 @@
 .chats-folder-add {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 16px;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #cfcfcf;
-  font-size: 12px;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.15s;
+  font-family: inherit;
+}
+.chats-folder-count {
+  background: var(--color-orange);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  line-height: 1;
 }
 .chats-folder-tab:hover,
 .chats-folder-add:hover {
