@@ -207,11 +207,16 @@
   padding: 0;
   background: transparent !important;
   overflow: hidden;
+  display: inline-flex;
+  flex-direction: column;
+  max-width: min(55%, 320px);
 }
 
 .chatview-bubble--photo .chatview-text {
   padding: 8px 12px 4px;
   background: rgba(255, 255, 255, 0.08);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chatview-msg--admin .chatview-bubble--photo .chatview-text {
@@ -221,6 +226,8 @@
 .chatview-bubble--photo .chatview-meta {
   padding: 2px 10px 5px;
   background: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chatview-msg--admin .chatview-bubble--photo .chatview-meta {
@@ -350,10 +357,9 @@
 
 /* Одно фото */
 .chatview-album:not([class*="chatview-album--"]) .chatview-album-item img {
-  max-width: 320px;
   max-height: 320px;
   min-width: 180px;
-  width: auto;
+  width: 100%;
   border-radius: 12px;
 }
 
