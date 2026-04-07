@@ -811,6 +811,56 @@ input[type="checkbox"]:checked {
 .bc-poll-option--correct .bc-poll-bar-fill {
   background: #34c759;
 }
+.bc-poll-option--clickable {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bc-poll-option--clickable:hover {
+  background: rgba(255,255,255,0.06);
+}
+.bc-poll-option--selected {
+  border-color: var(--color-orange) !important;
+  background: rgba(255,126,0,0.06);
+}
+.bc-poll-option-count svg {
+  opacity: 0.4;
+  vertical-align: -2px;
+  margin-left: 2px;
+}
+
+/* ─── Poll Voters ─── */
+.bc-poll-voters-loading {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;
+}
+.bc-poll-voters {
+  margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;
+}
+.bc-poll-voters-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.85rem; color: rgba(255,255,255,0.6); margin-bottom: 8px;
+}
+.bc-poll-voters-count {
+  background: rgba(255,126,0,0.15); color: var(--color-orange);
+  padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: 600;
+}
+.bc-poll-voters-empty {
+  color: rgba(255,255,255,0.35); font-size: 0.85rem; padding: 8px 0;
+}
+.bc-poll-voters-list {
+  max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+}
+.bc-poll-voter {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.03);
+}
+.bc-poll-voter:hover { background: rgba(255,255,255,0.06); }
+.bc-poll-voter-name {
+  color: var(--color-white); font-size: 0.85rem; font-weight: 500;
+}
+.bc-poll-voter-username {
+  color: rgba(255,255,255,0.35); font-size: 0.8rem;
+}
 
 /* ===== ТАБЫ ===== */
 /* ===== АККОРДЕОН ===== */

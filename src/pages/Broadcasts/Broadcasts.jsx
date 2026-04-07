@@ -1656,6 +1656,8 @@ export default function Broadcasts() {
   const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
   const [pollStatsModal, setPollStatsModal] = useState(null); // { question, stats, totalVotes, ... }
   const [pollStatsLoading, setPollStatsLoading] = useState(false);
+  const [pollVoters, setPollVoters] = useState(null); // { optionIndex, optionText, voters: [] }
+  const [pollVotersLoading, setPollVotersLoading] = useState(false);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1677,6 +1679,17 @@ export default function Broadcasts() {
       setPollStatsModal(data);
     } catch { setPollStatsModal(null); }
     setPollStatsLoading(false);
+  };
+
+  const loadPollVoters = async (pollId, optionIndex, optionText) => {
+    setPollVotersLoading(true);
+    try {
+      const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${optionIndex}`);
+      if (!res.ok) throw new Error();
+      const voters = await res.json();
+      setPollVoters({ optionIndex, optionText, voters });
+    } catch { setPollVoters(null); }
+    setPollVotersLoading(false);
   };
 
   const handleSendResult = (data) => {
@@ -1960,23 +1973,27 @@ export default function Broadcasts() {
       )}
 
       {pollStatsModal && (
-        <div className="bc-delivery-overlay" onClick={() => setPollStatsModal(null)}>
+        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); }}>
           <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
             <div className="bc-delivery-modal-header">
               <h3>{pollStatsModal.type === 'quiz' ? '🧠 Викторина' : '📊 Опрос'}</h3>
-              <button className="bc-delivery-close" onClick={() => setPollStatsModal(null)}><X size={18} /></button>
+              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); }}><X size={18} /></button>
             </div>
             <div className="bc-poll-question">{pollStatsModal.question}</div>
             <div className="bc-poll-total">Всего голосов: <b>{pollStatsModal.totalVotes}</b></div>
             <div className="bc-poll-options">
               {(pollStatsModal.stats || []).map((s, i) => (
-                <div key={i} className={`bc-poll-option ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''}`}>
+                <div
+                  key={i}
+                  className={`bc-poll-option bc-poll-option--clickable ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''} ${pollVoters?.optionIndex === i ? 'bc-poll-option--selected' : ''}`}
+                  onClick={() => s.count > 0 && loadPollVoters(pollStatsModal.id, i, s.option)}
+                >
                   <div className="bc-poll-option-header">
                     <span className="bc-poll-option-text">
                       {pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i && <Check size={14} className="bc-poll-correct-icon" />}
                       {s.option}
                     </span>
-                    <span className="bc-poll-option-count">{s.count} ({s.percent}%)</span>
+                    <span className="bc-poll-option-count">{s.count} ({s.percent}%) <Users size={12} /></span>
                   </div>
                   <div className="bc-poll-bar">
                     <div className="bc-poll-bar-fill" style={{ width: `${s.percent}%` }} />
@@ -1984,6 +2001,29 @@ export default function Broadcasts() {
                 </div>
               ))}
             </div>
+
+            {/* Voters list */}
+            {pollVotersLoading && <div className="bc-poll-voters-loading"><Loader size={16} className="spin" /> Загрузка...</div>}
+            {pollVoters && !pollVotersLoading && (
+              <div className="bc-poll-voters">
+                <div className="bc-poll-voters-header">
+                  <span>Проголосовали за «{pollVoters.optionText}»</span>
+                  <span className="bc-poll-voters-count">{pollVoters.voters.length}</span>
+                </div>
+                {pollVoters.voters.length === 0 ? (
+                  <div className="bc-poll-voters-empty">Нет голосов</div>
+                ) : (
+                  <div className="bc-poll-voters-list">
+                    {pollVoters.voters.map((v, vi) => (
+                      <div key={vi} className="bc-poll-voter">
+                        <span className="bc-poll-voter-name">{v.fullName || v.username || `ID: ${v.userId}`}</span>
+                        {v.username && <span className="bc-poll-voter-username">@{v.username}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

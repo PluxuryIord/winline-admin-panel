@@ -1360,4 +1360,29 @@ router.get('/poll/:id/stats', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/broadcasts/poll/:id/voters/:optionIndex — list voters for a specific option
+router.get('/poll/:id/voters/:optionIndex', async (req, res, next) => {
+  try {
+    const pollId = Number(req.params.id);
+    const optionIndex = Number(req.params.optionIndex);
+
+    const [voters] = await dbPool.query(
+      `SELECT v.user_id, v.created_at,
+              u.username, u.full_name
+       FROM wl_admin_poll_votes v
+       LEFT JOIN wl_admin_users u ON u.user_id = v.user_id
+       WHERE v.poll_id = ? AND v.option_index = ?
+       ORDER BY v.created_at DESC`,
+      [pollId, optionIndex]
+    );
+
+    res.json(voters.map(v => ({
+      userId: v.user_id,
+      username: v.username || '',
+      fullName: v.full_name || '',
+      votedAt: v.created_at,
+    })));
+  } catch (err) { next(err); }
+});
+
 export default router;
