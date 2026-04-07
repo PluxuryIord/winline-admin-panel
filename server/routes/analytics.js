@@ -51,11 +51,11 @@ router.get('/', async (req, res, next) => {
     const [[{ partners }]] = await dbPool.query('SELECT COUNT(*) AS partners FROM users WHERE registered = 1');
     const [[{ guests }]] = await dbPool.query('SELECT COUNT(*) AS guests FROM users WHERE registered = 0 OR registered IS NULL');
 
+    // Blocked — always total (not period-filtered)
+    const [[{ blocked }]] = await dbPool.query('SELECT COUNT(*) AS blocked FROM users WHERE banned = 1');
+
     // Period-filtered metrics
     const dc1 = dateCondition('date_reg', since, until);
-    const [[{ blocked }]] = await dbPool.query(
-      `SELECT COUNT(*) AS blocked FROM users WHERE banned = 1${dc1.where}`, dc1.params
-    );
     const [[{ newUsers }]] = await dbPool.query(
       `SELECT COUNT(*) AS newUsers FROM users WHERE 1=1${dc1.where}`, dc1.params
     );
