@@ -2,7 +2,6 @@
 
 .ios-dp-col {
   overflow-y: auto;
-  scroll-snap-type: y mandatory;
   scrollbar-width: none;
   width: 56px;
   position: relative;
@@ -17,7 +16,6 @@
   font-size: 1.05rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.25);
-  scroll-snap-align: start;
   cursor: pointer;
   transition: color 0.15s;
   user-select: none;
