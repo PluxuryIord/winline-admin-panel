@@ -361,7 +361,7 @@ export default function Users() {
                 <div className="tag-modal" onClick={e => e.stopPropagation()}>
                   <div className="tag-modal-header">
                     <h3>Фильтр по тегам</h3>
-                    <button className="tag-modal-close" onClick={() => setShowTagDropdown(false)}><X size={18} /></button>
+                    <button className="tag-modal-close" onClick={() => setShowTagDropdown(false)}><X size={14} /></button>
                   </div>
                   <div className="tag-modal-search">
                     <input
