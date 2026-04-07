@@ -81,7 +81,6 @@ function PollBubble({ poll, userId }) {
       <div className="cv-poll-question">{poll.question}</div>
       <div className="cv-poll-meta">
         {isQuiz ? 'Викторина' : 'Опрос'}
-        {poll.isAnonymous ? ' · анонимный' : ''}
         {poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}
       </div>
       <div className="cv-poll-options">
