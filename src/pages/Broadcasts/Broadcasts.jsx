@@ -62,13 +62,16 @@ function formatSize(bytes) {
 }
 
 /* ═══ iOS-style Time Picker ═══ */
-function IosTimePicker({ value, onChange }) {
+function IosTimePicker({ value, onChange, minTime = null }) {
   const [hours, minutes] = (value || '12:00').split(':').map(Number);
   const hoursRef = useRef(null);
   const minsRef = useRef(null);
 
   const ITEM_H = 36;
   const VISIBLE = 5;
+
+  const minH = minTime ? parseInt(minTime.split(':')[0], 10) : null;
+  const minM = minTime ? parseInt(minTime.split(':')[1], 10) : null;
 
   const scrollToValue = (ref, val) => {
     if (ref.current) {
@@ -81,13 +84,25 @@ function IosTimePicker({ value, onChange }) {
     scrollToValue(minsRef, minutes);
   }, []); // eslint-disable-line
 
+  const clampTime = (h, m) => {
+    if (minH != null) {
+      if (h < minH) { h = minH; m = minM || 0; }
+      else if (h === minH && minM != null && m < minM) { m = minM; }
+    }
+    return [h, m];
+  };
+
   const handleScroll = (ref, max, isHours) => {
     const idx = Math.round(ref.current.scrollTop / ITEM_H);
     const clamped = Math.max(0, Math.min(max, idx));
-    const h = isHours ? clamped : hours;
-    const m = isHours ? minutes : clamped;
+    let h = isHours ? clamped : hours;
+    let m = isHours ? minutes : clamped;
+    [h, m] = clampTime(h, m);
     onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
   };
+
+  const isHourDisabled = (h) => minH != null && h < minH;
+  const isMinDisabled = (m) => minH != null && hours === minH && minM != null && m < minM;
 
   const renderColumn = (ref, count, val, isHours) => (
     <div className="ios-tp-col" ref={ref}
@@ -95,13 +110,18 @@ function IosTimePicker({ value, onChange }) {
       style={{ height: ITEM_H * VISIBLE }}
     >
       <div style={{ height: ITEM_H * 2 }} />
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''}`} style={{ height: ITEM_H }}
-          onClick={() => { scrollToValue(ref, i); }}
-        >
-          {String(i).padStart(2, '0')}
-        </div>
-      ))}
+      {Array.from({ length: count }, (_, i) => {
+        const disabled = isHours ? isHourDisabled(i) : isMinDisabled(i);
+        return (
+          <div key={i}
+            className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''} ${disabled ? 'ios-tp-item--disabled' : ''}`}
+            style={{ height: ITEM_H }}
+            onClick={() => !disabled && scrollToValue(ref, i)}
+          >
+            {String(i).padStart(2, '0')}
+          </div>
+        );
+      })}
       <div style={{ height: ITEM_H * 2 }} />
     </div>
   );
@@ -445,24 +465,38 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
         </button>
       </div>
 
-      {scheduleMode && (
-        <div className="bc-schedule-picker-styled">
-          <IosDatePicker
-            value={scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10)}
-            onChange={(date) => {
-              const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
-              setScheduledAt(date + 'T' + time);
-            }}
-          />
-          <IosTimePicker
-            value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
-            onChange={(time) => {
-              const date = scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-              setScheduledAt(date + 'T' + time);
-            }}
-          />
-        </div>
-      )}
+      {scheduleMode && (() => {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const selDate = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+        const isToday = selDate === todayStr;
+        // If today, min time = current time + 2 minutes
+        let minTimeStr = null;
+        if (isToday) {
+          const min = new Date(now.getTime() + 2 * 60 * 1000);
+          minTimeStr = `${String(min.getHours()).padStart(2, '0')}:${String(min.getMinutes()).padStart(2, '0')}`;
+        }
+        return (
+          <div className="bc-schedule-picker-styled">
+            <IosDatePicker
+              value={selDate}
+              minDate={todayStr}
+              onChange={(date) => {
+                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+                setScheduledAt(date + 'T' + time);
+              }}
+            />
+            <IosTimePicker
+              value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
+              minTime={minTimeStr}
+              onChange={(time) => {
+                const date = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+                setScheduledAt(date + 'T' + time);
+              }}
+            />
+          </div>
+        );
+      })()}
 
       <div className="bc-compose-footer">
         <span className="bc-compose-hint">{hintText}</span>
@@ -485,15 +519,21 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
               className="broadcasts-create-btn bc-schedule-send-btn"
               disabled={sending || !(canSend && isValid()) || !scheduledAt}
               onClick={() => {
-                // Проверка: минимум +2 минуты от текущего времени
-                const minTime = new Date(Date.now() + 2 * 60 * 1000);
-                if (new Date(scheduledAt) < minTime) {
-                  alert('Время отправки должно быть минимум на 2 минуты вперёд');
-                  return;
+                // Auto-correct: if scheduled time < now+2min, bump it
+                let finalSchedule = scheduledAt;
+                const minAllowed = new Date(Date.now() + 2 * 60 * 1000);
+                if (new Date(scheduledAt) < minAllowed) {
+                  const y = minAllowed.getFullYear();
+                  const mo = String(minAllowed.getMonth() + 1).padStart(2, '0');
+                  const d = String(minAllowed.getDate()).padStart(2, '0');
+                  const h = String(minAllowed.getHours()).padStart(2, '0');
+                  const mi = String(minAllowed.getMinutes()).padStart(2, '0');
+                  finalSchedule = `${y}-${mo}-${d}T${h}:${mi}`;
+                  setScheduledAt(finalSchedule);
                 }
                 const body = getComposeBody();
                 if (body && onSaveDraft) {
-                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: scheduledAt }, () => {
+                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: finalSchedule }, () => {
                     setText(''); setMedia(null); setQuestion(''); setPollOptions(['', '']); setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0); setScheduleMode(false); setScheduledAt('');
                   });
                 }

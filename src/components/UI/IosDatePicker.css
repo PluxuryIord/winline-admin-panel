@@ -26,6 +26,10 @@
   color: #fff;
   font-weight: 700;
 }
+.ios-dp-item--disabled {
+  color: rgba(255, 255, 255, 0.1) !important;
+  pointer-events: none;
+}
 
 .ios-dp-year {
   font-size: 1.05rem;

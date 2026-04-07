@@ -1995,6 +1995,10 @@ input[type="checkbox"]:checked {
   color: #fff;
   font-weight: 700;
 }
+.ios-tp-item--disabled {
+  color: rgba(255, 255, 255, 0.1) !important;
+  pointer-events: none;
+}
 
 .ios-tp-highlight {
   position: absolute;
