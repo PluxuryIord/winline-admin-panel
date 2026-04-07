@@ -332,7 +332,8 @@ export default function ChatView() {
                   <div className={`chatview-bubble ${sticker ? 'chatview-bubble--sticker' : hasImages ? 'chatview-bubble--photo' : hasMedia ? 'chatview-bubble--media' : ''}`}>
                     {sticker && (() => {
                       const url = sticker.url || `/uploads/${sticker.filename}`;
-                      const isVideo = sticker.mimeType?.includes('webm') || sticker.mimeType?.includes('video');
+                      const urlOrName = url || sticker.filename || '';
+                      const isVideo = sticker.mimeType?.includes('webm') || sticker.mimeType?.includes('video') || urlOrName.endsWith('.webm');
                       return (
                         <div className="chatview-sticker">
                           {isVideo ? (
