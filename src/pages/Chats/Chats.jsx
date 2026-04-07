@@ -38,6 +38,7 @@ export default function Chats() {
   const [activeFolderId, setActiveFolderId] = useState(null); // null = All, 0 = "Без папки"
   const [createPrompt, setCreatePrompt] = useState(false);
   const [renamePrompt, setRenamePrompt] = useState(null); // folder obj
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null); // folder obj for delete confirm
   const [moveMenu, setMoveMenu] = useState(null); // { chatId, x, y }
   const moveMenuRef = useRef(null);
 
@@ -308,7 +309,16 @@ export default function Chats() {
           defaultValue={renamePrompt.name}
           onConfirm={renameFolder}
           onCancel={() => setRenamePrompt(null)}
-          extraAction={{ label: 'Удалить папку', onClick: () => deleteFolder(renamePrompt) }}
+          extraAction={{ label: 'Удалить папку', onClick: () => { setConfirmDeleteFolder(renamePrompt); setRenamePrompt(null); } }}
+        />
+      )}
+
+      {confirmDeleteFolder && (
+        <PromptModal
+          title={`Удалить папку «${confirmDeleteFolder.name}»?`}
+          isConfirm
+          onConfirm={() => { deleteFolder(confirmDeleteFolder); setConfirmDeleteFolder(null); }}
+          onCancel={() => setConfirmDeleteFolder(null)}
         />
       )}
 
