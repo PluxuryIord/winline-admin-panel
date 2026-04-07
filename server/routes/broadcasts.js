@@ -1233,6 +1233,8 @@ setInterval(async () => {
         console.log(`[scheduler] Broadcast #${sched.id} sent successfully`);
       } catch (err) {
         console.error(`[scheduler] Failed to send broadcast #${sched.id}:`, err.message);
+        // Mark as failed to prevent infinite retry loop
+        await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'failed' WHERE id = ?`, [sched.id]).catch(() => {});
       }
     }
   } catch (err) {
