@@ -305,7 +305,7 @@ export default function Chats() {
 
       {renamePrompt && (
         <PromptModal
-          title="Переименовать папку"
+          title="Изменить папку"
           placeholder="Название"
           defaultValue={renamePrompt.name}
           onConfirm={renameFolder}
