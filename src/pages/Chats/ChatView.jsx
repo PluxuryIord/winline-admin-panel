@@ -384,7 +384,7 @@ export default function ChatView() {
                       </div>
                     )}
                     {/* Файлы (не картинки) */}
-                    {ml.filter(m => !m.mimeType?.startsWith('image/')).map((m, idx) => {
+                    {ml.filter(m => !m.mimeType?.startsWith('image/') && !m.isSticker).map((m, idx) => {
                       const url = m.url || `/uploads/${m.filename}`;
                       return (
                         <a key={`f-${idx}`} href={url} download={m.originalName} className="chatview-file">
