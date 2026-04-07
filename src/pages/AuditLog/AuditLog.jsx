@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Loader } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import IosDatePicker from '../../components/UI/IosDatePicker';
 import './AuditLog.css';
 
 const ACTION_LABELS = {
@@ -167,17 +168,15 @@ export default function AuditLog() {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
-        <input
-          type="date"
-          className="audit-filter-date"
+        <IosDatePicker
+          compact
           value={dateFrom}
-          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+          onChange={(v) => { setDateFrom(v); setPage(1); }}
         />
-        <input
-          type="date"
-          className="audit-filter-date"
+        <IosDatePicker
+          compact
           value={dateTo}
-          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+          onChange={(v) => { setDateTo(v); setPage(1); }}
         />
       </div>
 

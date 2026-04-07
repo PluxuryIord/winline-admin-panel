@@ -9,6 +9,7 @@ import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
+import IosDatePicker from '../../components/UI/IosDatePicker';
 import './Broadcasts.css';
 
 /** Strip HTML for preview text */
@@ -446,19 +447,13 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
 
       {scheduleMode && (
         <div className="bc-schedule-picker-styled">
-          <div className="bc-schedule-date-section">
-            <Calendar size={14} />
-            <input
-              type="date"
-              className="bc-schedule-date-input"
-              value={scheduledAt ? scheduledAt.slice(0, 10) : ''}
-              onChange={e => {
-                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
-                setScheduledAt(e.target.value + 'T' + time);
-              }}
-              min={new Date().toISOString().slice(0, 10)}
-            />
-          </div>
+          <IosDatePicker
+            value={scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10)}
+            onChange={(date) => {
+              const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+              setScheduledAt(date + 'T' + time);
+            }}
+          />
           <IosTimePicker
             value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
             onChange={(time) => {
@@ -1746,6 +1741,8 @@ export default function Broadcasts() {
     const targetSection = draft.targetType || 'channels';
     setOpenSection(targetSection);
     setMounted(prev => ({ ...prev, [targetSection]: true }));
+    // Scroll to top so compose area is visible
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
   };
 
   const handleEditScheduled = (b) => {

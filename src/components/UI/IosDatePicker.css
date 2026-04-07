@@ -1,0 +1,96 @@
+/* ─── Shared iOS Date Picker Styles ─── */
+
+.ios-dp-col {
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  width: 56px;
+  position: relative;
+  z-index: 1;
+}
+.ios-dp-col::-webkit-scrollbar { display: none; }
+
+.ios-dp-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.25);
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: color 0.15s;
+  user-select: none;
+}
+.ios-dp-item--active {
+  color: #fff;
+  font-weight: 700;
+}
+
+.ios-dp-year {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  z-index: 1;
+  padding: 0 12px 0 4px;
+  user-select: none;
+}
+
+.ios-dp-highlight {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background: rgba(255, 126, 0, 0.15);
+  border-radius: 8px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ─── Inline variant (used in Broadcasts) ─── */
+.ios-dp-inline {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Compact variant (used in AuditLog, etc.) ─── */
+.ios-dp-compact-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ios-dp-compact-btn {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--color-white);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+}
+.ios-dp-compact-btn:hover,
+.ios-dp-compact-btn:focus {
+  outline: none;
+  border-color: var(--color-orange);
+}
+
+.ios-dp-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  align-items: center;
+  background: var(--color-panel);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  z-index: 100;
+  overflow: hidden;
+}

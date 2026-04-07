@@ -71,6 +71,8 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
     order.forEach((btnKey, btnIdx) => {
       const btn = screen.buttons[btnKey];
       if (!btn?.targetScreen || !screens[btn.targetScreen]) return;
+      // Skip self-referencing arrows
+      if (btn.targetScreen === srcId) return;
 
       if (btn.label?.includes('Назад') || btn.label?.includes('Меню') && btnKey.includes('back')) return;
 

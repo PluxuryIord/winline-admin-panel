@@ -4,6 +4,8 @@ import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import './VersionHistory.css';
 
+const PAGE_SIZE = 20;
+
 export default function VersionHistory() {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState([]);
@@ -13,6 +15,7 @@ export default function VersionHistory() {
   const [creating, setCreating] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteDraft, setNoteDraft] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const saveNote = async (snapId) => {
     try {
@@ -38,6 +41,17 @@ export default function VersionHistory() {
   }, []);
 
   useEffect(() => { fetchSnapshots(); }, [fetchSnapshots]);
+
+  // Infinite scroll on window
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+        setVisibleCount(prev => Math.min(prev + PAGE_SIZE, snapshots.length));
+      }
+    };
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [snapshots.length]);
 
   const handleRollback = async () => {
     if (!rollbackTarget) return;
@@ -98,7 +112,7 @@ export default function VersionHistory() {
           <div className="version-empty">Нет сохранённых версий</div>
         ) : (
           <div className="version-list">
-            {snapshots.map((snap, idx) => (
+            {snapshots.slice(0, visibleCount).map((snap, idx) => (
               <div key={snap.id} className={`version-item ${idx === 0 ? 'current' : ''}`}>
                 <div className="version-item-info">
                   {idx === 0 && <span className="version-current-badge">Текущая</span>}

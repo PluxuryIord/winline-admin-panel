@@ -92,6 +92,7 @@
   padding: 8px;
   max-height: 200px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .emoji-picker-item {
@@ -136,6 +137,7 @@
 .emoji-picker-standard {
   max-height: 240px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .emoji-picker-cat-label {
