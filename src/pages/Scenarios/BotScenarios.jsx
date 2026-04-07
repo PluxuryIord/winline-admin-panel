@@ -72,6 +72,21 @@ function migrateData(data) {
   if (!data?.screens) return data;
   let changed = false;
 
+  // Ensure all system screens exist
+  for (const sysId of SYSTEM_SCREENS) {
+    if (!data.screens[sysId]) {
+      const pos = DEFAULT_POSITIONS[sysId] || { x: 100, y: 100 };
+      data.screens[sysId] = {
+        title: sysId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        texts: [''],
+        buttons: { _order: [] },
+        x: pos.x,
+        y: pos.y,
+      };
+      changed = true;
+    }
+  }
+
   for (const [screenId, screen] of Object.entries(data.screens)) {
     // Add positions
     if (screen.x == null || screen.y == null) {
