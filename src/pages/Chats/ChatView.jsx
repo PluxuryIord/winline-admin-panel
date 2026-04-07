@@ -76,18 +76,16 @@ function PollBubble({ poll, userId }) {
   const options = poll.options || [];
 
   return (
-    <div className="cv-poll">
-      <div className="cv-poll-icon">{isQuiz ? '🧠' : '📊'}</div>
+    <div className={`cv-poll ${isQuiz ? 'cv-poll--quiz' : ''}`}>
+      <div className="cv-poll-badge">{isQuiz ? 'Викторина' : 'Опрос'}{poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}</div>
       <div className="cv-poll-question">{poll.question}</div>
-      <div className="cv-poll-meta">
-        {isQuiz ? 'Викторина' : 'Опрос'}
-        {poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}
-      </div>
+      <div className="cv-poll-divider" />
       <div className="cv-poll-options">
         {options.map((opt, i) => {
           const isVoted = vote?.voted && vote.optionIndex === i;
           return (
             <div key={i} className={`cv-poll-opt${isVoted ? ' cv-poll-opt--voted' : ''}`}>
+              <span className="cv-poll-opt-num">{i + 1}</span>
               <span className="cv-poll-opt-text">{opt}</span>
               {isVoted && <span className="cv-poll-opt-check">✓</span>}
             </div>
@@ -95,10 +93,10 @@ function PollBubble({ poll, userId }) {
         })}
       </div>
       {vote?.voted && (
-        <div className="cv-poll-voted-label">Пользователь проголосовал за вариант {vote.optionIndex + 1}</div>
+        <div className="cv-poll-status cv-poll-status--voted">Ответ: вариант {vote.optionIndex + 1}</div>
       )}
       {!loading && poll.pollId && !vote?.voted && (
-        <div className="cv-poll-voted-label cv-poll-no-vote">Пользователь ещё не голосовал</div>
+        <div className="cv-poll-status cv-poll-status--pending">Ожидает ответа</div>
       )}
     </div>
   );
