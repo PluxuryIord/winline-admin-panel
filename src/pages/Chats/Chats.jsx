@@ -136,13 +136,11 @@ export default function Chats() {
   };
 
   const deleteFolder = async (folder) => {
-    const f = folder || deleteFolderPrompt;
-    setDeleteFolderPrompt(null);
+    if (!folder) return;
     setRenamePrompt(null);
-    if (!f) return;
-    await api.delete(`/api/chat-folders/${f.id}`);
-    if (activeFolderId === f.id) setActiveFolderId(null);
-    setChats(prev => prev.map(c => c.folderId === f.id ? { ...c, folderId: null } : c));
+    await api.delete(`/api/chat-folders/${folder.id}`);
+    if (activeFolderId === folder.id) setActiveFolderId(null);
+    setChats(prev => prev.map(c => c.folderId === folder.id ? { ...c, folderId: null } : c));
     reloadFolders();
   };
 
