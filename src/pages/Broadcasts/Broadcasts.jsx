@@ -79,9 +79,17 @@ function IosTimePicker({ value, onChange, minTime = null }) {
     }
   };
 
+  // Build filtered item lists for scroll offset calculation
+  const hourItems = [];
+  for (let i = 0; i < 24; i++) { if (!isHourDisabled(i)) hourItems.push(i); }
+  const minItems = [];
+  for (let i = 0; i < 60; i++) { if (!isMinDisabled(i)) minItems.push(i); }
+
   useEffect(() => {
-    scrollToValue(hoursRef, hours);
-    scrollToValue(minsRef, minutes);
+    const hIdx = hourItems.indexOf(hours);
+    const mIdx = minItems.indexOf(minutes);
+    scrollToValue(hoursRef, hIdx >= 0 ? hIdx : 0);
+    scrollToValue(minsRef, mIdx >= 0 ? mIdx : 0);
   }, []); // eslint-disable-line
 
   const clampTime = (h, m) => {
@@ -104,27 +112,40 @@ function IosTimePicker({ value, onChange, minTime = null }) {
   const isHourDisabled = (h) => minH != null && h < minH;
   const isMinDisabled = (m) => minH != null && hours === minH && minM != null && m < minM;
 
-  const renderColumn = (ref, count, val, isHours) => (
-    <div className="ios-tp-col" ref={ref}
-      onScroll={() => handleScroll(ref, count - 1, isHours)}
-      style={{ height: ITEM_H * VISIBLE }}
-    >
-      <div style={{ height: ITEM_H * 2 }} />
-      {Array.from({ length: count }, (_, i) => {
-        const disabled = isHours ? isHourDisabled(i) : isMinDisabled(i);
-        return (
-          <div key={i}
-            className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''} ${disabled ? 'ios-tp-item--disabled' : ''}`}
+  const renderColumn = (ref, count, val, isHours) => {
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      const disabled = isHours ? isHourDisabled(i) : isMinDisabled(i);
+      if (!disabled) items.push(i);
+    }
+    const activeIdx = items.indexOf(val);
+    return (
+      <div className="ios-tp-col" ref={ref}
+        onScroll={() => {
+          const idx = Math.round(ref.current.scrollTop / ITEM_H);
+          const clamped = Math.max(0, Math.min(items.length - 1, idx));
+          const realVal = items[clamped];
+          let h = isHours ? realVal : hours;
+          let m = isHours ? minutes : realVal;
+          [h, m] = clampTime(h, m);
+          onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }}
+        style={{ height: ITEM_H * VISIBLE }}
+      >
+        <div style={{ height: ITEM_H * 2 }} />
+        {items.map((realI, idx) => (
+          <div key={realI}
+            className={`ios-tp-item ${realI === val ? 'ios-tp-item--active' : ''}`}
             style={{ height: ITEM_H }}
-            onClick={() => !disabled && scrollToValue(ref, i)}
+            onClick={() => scrollToValue(ref, idx)}
           >
-            {String(i).padStart(2, '0')}
+            {String(realI).padStart(2, '0')}
           </div>
-        );
-      })}
-      <div style={{ height: ITEM_H * 2 }} />
-    </div>
-  );
+        ))}
+        <div style={{ height: ITEM_H * 2 }} />
+      </div>
+    );
+  };
 
   return (
     <div className="ios-tp">

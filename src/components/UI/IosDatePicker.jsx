@@ -29,11 +29,31 @@ export default function IosDatePicker({ value, onChange, compact = false, minDat
     if (ref.current) ref.current.scrollTop = val * ITEM_H;
   };
 
+  // Helper: get filtered index for a value
+  const filteredDayIdx = () => {
+    let vi = 0;
+    for (let i = 0; i < daysInMonth; i++) {
+      if (isDayDisabled(i)) continue;
+      if (i === selDay - 1) return vi;
+      vi++;
+    }
+    return 0;
+  };
+  const filteredMonIdx = () => {
+    let vi = 0;
+    for (let i = 0; i < 12; i++) {
+      if (isMonthDisabled(i)) continue;
+      if (i === selMonth) return vi;
+      vi++;
+    }
+    return 0;
+  };
+
   useEffect(() => {
     if (open) {
       setTimeout(() => {
-        scrollTo(dayRef, selDay - 1);
-        scrollTo(monRef, selMonth);
+        scrollTo(dayRef, filteredDayIdx());
+        scrollTo(monRef, filteredMonIdx());
       }, 50);
     }
   }, [open]); // eslint-disable-line
@@ -73,22 +93,18 @@ export default function IosDatePicker({ value, onChange, compact = false, minDat
     onChange(`${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
   };
 
-  const handleDayScroll = () => {
-    const idx = Math.round(dayRef.current.scrollTop / ITEM_H);
-    const clamped = Math.max(0, Math.min(daysInMonth - 1, idx));
-    const newDay = clamped + 1;
+  const handleDayScroll = (realIdx) => {
+    const newDay = realIdx + 1;
     setSelDay(newDay);
     clampAndEmit(newDay, selMonth, selYear);
   };
 
-  const handleMonScroll = () => {
-    const idx = Math.round(monRef.current.scrollTop / ITEM_H);
-    const clamped = Math.max(0, Math.min(11, idx));
-    setSelMonth(clamped);
-    const maxD = new Date(selYear, clamped + 1, 0).getDate();
+  const handleMonScroll = (realIdx) => {
+    setSelMonth(realIdx);
+    const maxD = new Date(selYear, realIdx + 1, 0).getDate();
     const newDay = Math.min(selDay, maxD);
     setSelDay(newDay);
-    clampAndEmit(newDay, clamped, selYear);
+    clampAndEmit(newDay, realIdx, selYear);
   };
 
   // Check if a day/month is before minDate
@@ -104,23 +120,36 @@ export default function IosDatePicker({ value, onChange, compact = false, minDat
     return lastDay < minD;
   };
 
-  const renderCol = (ref, items, activeIdx, onScroll, disabledFn) => (
-    <div className="ios-dp-col" ref={ref} onScroll={onScroll} style={{ height: ITEM_H * VISIBLE }}>
-      <div style={{ height: ITEM_H * 2 }} />
-      {items.map((label, i) => {
-        const disabled = disabledFn ? disabledFn(i) : false;
-        return (
-          <div key={i}
-            className={`ios-dp-item ${i === activeIdx ? 'ios-dp-item--active' : ''} ${disabled ? 'ios-dp-item--disabled' : ''}`}
+  const renderCol = (ref, items, activeIdx, onScroll, disabledFn) => {
+    // Filter out disabled items, keep mapping to original indices
+    const filtered = [];
+    items.forEach((label, i) => {
+      const disabled = disabledFn ? disabledFn(i) : false;
+      if (!disabled) filtered.push({ label, origIdx: i });
+    });
+    const visibleActiveIdx = filtered.findIndex(f => f.origIdx === activeIdx);
+    return (
+      <div className="ios-dp-col" ref={ref}
+        onScroll={() => {
+          const scrollIdx = Math.round(ref.current.scrollTop / ITEM_H);
+          const clamped = Math.max(0, Math.min(filtered.length - 1, scrollIdx));
+          const realIdx = filtered[clamped].origIdx;
+          onScroll(realIdx);
+        }}
+        style={{ height: ITEM_H * VISIBLE }}>
+        <div style={{ height: ITEM_H * 2 }} />
+        {filtered.map((f, vi) => (
+          <div key={f.origIdx}
+            className={`ios-dp-item ${f.origIdx === activeIdx ? 'ios-dp-item--active' : ''}`}
             style={{ height: ITEM_H }}
-            onClick={() => !disabled && scrollTo(ref, i)}>
-            {label}
+            onClick={() => { if (ref.current) ref.current.scrollTop = vi * ITEM_H; }}>
+            {f.label}
           </div>
-        );
-      })}
-      <div style={{ height: ITEM_H * 2 }} />
-    </div>
-  );
+        ))}
+        <div style={{ height: ITEM_H * 2 }} />
+      </div>
+    );
+  };
 
   const dayItems = Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, '0'));
   const displayStr = value
