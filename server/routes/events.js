@@ -516,7 +516,7 @@ router.post('/questions', async (req, res, next) => {
     const [maxRow] = await dbPool.query('SELECT COALESCE(MAX(`order`), 0) AS mx FROM event_questions');
     const nextOrder = (maxRow[0]?.mx || 0) + 1;
     const [result] = await dbPool.query(
-      'INSERT INTO event_questions (question_text, question_type, options, `order`) VALUES (?, ?, ?, ?)',
+      'INSERT INTO event_questions (question_text, question_type, options, `order`, is_active) VALUES (?, ?, ?, ?, 1)',
       [question_text.trim(), question_type, options ? JSON.stringify(options) : null, nextOrder]
     );
     res.json({ id: result.insertId, question_text: question_text.trim(), question_type, options, order: nextOrder, is_active: true });
