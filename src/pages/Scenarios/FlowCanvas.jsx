@@ -8,7 +8,7 @@ import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
 const SCENARIO_GROUPS = {
   'Сценарий 1': ['start_menu', 'registration_flow'],
   'Сценарий 2': ['auth_flow', 'main_menu', 'offer_page', 'promo_page', 'socials_page'],
-  'Сценарий 3': ['event_flow'],
+  'Сценарий 3': ['event_flow', 'event_anketa'],
   'Сценарий 4': ['group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb'],
 };
 

@@ -9,7 +9,7 @@ import { api } from '../../utils/api';
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
   main_menu: '🏠', offer_page: '📋', promo_page: '🎨',
-  socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
+  socials_page: '📱', event_flow: '🎪', event_anketa: '📋', logout_screen: '🚪',
   knowledge_base: '📚', group_menu: '💬', group_promo: '📢',
   group_calendar: '📅', group_landings: '🌐', group_kb: '📖',
 };

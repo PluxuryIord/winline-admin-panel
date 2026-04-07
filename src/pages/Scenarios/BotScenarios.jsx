@@ -8,7 +8,7 @@ import './BotScenarios.css';
 // System screens that cannot be deleted
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
-  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'event_anketa', 'logout_screen',
 ]);
 
 // ─── Callback → Screen mapping (for auto-migration) ────────────────────────
@@ -21,6 +21,7 @@ const CALLBACK_TO_SCREEN = {
   client_promo: 'promo_page',
   client_socials: 'socials_page',
   client_at_event: 'event_flow',
+  client_event_anketa: 'event_anketa',
   client_logout: 'logout_screen',
 };
 
@@ -34,6 +35,7 @@ const SCREEN_TO_CALLBACK = {
   promo_page: 'client_promo',
   socials_page: 'client_socials',
   event_flow: 'client_at_event',
+  event_anketa: 'client_event_anketa',
   logout_screen: 'client_logout',
 };
 
@@ -52,6 +54,7 @@ const DEFAULT_POSITIONS = {
 
   // Сценарий 3: Мероприятие
   event_flow:        { x: 900, y: 350 },
+  event_anketa:      { x: 1300, y: 60 },
 
   // Выход
   logout_screen:     { x: 1300, y: 350 },
