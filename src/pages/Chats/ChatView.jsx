@@ -338,7 +338,12 @@ export default function ChatView() {
                           {isVideo ? (
                             <video src={url} autoPlay loop muted playsInline className="chatview-sticker-media" />
                           ) : (
-                            <img src={url} alt="sticker" className="chatview-sticker-media" />
+                            <img
+                              src={url}
+                              alt="sticker"
+                              className="chatview-sticker-media"
+                              onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = '<span style="font-size:2rem">🖼️</span>'; }}
+                            />
                           )}
                         </div>
                       );
