@@ -12,7 +12,7 @@ export default function EmojiPicker({ onInsert, textareaRef, compact = false, cu
   const cursorPosRef = useRef(null);
   const triggerRef = useRef(null);
 
-  const popupWidth = compact ? 220 : 280;
+  const popupWidth = compact ? 220 : 340;
 
   const handleOpen = () => {
     if (textareaRef?.current) {
