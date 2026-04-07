@@ -471,4 +471,87 @@ router.put('/toggle', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Anketa Questions CRUD ──────────────────────────────────────────────────
+
+// Ensure table exists
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS event_questions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      question_text TEXT NOT NULL,
+      question_type VARCHAR(20) NOT NULL DEFAULT 'text',
+      options JSON DEFAULT NULL,
+      \`order\` INT NOT NULL DEFAULT 0,
+      is_active TINYINT(1) NOT NULL DEFAULT 1
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[events] Failed to create event_questions table:', err.message);
+  }
+})();
+
+// GET /api/events/questions
+router.get('/questions', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query('SELECT id, question_text, question_type, options, `order`, is_active FROM event_questions ORDER BY `order` ASC');
+    res.json(rows.map(r => ({
+      ...r,
+      options: typeof r.options === 'string' ? JSON.parse(r.options) : (r.options || null),
+      is_active: !!r.is_active,
+    })));
+  } catch (err) { next(err); }
+});
+
+// POST /api/events/questions
+router.post('/questions', async (req, res, next) => {
+  try {
+    const { question_text, question_type = 'text', options = null } = req.body;
+    if (!question_text?.trim()) return res.status(400).json({ error: 'question_text required' });
+    const [maxRow] = await dbPool.query('SELECT COALESCE(MAX(`order`), 0) AS mx FROM event_questions');
+    const nextOrder = (maxRow[0]?.mx || 0) + 1;
+    const [result] = await dbPool.query(
+      'INSERT INTO event_questions (question_text, question_type, options, `order`) VALUES (?, ?, ?, ?)',
+      [question_text.trim(), question_type, options ? JSON.stringify(options) : null, nextOrder]
+    );
+    res.json({ id: result.insertId, question_text: question_text.trim(), question_type, options, order: nextOrder, is_active: true });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/events/questions/:id
+router.put('/questions/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const updates = [];
+    const params = [];
+    if (req.body.question_text !== undefined) { updates.push('question_text = ?'); params.push(req.body.question_text); }
+    if (req.body.question_type !== undefined) { updates.push('question_type = ?'); params.push(req.body.question_type); }
+    if (req.body.options !== undefined) { updates.push('options = ?'); params.push(req.body.options ? JSON.stringify(req.body.options) : null); }
+    if (req.body.order !== undefined) { updates.push('`order` = ?'); params.push(Number(req.body.order)); }
+    if (req.body.is_active !== undefined) { updates.push('is_active = ?'); params.push(req.body.is_active ? 1 : 0); }
+    if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
+    params.push(id);
+    await dbPool.query(`UPDATE event_questions SET ${updates.join(', ')} WHERE id = ?`, params);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/events/questions/:id
+router.delete('/questions/:id', async (req, res, next) => {
+  try {
+    await dbPool.query('DELETE FROM event_questions WHERE id = ?', [Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/events/questions/reorder — [{id, order}, ...]
+router.put('/questions/reorder', async (req, res, next) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Array expected' });
+    for (const item of items) {
+      await dbPool.query('UPDATE event_questions SET `order` = ? WHERE id = ?', [item.order, item.id]);
+    }
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 export default router;

@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
   Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye, ImageIcon,
+  ClipboardList, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import { api } from '../../utils/api';
@@ -21,6 +22,155 @@ const ENTRY_POINTS = new Set(['start_menu', 'event_flow', 'group_menu']);
 const LOCKED_CONNECTIONS = new Set([
   'start_menu', 'registration_flow', 'auth_flow',
 ]);
+
+// ─── Anketa Question Manager ─────────────────────────────────────────────────
+function AnketaQuestionManager() {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [newText, setNewText] = useState('');
+  const [newType, setNewType] = useState('text');
+  const [newOptions, setNewOptions] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editType, setEditType] = useState('text');
+  const [editOptions, setEditOptions] = useState('');
+
+  const load = async () => {
+    try {
+      const res = await api.get('/api/events/questions');
+      if (res.ok) setQuestions(await res.json());
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleAdd = async () => {
+    if (!newText.trim()) return;
+    setAdding(true);
+    const opts = newType === 'choice' ? newOptions.split(',').map(s => s.trim()).filter(Boolean) : null;
+    if (newType === 'choice' && (!opts || opts.length < 2)) { setAdding(false); return alert('Нужно минимум 2 варианта через запятую'); }
+    try {
+      await api.post('/api/events/questions', { question_text: newText.trim(), question_type: newType, options: opts });
+      setNewText(''); setNewType('text'); setNewOptions('');
+      await load();
+    } catch {}
+    setAdding(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Удалить вопрос?')) return;
+    await api.delete(`/api/events/questions/${id}`);
+    await load();
+  };
+
+  const handleToggle = async (q) => {
+    await api.put(`/api/events/questions/${q.id}`, { is_active: !q.is_active });
+    await load();
+  };
+
+  const handleMove = async (idx, dir) => {
+    const arr = [...questions];
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    const reorder = arr.map((q, i) => ({ id: q.id, order: i + 1 }));
+    await api.put('/api/events/questions/reorder', reorder);
+    await load();
+  };
+
+  const startEdit = (q) => {
+    setEditingId(q.id);
+    setEditText(q.question_text);
+    setEditType(q.question_type);
+    setEditOptions(q.options ? q.options.join(', ') : '');
+  };
+
+  const saveEdit = async () => {
+    const opts = editType === 'choice' ? editOptions.split(',').map(s => s.trim()).filter(Boolean) : null;
+    if (editType === 'choice' && (!opts || opts.length < 2)) return alert('Нужно минимум 2 варианта через запятую');
+    await api.put(`/api/events/questions/${editingId}`, { question_text: editText, question_type: editType, options: opts });
+    setEditingId(null);
+    await load();
+  };
+
+  if (loading) return <div style={{ padding: 16, color: '#888' }}><Loader size={16} className="sc-spinner" /> Загрузка...</div>;
+
+  return (
+    <div className="sc-section">
+      <h3 className="sc-section-title"><ClipboardList size={16} /> Вопросы анкеты</h3>
+
+      {/* Question list */}
+      <div className="anketa-questions-list">
+        {questions.length === 0 && <p style={{ color: '#888', fontSize: '0.85rem', padding: '8px 0' }}>Вопросов пока нет</p>}
+        {questions.map((q, idx) => (
+          <div key={q.id} className={`anketa-q-card ${!q.is_active ? 'anketa-q-inactive' : ''}`}>
+            {editingId === q.id ? (
+              <div className="anketa-q-edit">
+                <input className="anketa-q-input" value={editText} onChange={e => setEditText(e.target.value)} placeholder="Текст вопроса" />
+                <div className="anketa-q-type-row">
+                  <select className="anketa-q-select" value={editType} onChange={e => setEditType(e.target.value)}>
+                    <option value="text">Текстовый</option>
+                    <option value="choice">С вариантами</option>
+                  </select>
+                  {editType === 'choice' && (
+                    <input className="anketa-q-input" value={editOptions} onChange={e => setEditOptions(e.target.value)} placeholder="Вариант 1, Вариант 2, ..." />
+                  )}
+                </div>
+                <div className="anketa-q-edit-actions">
+                  <button className="anketa-q-save-btn" onClick={saveEdit}><Check size={14} /> Сохранить</button>
+                  <button className="anketa-q-cancel-btn" onClick={() => setEditingId(null)}><X size={14} /></button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="anketa-q-header">
+                  <div className="anketa-q-arrows">
+                    <button onClick={() => handleMove(idx, -1)} disabled={idx === 0}><ChevronUp size={14} /></button>
+                    <button onClick={() => handleMove(idx, 1)} disabled={idx === questions.length - 1}><ChevronDown size={14} /></button>
+                  </div>
+                  <div className="anketa-q-body" onClick={() => startEdit(q)}>
+                    <span className="anketa-q-text">{q.question_text}</span>
+                    <span className="anketa-q-type-badge">{q.question_type === 'choice' ? '🔘 Выбор' : '✏️ Текст'}</span>
+                  </div>
+                  <div className="anketa-q-actions">
+                    <button onClick={() => handleToggle(q)} title={q.is_active ? 'Выключить' : 'Включить'}>
+                      {q.is_active ? <ToggleRight size={18} color="var(--color-orange)" /> : <ToggleLeft size={18} />}
+                    </button>
+                    <button onClick={() => handleDelete(q.id)} title="Удалить"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+                {q.question_type === 'choice' && q.options && (
+                  <div className="anketa-q-options">
+                    {q.options.map((opt, i) => <span key={i} className="anketa-q-option-chip">{opt}</span>)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add new question */}
+      <div className="anketa-add-block">
+        <input className="anketa-q-input" value={newText} onChange={e => setNewText(e.target.value)} placeholder="Текст нового вопроса..." onKeyDown={e => e.key === 'Enter' && newType === 'text' && handleAdd()} />
+        <div className="anketa-q-type-row">
+          <select className="anketa-q-select" value={newType} onChange={e => setNewType(e.target.value)}>
+            <option value="text">Текстовый ответ</option>
+            <option value="choice">С вариантами (кнопки)</option>
+          </select>
+          {newType === 'choice' && (
+            <input className="anketa-q-input" value={newOptions} onChange={e => setNewOptions(e.target.value)} placeholder="Вариант 1, Вариант 2, ..." />
+          )}
+          <button className="anketa-q-add-btn" onClick={handleAdd} disabled={adding || !newText.trim()}>
+            {adding ? <Loader size={14} className="sc-spinner" /> : <Plus size={14} />} Добавить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function NodeEditorPanel({
   screenId, editData, allScreens, isCustom,
@@ -208,6 +358,9 @@ export default function NodeEditorPanel({
           })}
         </div>
       )}
+
+      {/* Anketa Questions (only for event_anketa screen) */}
+      {screenId === 'event_anketa' && <AnketaQuestionManager />}
 
       {/* Buttons */}
       <div className="sc-section">

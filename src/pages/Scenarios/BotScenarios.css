@@ -1502,3 +1502,73 @@
   color: #fff;
 }
 .eaq-btn--primary:hover { background: linear-gradient(135deg, rgba(255,126,0,0.35), rgba(255,126,0,0.2)); }
+
+/* ─── Anketa Question Manager ─── */
+.anketa-questions-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.anketa-q-card {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 10px 12px; transition: all 0.15s;
+}
+.anketa-q-card:hover { border-color: rgba(255,126,0,0.25); }
+.anketa-q-inactive { opacity: 0.45; }
+.anketa-q-header { display: flex; align-items: center; gap: 8px; }
+.anketa-q-arrows { display: flex; flex-direction: column; gap: 2px; }
+.anketa-q-arrows button {
+  background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; padding: 0;
+  display: flex; align-items: center;
+}
+.anketa-q-arrows button:hover:not(:disabled) { color: var(--color-orange); }
+.anketa-q-arrows button:disabled { opacity: 0.2; cursor: default; }
+.anketa-q-body { flex: 1; cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.anketa-q-text { font-size: 0.9rem; color: #ddd; word-break: break-word; }
+.anketa-q-type-badge { font-size: 0.75rem; color: rgba(255,255,255,0.45); }
+.anketa-q-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.anketa-q-actions button {
+  background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; padding: 2px;
+  display: flex; align-items: center;
+}
+.anketa-q-actions button:hover { color: var(--color-orange); }
+.anketa-q-options { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 0 0 30px; }
+.anketa-q-option-chip {
+  padding: 3px 10px; border-radius: 12px; font-size: 0.78rem;
+  background: rgba(255,126,0,0.12); color: var(--color-orange); font-weight: 500;
+}
+.anketa-q-edit { display: flex; flex-direction: column; gap: 8px; }
+.anketa-q-input {
+  flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 0.88rem;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); color: #fff;
+  outline: none; font-family: inherit;
+}
+.anketa-q-input:focus { border-color: rgba(255,126,0,0.5); }
+.anketa-q-select {
+  padding: 8px 10px; border-radius: 8px; font-size: 0.85rem;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); color: #fff;
+  outline: none; font-family: inherit; cursor: pointer;
+}
+.anketa-q-type-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.anketa-q-edit-actions { display: flex; gap: 6px; }
+.anketa-q-save-btn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 8px;
+  background: rgba(46,204,113,0.2); border: 1px solid rgba(46,204,113,0.4); color: #2ecc71;
+  font-size: 0.82rem; cursor: pointer; font-family: inherit;
+}
+.anketa-q-save-btn:hover { background: rgba(46,204,113,0.3); }
+.anketa-q-cancel-btn {
+  display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #aaa;
+  cursor: pointer; font-family: inherit;
+}
+.anketa-q-cancel-btn:hover { color: #fff; }
+.anketa-add-block {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border-radius: 10px;
+  background: rgba(255,126,0,0.04); border: 1px dashed rgba(255,126,0,0.2);
+}
+.anketa-q-add-btn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 8px 16px; border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255,126,0,0.25), rgba(255,126,0,0.15));
+  border: 1px solid rgba(255,126,0,0.4); color: #fff;
+  font-size: 0.85rem; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.anketa-q-add-btn:hover { background: linear-gradient(135deg, rgba(255,126,0,0.35), rgba(255,126,0,0.2)); }
+.anketa-q-add-btn:disabled { opacity: 0.5; cursor: default; }
