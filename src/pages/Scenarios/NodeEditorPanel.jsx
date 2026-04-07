@@ -39,8 +39,9 @@ function AnketaQuestionManager() {
   const load = async () => {
     try {
       const res = await api.get('/api/events/questions');
-      if (res.ok) setQuestions(await res.json());
-    } catch {}
+      if (res.ok) { setQuestions(await res.json()); }
+      else { console.error('Load questions failed:', res.status, await res.text()); }
+    } catch (e) { console.error('Load questions error:', e); }
     setLoading(false);
   };
 
@@ -52,10 +53,11 @@ function AnketaQuestionManager() {
     const opts = newType === 'choice' ? newOptions.split(',').map(s => s.trim()).filter(Boolean) : null;
     if (newType === 'choice' && (!opts || opts.length < 2)) { setAdding(false); return alert('Нужно минимум 2 варианта через запятую'); }
     try {
-      await api.post('/api/events/questions', { question_text: newText.trim(), question_type: newType, options: opts });
+      const res = await api.post('/api/events/questions', { question_text: newText.trim(), question_type: newType, options: opts });
+      if (!res.ok) { const err = await res.text(); console.error('Add question failed:', err); alert('Ошибка: ' + err); setAdding(false); return; }
       setNewText(''); setNewType('text'); setNewOptions('');
       await load();
-    } catch {}
+    } catch (e) { console.error('Add question error:', e); alert('Ошибка при добавлении: ' + e.message); }
     setAdding(false);
   };
 
