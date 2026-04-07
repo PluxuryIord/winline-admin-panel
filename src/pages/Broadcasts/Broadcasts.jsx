@@ -79,6 +79,17 @@ function IosTimePicker({ value, onChange, minTime = null }) {
     }
   };
 
+  const isHourDisabled = (h) => minH != null && h < minH;
+  const isMinDisabled = (m) => minH != null && hours === minH && minM != null && m < minM;
+
+  const clampTime = (h, m) => {
+    if (minH != null) {
+      if (h < minH) { h = minH; m = minM || 0; }
+      else if (h === minH && minM != null && m < minM) { m = minM; }
+    }
+    return [h, m];
+  };
+
   // Build filtered item lists for scroll offset calculation
   const hourItems = [];
   for (let i = 0; i < 24; i++) { if (!isHourDisabled(i)) hourItems.push(i); }
@@ -91,26 +102,6 @@ function IosTimePicker({ value, onChange, minTime = null }) {
     scrollToValue(hoursRef, hIdx >= 0 ? hIdx : 0);
     scrollToValue(minsRef, mIdx >= 0 ? mIdx : 0);
   }, []); // eslint-disable-line
-
-  const clampTime = (h, m) => {
-    if (minH != null) {
-      if (h < minH) { h = minH; m = minM || 0; }
-      else if (h === minH && minM != null && m < minM) { m = minM; }
-    }
-    return [h, m];
-  };
-
-  const handleScroll = (ref, max, isHours) => {
-    const idx = Math.round(ref.current.scrollTop / ITEM_H);
-    const clamped = Math.max(0, Math.min(max, idx));
-    let h = isHours ? clamped : hours;
-    let m = isHours ? minutes : clamped;
-    [h, m] = clampTime(h, m);
-    onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-  };
-
-  const isHourDisabled = (h) => minH != null && h < minH;
-  const isMinDisabled = (m) => minH != null && hours === minH && minM != null && m < minM;
 
   const renderColumn = (ref, count, val, isHours) => {
     const items = [];
