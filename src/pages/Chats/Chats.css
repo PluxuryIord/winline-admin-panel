@@ -92,22 +92,10 @@
   position: relative;
 }
 
-/* Unread indicator */
-.chat-item--unread {
-  border-color: rgba(255, 126, 0, 0.25);
-}
-
-.chat-item--unread::after {
-  content: '';
-  position: absolute;
-  left: 44px;
-  top: 12px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-orange);
-  box-shadow: 0 0 8px rgba(255, 126, 0, 0.5);
-  border: 2px solid #1a1a1a;
+/* Unread indicator — bright orange avatar border */
+.chat-item--unread .chat-item-avatar {
+  border: 2.5px solid var(--color-orange);
+  box-shadow: 0 0 10px rgba(255, 126, 0, 0.35);
 }
 
 .chat-item:hover {
