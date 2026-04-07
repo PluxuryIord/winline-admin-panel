@@ -50,7 +50,9 @@ export default function IosDatePicker({ value, onChange, compact = false, minDat
   };
 
   useEffect(() => {
-    if (open) {
+    // Scroll to active position on open (compact) or mount (inline)
+    const shouldScroll = compact ? open : true;
+    if (shouldScroll) {
       setTimeout(() => {
         scrollTo(dayRef, filteredDayIdx());
         scrollTo(monRef, filteredMonIdx());

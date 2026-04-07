@@ -1932,6 +1932,96 @@ input[type="checkbox"]:checked {
   border-radius: 14px;
 }
 
+/* Schedule modal */
+.bc-schedule-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bc-schedule-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  min-width: 360px;
+  max-width: 90vw;
+  overflow: hidden;
+}
+.bc-schedule-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+}
+.bc-schedule-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+}
+.bc-schedule-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.bc-schedule-modal-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 18px 18px 12px;
+  justify-content: center;
+}
+.bc-schedule-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.bc-schedule-section-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.bc-schedule-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bc-schedule-modal-preview {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+.bc-schedule-modal-ok {
+  background: var(--color-orange);
+  color: #fff;
+  border: none;
+  padding: 8px 22px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.bc-schedule-modal-ok:hover {
+  opacity: 0.9;
+}
+
 .bc-schedule-date-section {
   display: flex;
   align-items: center;

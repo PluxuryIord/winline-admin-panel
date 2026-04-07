@@ -479,33 +479,53 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
 
       {scheduleMode && (() => {
         const now = new Date();
-        const todayStr = now.toISOString().slice(0, 10);
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const selDate = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+        const selTime = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
         const isToday = selDate === todayStr;
-        // If today, min time = current time + 2 minutes
         let minTimeStr = null;
         if (isToday) {
           const min = new Date(now.getTime() + 2 * 60 * 1000);
           minTimeStr = `${String(min.getHours()).padStart(2, '0')}:${String(min.getMinutes()).padStart(2, '0')}`;
         }
         return (
-          <div className="bc-schedule-picker-styled">
-            <IosDatePicker
-              value={selDate}
-              minDate={todayStr}
-              onChange={(date) => {
-                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
-                setScheduledAt(date + 'T' + time);
-              }}
-            />
-            <IosTimePicker
-              value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
-              minTime={minTimeStr}
-              onChange={(time) => {
-                const date = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
-                setScheduledAt(date + 'T' + time);
-              }}
-            />
+          <div className="bc-schedule-overlay" onClick={() => setScheduleMode(false)}>
+            <div className="bc-schedule-modal" onClick={e => e.stopPropagation()}>
+              <div className="bc-schedule-modal-header">
+                <span>Запланировать отправку</span>
+                <button className="bc-schedule-modal-close" onClick={() => setScheduleMode(false)}><X size={16} /></button>
+              </div>
+              <div className="bc-schedule-modal-body">
+                <div className="bc-schedule-section">
+                  <div className="bc-schedule-section-label">Дата</div>
+                  <IosDatePicker
+                    value={selDate}
+                    minDate={todayStr}
+                    onChange={(date) => {
+                      const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+                      setScheduledAt(date + 'T' + time);
+                    }}
+                  />
+                </div>
+                <div className="bc-schedule-section">
+                  <div className="bc-schedule-section-label">Время</div>
+                  <IosTimePicker
+                    value={selTime}
+                    minTime={minTimeStr}
+                    onChange={(time) => {
+                      const date = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+                      setScheduledAt(date + 'T' + time);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="bc-schedule-modal-footer">
+                <span className="bc-schedule-modal-preview">
+                  {selDate.split('-').reverse().join('.')} в {selTime}
+                </span>
+                <button className="bc-schedule-modal-ok" onClick={() => setScheduleMode(false)}>Готово</button>
+              </div>
+            </div>
           </div>
         );
       })()}
