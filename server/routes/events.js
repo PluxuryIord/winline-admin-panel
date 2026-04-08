@@ -546,9 +546,21 @@ router.put('/questions/:id', async (req, res, next) => {
 router.delete('/questions/:id', async (req, res, next) => {
   try {
     await ensureQuestionsTable();
-    await dbPool.query('DELETE FROM event_questions WHERE id = ?', [Number(req.params.id)]);
-    res.json({ ok: true });
-  } catch (err) { next(err); }
+    const id = Number(req.params.id);
+    console.log('[events] Deleting question id:', id);
+    // Try to delete related answers first (bot may have created FK tables)
+    try { await dbPool.query('DELETE FROM event_anketa_answers WHERE question_id = ?', [id]); } catch {}
+    try { await dbPool.query('DELETE FROM event_answers WHERE question_id = ?', [id]); } catch {}
+    const [result] = await dbPool.query('DELETE FROM event_questions WHERE id = ?', [id]);
+    console.log('[events] Delete result:', JSON.stringify(result));
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ ok: false, error: 'Вопрос не найден в БД', id });
+    }
+    res.json({ ok: true, deleted: id });
+  } catch (err) {
+    console.error('[events] Delete question error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // PUT /api/events/questions/reorder — [{id, order}, ...]
