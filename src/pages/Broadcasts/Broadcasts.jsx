@@ -239,6 +239,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
   const [media, setMedia] = useState(null);
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [confirmSend, setConfirmSend] = useState(false);
 
   // Poll state
   const [question, setQuestion] = useState('');
@@ -473,7 +474,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
           className={`bc-schedule-btn ${scheduleMode ? 'bc-schedule-btn--active' : ''}`}
           onClick={() => setScheduleMode(true)}
         >
-          <Clock size={13} /> Запланировать
+          <Clock size={13} /> {scheduledAt ? `${scheduledAt.slice(8,10)}.${scheduledAt.slice(5,7)} в ${scheduledAt.slice(11,16)}` : 'Запланировать'}
         </button>
       </div>
 
@@ -573,8 +574,14 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
             >
               <Clock size={16} /> Запланировать
             </button>
+          ) : confirmSend ? (
+            <div className="bc-confirm-send">
+              <span>Отправить сейчас?</span>
+              <button className="bc-confirm-yes" onClick={() => { setConfirmSend(false); handleSend(); }}>Да</button>
+              <button className="bc-confirm-no" onClick={() => setConfirmSend(false)}>Отмена</button>
+            </div>
           ) : (
-            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
+            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={() => setConfirmSend(true)}>
               {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
               {sending ? 'Отправка...' : 'Отправить'}
             </button>
@@ -1250,8 +1257,8 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
       <ComposeBlock
         title="Рассылка пользователям бота"
-        hintText={userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
-        canSend={userCount > 0}
+        hintText={selectedTags.length === 0 ? 'Выберите хотя бы один тег' : userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
+        canSend={userCount > 0 && selectedTags.length > 0}
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
@@ -1859,9 +1866,16 @@ export default function Broadcasts() {
   const TYPE_ICONS = { channels: '📢', users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
   const [mounted, setMounted] = useState({ channels: true }); // track which sections have been opened
+  const sectionRefs = useRef({});
   const toggleSection = (id) => {
+    const wasOpen = openSection === id;
     setOpenSection(prev => prev === id ? null : id);
     setMounted(prev => ({ ...prev, [id]: true }));
+    if (!wasOpen) {
+      setTimeout(() => {
+        sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
 
   if (loading) {
@@ -1887,7 +1901,7 @@ export default function Broadcasts() {
         const Icon = s.icon;
         const isOpen = openSection === s.id;
         return (
-          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`}>
+          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`} ref={el => sectionRefs.current[s.id] = el}>
             <button className="bc-accordion-header" onClick={() => toggleSection(s.id)}>
               <Icon size={18} />
               <span className="bc-accordion-label">{s.label}</span>

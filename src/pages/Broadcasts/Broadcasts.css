@@ -2313,7 +2313,8 @@ input[type="checkbox"]:checked {
 .bc-toast {
   position: fixed;
   top: 24px;
-  right: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 12px 20px;
   border-radius: 10px;
   font-size: 0.9rem;
@@ -2332,7 +2333,40 @@ input[type="checkbox"]:checked {
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+/* Confirm send */
+.bc-confirm-send {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.bc-confirm-yes {
+  background: var(--color-orange);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bc-confirm-no {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bc-confirm-no:hover {
+  color: #fff;
+}
+
 @keyframes bc-toast-in {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
