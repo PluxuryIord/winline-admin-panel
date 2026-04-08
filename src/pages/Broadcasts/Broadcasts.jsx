@@ -3,7 +3,7 @@ import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
   BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye,
-  Save, Clock, Calendar, Play, Edit3, FileBox
+  Save, Clock, Calendar, Play, Edit3, FileBox, MoreVertical
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
@@ -763,6 +763,150 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 
   );
 }
 
+function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive }) {
+  const [open, setOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null); // 'comment' | 'tags'
+  const menuRef = useRef(null);
+
+  // Comment state
+  const [comment, setComment] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentLoading, setCommentLoading] = useState(true);
+
+  // Tags state
+  const [tags, setTags] = useState([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
+  const [tagSearch, setTagSearch] = useState('');
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`)
+      .then(r => r.json())
+      .then(data => { setComment(data.comment || ''); setCommentLoading(false); })
+      .catch(() => setCommentLoading(false));
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`)
+      .then(r => r.json())
+      .then(data => { setTags(data); setTagsLoading(false); })
+      .catch(() => setTagsLoading(false));
+  }, [chatId, entityType]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) { setOpen(false); setActivePanel(null); } };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const saveComment = async () => {
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`, { comment: commentDraft });
+      setComment(commentDraft);
+      setActivePanel(null);
+    } catch { /* ignore */ }
+  };
+
+  const saveTags = async (newTags) => {
+    setTags(newTags);
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
+      onTagsChange?.();
+    } catch { /* ignore */ }
+  };
+
+  const toggleTag = (tag) => saveTags(tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]);
+  const addNewTag = () => { const t = tagSearch.trim(); if (t && !tags.includes(t)) saveTags([...tags, t]); setTagSearch(''); };
+
+  const filteredSuggestions = (allTags || []).filter(t => !tags.includes(t)).filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()));
+
+  return (
+    <div className="bc-item-menu" ref={menuRef}>
+      <button className="bc-item-menu-btn" onClick={(e) => { e.stopPropagation(); setOpen(!open); setActivePanel(null); }} title="Действия">
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="bc-item-menu-dropdown" onClick={e => e.stopPropagation()}>
+          {!activePanel && (
+            <>
+              <button className="bc-item-menu-option" onClick={() => { setCommentDraft(comment); setActivePanel('comment'); }}>
+                <Edit3 size={13} /> {comment ? 'Комментарий' : 'Добавить комментарий'}
+                {comment && <span className="bc-item-menu-hint">{comment.length > 20 ? comment.slice(0, 20) + '…' : comment}</span>}
+              </button>
+              <button className="bc-item-menu-option" onClick={() => { setTagSearch(''); setActivePanel('tags'); }}>
+                <Tag size={13} /> Теги
+                {tags.length > 0 && <span className="bc-item-menu-hint">{tags.length}</span>}
+              </button>
+              <button className="bc-item-menu-option bc-item-menu-option--archive" onClick={() => { setOpen(false); onArchive(); }}>
+                <Archive size={13} /> В архив
+              </button>
+            </>
+          )}
+          {activePanel === 'comment' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>
+                  <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                </button>
+                <span>Комментарий</span>
+              </div>
+              <input
+                className="bc-item-menu-input"
+                type="text"
+                placeholder="Комментарий..."
+                value={commentDraft}
+                onChange={e => setCommentDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveComment(); }}
+                autoFocus
+              />
+              <button className="bc-item-menu-save" onClick={saveComment}>Сохранить</button>
+            </div>
+          )}
+          {activePanel === 'tags' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>
+                  <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                </button>
+                <span>Теги</span>
+              </div>
+              {tags.length > 0 && (
+                <div className="bc-item-menu-tags-list">
+                  {tags.map(t => (
+                    <span key={t} className="bc-ch-tag-chip">
+                      {t}
+                      <button className="bc-chip-remove" onClick={() => saveTags(tags.filter(x => x !== t))}><X size={10} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="bc-tag-search-wrap">
+                <Search size={12} className="bc-tag-search-icon" />
+                <input
+                  className="bc-tag-search-input"
+                  type="text"
+                  placeholder="Поиск или новый тег..."
+                  value={tagSearch}
+                  onChange={e => setTagSearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addNewTag(); }}
+                  autoFocus
+                />
+              </div>
+              <div className="bc-tag-options-list">
+                {filteredSuggestions.map(t => (
+                  <div key={t} className="bc-tag-option" onClick={() => toggleTag(t)}>{t}</div>
+                ))}
+                {tagSearch.trim() && !(allTags || []).includes(tagSearch.trim()) && !tags.includes(tagSearch.trim()) && (
+                  <div className="bc-tag-option bc-tag-option--create" onClick={addNewTag}>
+                    <Plus size={12} /> Создать «{tagSearch.trim()}»
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -975,17 +1119,13 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
             {filteredChannels.map(ch => (
-              <div key={ch.id} className="bc-list-item bc-list-item--with-tags">
+              <div key={ch.id} className="bc-list-item bc-list-item--with-menu">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{ch.title}</span>
                 </label>
-                <CommentEditor chatId={ch.chatId} entityType="channels" />
-                <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
-                <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
-                  <Archive size={14} />
-                </button>
+                <ItemActionsMenu chatId={ch.chatId} entityType="channels" allTags={allChannelTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(ch.id)} />
               </div>
             ))}
           </div>
@@ -1491,17 +1631,13 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
             {filteredGroups.map(g => (
-              <div key={g.id} className="bc-list-item bc-list-item--with-tags">
+              <div key={g.id} className="bc-list-item bc-list-item--with-menu">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{g.title}</span>
                 </label>
-                <CommentEditor chatId={g.chatId} entityType="groups" />
-                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
-                <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
-                  <Archive size={14} />
-                </button>
+                <ItemActionsMenu chatId={g.chatId} entityType="groups" allTags={allGroupTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(g.id)} />
               </div>
             ))}
           </div>
