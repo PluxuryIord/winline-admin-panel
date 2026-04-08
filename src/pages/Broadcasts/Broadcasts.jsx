@@ -1197,11 +1197,15 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
   }, []);
 
-  // Подсчёт по фильтрам
+  // Подсчёт по фильтрам — только когда выбраны теги
   useEffect(() => {
+    if (selectedTags.length === 0) {
+      setUserCount(0);
+      return;
+    }
     setCountLoading(true);
     const params = new URLSearchParams();
-    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    params.set('tags', selectedTags.join(','));
 
     api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
