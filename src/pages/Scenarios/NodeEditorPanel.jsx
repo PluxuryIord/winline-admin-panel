@@ -23,6 +23,49 @@ const LOCKED_CONNECTIONS = new Set([
   'start_menu', 'registration_flow', 'auth_flow',
 ]);
 
+// ─── Custom Type Dropdown ────────────────────────────────────────────────────
+function AnketaTypeDropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const current = options.find(o => o.value === value);
+
+  return (
+    <div className="anketa-dropdown" ref={ref}>
+      <button className="anketa-dropdown-btn" type="button" onClick={() => setOpen(!open)}>
+        <span>{current?.label || value}</span>
+        <ChevronDown size={13} className={`anketa-dropdown-chevron${open ? ' open' : ''}`} />
+      </button>
+      {open && (
+        <div className="anketa-dropdown-menu">
+          {options.map(o => (
+            <div key={o.value} className={`anketa-dropdown-item${o.value === value ? ' active' : ''}`} onClick={() => { onChange(o.value); setOpen(false); }}>
+              {o.icon && <span className="anketa-dropdown-item-icon">{o.icon}</span>}
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TYPE_OPTIONS = [
+  { value: 'text', label: 'Текстовый ответ', icon: '✏️' },
+  { value: 'choice', label: 'С вариантами (кнопки)', icon: '🔘' },
+];
+const TYPE_OPTIONS_SHORT = [
+  { value: 'text', label: 'Текстовый', icon: '✏️' },
+  { value: 'choice', label: 'С вариантами', icon: '🔘' },
+];
+
 // ─── Anketa Question Manager ─────────────────────────────────────────────────
 function AnketaQuestionManager() {
   const [questions, setQuestions] = useState([]);
@@ -35,6 +78,7 @@ function AnketaQuestionManager() {
   const [editText, setEditText] = useState('');
   const [editType, setEditType] = useState('text');
   const [editOptions, setEditOptions] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // question id
 
   const load = async () => {
     try {
@@ -61,9 +105,10 @@ function AnketaQuestionManager() {
     setAdding(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Удалить вопрос?')) return;
-    await api.delete(`/api/events/questions/${id}`);
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    await api.delete(`/api/events/questions/${deleteConfirm}`);
+    setDeleteConfirm(null);
     await load();
   };
 
@@ -113,10 +158,7 @@ function AnketaQuestionManager() {
               <div className="anketa-q-edit">
                 <input className="anketa-q-input" value={editText} onChange={e => setEditText(e.target.value)} placeholder="Текст вопроса" />
                 <div className="anketa-q-type-row">
-                  <select className="anketa-q-select" value={editType} onChange={e => setEditType(e.target.value)}>
-                    <option value="text">Текстовый</option>
-                    <option value="choice">С вариантами</option>
-                  </select>
+                  <AnketaTypeDropdown value={editType} onChange={setEditType} options={TYPE_OPTIONS_SHORT} />
                   {editType === 'choice' && (
                     <input className="anketa-q-input" value={editOptions} onChange={e => setEditOptions(e.target.value)} placeholder="Вариант 1, Вариант 2, ..." />
                   )}
@@ -135,13 +177,13 @@ function AnketaQuestionManager() {
                   </div>
                   <div className="anketa-q-body" onClick={() => startEdit(q)}>
                     <span className="anketa-q-text">{q.question_text}</span>
-                    <span className="anketa-q-type-badge">{q.question_type === 'choice' ? '🔘 Выбор' : '✏️ Текст'}</span>
+                    <span className="anketa-q-type-badge">{q.question_type === 'choice' ? 'Выбор' : 'Текст'}</span>
                   </div>
                   <div className="anketa-q-actions">
                     <button onClick={() => handleToggle(q)} title={q.is_active ? 'Выключить' : 'Включить'}>
                       {q.is_active ? <ToggleRight size={18} color="var(--color-orange)" /> : <ToggleLeft size={18} />}
                     </button>
-                    <button onClick={() => handleDelete(q.id)} title="Удалить"><Trash2 size={14} /></button>
+                    <button onClick={() => setDeleteConfirm(q.id)} title="Удалить"><Trash2 size={14} /></button>
                   </div>
                 </div>
                 {q.question_type === 'choice' && q.options && (
@@ -159,10 +201,7 @@ function AnketaQuestionManager() {
       <div className="anketa-add-block">
         <input className="anketa-q-input" value={newText} onChange={e => setNewText(e.target.value)} placeholder="Текст нового вопроса..." onKeyDown={e => e.key === 'Enter' && newType === 'text' && handleAdd()} />
         <div className="anketa-q-type-row">
-          <select className="anketa-q-select" value={newType} onChange={e => setNewType(e.target.value)}>
-            <option value="text">Текстовый ответ</option>
-            <option value="choice">С вариантами (кнопки)</option>
-          </select>
+          <AnketaTypeDropdown value={newType} onChange={setNewType} options={TYPE_OPTIONS} />
           {newType === 'choice' && (
             <input className="anketa-q-input" value={newOptions} onChange={e => setNewOptions(e.target.value)} placeholder="Вариант 1, Вариант 2, ..." />
           )}
@@ -171,6 +210,20 @@ function AnketaQuestionManager() {
           </button>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="anketa-confirm-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="anketa-confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="anketa-confirm-title">Удалить вопрос?</div>
+            <div className="anketa-confirm-text">Вопрос будет удалён из анкеты без возможности восстановления</div>
+            <div className="anketa-confirm-actions">
+              <button className="anketa-confirm-cancel" onClick={() => setDeleteConfirm(null)}>Отмена</button>
+              <button className="anketa-confirm-delete" onClick={handleDelete}><Trash2 size={13} /> Удалить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -187,7 +240,7 @@ export default function NodeEditorPanel({
 
   if (!editData) return null;
 
-  const messageKeys = Object.keys(editData.messages || {});
+  const messageKeys = Object.keys(editData.messages || {}).filter(k => !(screenId === 'event_anketa' && k === 'anketa_question_prompt'));
   const buttonOrder = editData.buttons?._order || [];
 
   // Build list of screens for the dropdown (exclude entry points)

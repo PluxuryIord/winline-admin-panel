@@ -1579,3 +1579,62 @@
 }
 .anketa-q-add-btn:hover { background: linear-gradient(135deg, rgba(255,126,0,0.35), rgba(255,126,0,0.2)); }
 .anketa-q-add-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Custom dropdown */
+.anketa-dropdown { position: relative; flex-shrink: 0; }
+.anketa-dropdown-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 8px;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12);
+  color: #fff; font-size: 0.85rem; font-family: inherit; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.anketa-dropdown-btn:hover { border-color: rgba(255,126,0,0.4); }
+.anketa-dropdown-chevron { transition: transform 0.2s; color: rgba(255,255,255,0.4); }
+.anketa-dropdown-chevron.open { transform: rotate(180deg); }
+.anketa-dropdown-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+  min-width: 100%; width: max-content;
+  background: var(--color-panel, #1a1a1a); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.anketa-dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border-radius: 7px;
+  font-size: 0.84rem; color: rgba(255,255,255,0.7);
+  cursor: pointer; transition: background 0.12s; white-space: nowrap;
+}
+.anketa-dropdown-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.anketa-dropdown-item.active { background: rgba(255,126,0,0.1); color: var(--color-orange); }
+.anketa-dropdown-item-icon { font-size: 0.9rem; }
+
+/* Delete confirmation */
+.anketa-confirm-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.anketa-confirm-modal {
+  background: var(--color-panel, #1a1a1a); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; padding: 28px 32px 24px; min-width: 300px; max-width: 380px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5); text-align: center;
+}
+.anketa-confirm-title {
+  font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 8px;
+}
+.anketa-confirm-text {
+  font-size: 0.85rem; color: rgba(255,255,255,0.5); margin-bottom: 22px; line-height: 1.4;
+}
+.anketa-confirm-actions { display: flex; gap: 10px; justify-content: center; }
+.anketa-confirm-cancel {
+  padding: 9px 20px; border-radius: 10px; font-size: 0.85rem; font-family: inherit;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6); cursor: pointer; transition: color 0.15s;
+}
+.anketa-confirm-cancel:hover { color: #fff; }
+.anketa-confirm-delete {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 9px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; font-family: inherit;
+  background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3);
+  color: #ef4444; cursor: pointer; transition: background 0.15s;
+}
+.anketa-confirm-delete:hover { background: rgba(239,68,68,0.25); }
