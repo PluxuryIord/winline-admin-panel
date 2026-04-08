@@ -238,6 +238,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
   const [text, setText] = useState('');
   const [media, setMedia] = useState(null);
   const [scheduleMode, setScheduleMode] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
   const [confirmSend, setConfirmSend] = useState(false);
 
@@ -466,19 +467,19 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
       <div className="bc-schedule-toggle">
         <button
           className={`bc-schedule-btn ${!scheduleMode ? 'bc-schedule-btn--active' : ''}`}
-          onClick={() => setScheduleMode(false)}
+          onClick={() => { setScheduleMode(false); setShowScheduleModal(false); setScheduledAt(null); }}
         >
           <Send size={13} /> Отправить сейчас
         </button>
         <button
           className={`bc-schedule-btn ${scheduleMode ? 'bc-schedule-btn--active' : ''}`}
-          onClick={() => setScheduleMode(true)}
+          onClick={() => { setScheduleMode(true); setShowScheduleModal(true); }}
         >
           <Clock size={13} /> {scheduledAt ? `${scheduledAt.slice(8,10)}.${scheduledAt.slice(5,7)} в ${scheduledAt.slice(11,16)}` : 'Запланировать'}
         </button>
       </div>
 
-      {scheduleMode && (() => {
+      {showScheduleModal && (() => {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const selDate = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
@@ -490,11 +491,11 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
           minTimeStr = `${String(min.getHours()).padStart(2, '0')}:${String(min.getMinutes()).padStart(2, '0')}`;
         }
         return (
-          <div className="bc-schedule-overlay" onClick={() => setScheduleMode(false)}>
+          <div className="bc-schedule-overlay" onClick={() => setShowScheduleModal(false)}>
             <div className="bc-schedule-modal" onClick={e => e.stopPropagation()}>
               <div className="bc-schedule-modal-header">
                 <span>Запланировать отправку</span>
-                <button className="bc-schedule-modal-close" onClick={() => setScheduleMode(false)}><X size={16} /></button>
+                <button className="bc-schedule-modal-close" onClick={() => setShowScheduleModal(false)}><X size={16} /></button>
               </div>
               <div className="bc-schedule-modal-body">
                 <div className="bc-schedule-section">
@@ -524,7 +525,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
                 <span className="bc-schedule-modal-preview">
                   {selDate.split('-').reverse().join('.')} в {selTime}
                 </span>
-                <button className="bc-schedule-modal-ok" onClick={() => setScheduleMode(false)}>Готово</button>
+                <button className="bc-schedule-modal-ok" onClick={() => setShowScheduleModal(false)}>Готово</button>
               </div>
             </div>
           </div>
