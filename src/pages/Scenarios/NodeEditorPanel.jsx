@@ -78,7 +78,10 @@ function AnketaQuestionManager() {
   const [editText, setEditText] = useState('');
   const [editType, setEditType] = useState('text');
   const [editOptions, setEditOptions] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // question id
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState(null);
+  const [creatingSheet, setCreatingSheet] = useState(false);
+  const [sheetToast, setSheetToast] = useState(null);
 
   const load = async () => {
     try {
@@ -89,7 +92,10 @@ function AnketaQuestionManager() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setSpreadsheetUrl(d.url)).catch(() => {});
+  }, []);
 
   const handleAdd = async () => {
     if (!newText.trim()) return;
@@ -132,6 +138,21 @@ function AnketaQuestionManager() {
     await load();
   };
 
+  const createNewSheet = async () => {
+    setCreatingSheet(true);
+    try {
+      const res = await api.post('/api/events/questions/new-sheet');
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setSheetToast(`Лист «${data.sheetTitle}» создан`);
+      } else {
+        setSheetToast(data.error || 'Ошибка создания листа');
+      }
+    } catch { setSheetToast('Ошибка соединения'); }
+    setCreatingSheet(false);
+    setTimeout(() => setSheetToast(null), 3000);
+  };
+
   const startEdit = (q) => {
     setEditingId(q.id);
     setEditText(q.question_text);
@@ -153,6 +174,19 @@ function AnketaQuestionManager() {
     <div className="sc-section anketa-manager-section">
       <h3 className="sc-section-title"><ClipboardList size={16} /> Вопросы анкеты</h3>
       <p className="anketa-manager-hint">Добавляйте вопросы, которые бот задаст пользователю при заполнении анкеты</p>
+
+      <div className="anketa-sheet-actions">
+        {spreadsheetUrl && (
+          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
+            <ExternalLink size={14} /> Google Таблица
+          </a>
+        )}
+        <button className="anketa-new-sheet-btn" onClick={createNewSheet} disabled={creatingSheet || questions.length === 0}>
+          {creatingSheet ? <Loader size={14} className="sc-spinner" /> : <Plus size={14} />}
+          Новый лист
+        </button>
+        {sheetToast && <span className="anketa-sheet-toast">{sheetToast}</span>}
+      </div>
 
       {/* Question list */}
       <div className="anketa-questions-list">

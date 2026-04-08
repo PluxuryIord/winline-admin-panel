@@ -6,6 +6,7 @@ import dbPool from '../config/db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { createSheetForQuestions, getSpreadsheetUrl } from '../services/googleSheets.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -572,6 +573,27 @@ router.put('/questions/reorder', async (req, res, next) => {
       await dbPool.query('UPDATE event_questions SET `order` = ? WHERE id = ?', [item.order, item.id]);
     }
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// GET /api/events/spreadsheet-url — get Google Sheets link
+router.get('/spreadsheet-url', (req, res) => {
+  const url = getSpreadsheetUrl();
+  res.json({ url });
+});
+
+// POST /api/events/questions/new-sheet — create new sheet tab with current questions
+router.post('/questions/new-sheet', async (req, res, next) => {
+  try {
+    await ensureQuestionsTable();
+    const [rows] = await dbPool.query(
+      'SELECT question_text FROM event_questions WHERE is_active = 1 ORDER BY `order` ASC'
+    );
+    const questions = rows.map(r => r.question_text);
+    if (questions.length === 0) return res.status(400).json({ error: 'Нет активных вопросов' });
+    const sheetTitle = await createSheetForQuestions(questions);
+    if (!sheetTitle) return res.status(500).json({ error: 'Google Sheets не настроен или ошибка' });
+    res.json({ ok: true, sheetTitle });
   } catch (err) { next(err); }
 });
 

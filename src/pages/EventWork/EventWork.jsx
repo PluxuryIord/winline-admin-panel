@@ -517,6 +517,19 @@ function EventToggle() {
   );
 }
 
+function SpreadsheetButton() {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setUrl(d.url)).catch(() => {});
+  }, []);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="ew-spreadsheet-btn">
+      <ExternalLink size={16} /> Google Таблица
+    </a>
+  );
+}
+
 export default function EventWork() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -530,9 +543,12 @@ export default function EventWork() {
           </div>
           <p>QR-коды, сканирования и управление мероприятием</p>
         </div>
-        <button className="ew-settings-btn" onClick={() => setSettingsOpen(true)}>
-          <Settings size={18} /> Настройки
-        </button>
+        <div className="ew-header-actions">
+          <SpreadsheetButton />
+          <button className="ew-settings-btn" onClick={() => setSettingsOpen(true)}>
+            <Settings size={18} /> Настройки
+          </button>
+        </div>
       </div>
 
       <StatsBar />
