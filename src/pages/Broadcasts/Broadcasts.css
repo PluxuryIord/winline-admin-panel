@@ -2334,36 +2334,63 @@ input[type="checkbox"]:checked {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 /* Confirm send */
-.bc-confirm-send {
+.bc-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  justify-content: center;
+  z-index: 1000;
 }
-.bc-confirm-yes {
-  background: var(--color-orange);
+.bc-confirm-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  min-width: 320px;
+  max-width: 400px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.bc-confirm-modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
   color: #fff;
-  border: none;
-  padding: 8px 18px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
+  margin-bottom: 8px;
 }
-.bc-confirm-no {
+.bc-confirm-modal-text {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 24px;
+}
+.bc-confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.bc-confirm-modal-cancel {
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 0.9rem;
   cursor: pointer;
   font-family: inherit;
+  transition: color 0.2s;
 }
-.bc-confirm-no:hover {
+.bc-confirm-modal-cancel:hover { color: #fff; }
+.bc-confirm-modal-ok {
+  background: var(--color-orange);
   color: #fff;
+  border: none;
+  padding: 10px 28px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 @keyframes bc-toast-in {

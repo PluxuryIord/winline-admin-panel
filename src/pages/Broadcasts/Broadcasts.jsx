@@ -575,12 +575,6 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
             >
               <Clock size={16} /> Запланировать
             </button>
-          ) : confirmSend ? (
-            <div className="bc-confirm-send">
-              <span>Отправить сейчас?</span>
-              <button className="bc-confirm-yes" onClick={() => { setConfirmSend(false); handleSend(); }}>Да</button>
-              <button className="bc-confirm-no" onClick={() => setConfirmSend(false)}>Отмена</button>
-            </div>
           ) : (
             <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={() => setConfirmSend(true)}>
               {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
@@ -592,6 +586,19 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
       {sendResult && (
         <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
           {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+        </div>
+      )}
+
+      {confirmSend && (
+        <div className="bc-confirm-overlay" onClick={() => setConfirmSend(false)}>
+          <div className="bc-confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-confirm-modal-title">Подтверждение</div>
+            <div className="bc-confirm-modal-text">Отправить рассылку сейчас?</div>
+            <div className="bc-confirm-modal-actions">
+              <button className="bc-confirm-modal-cancel" onClick={() => setConfirmSend(false)}>Отмена</button>
+              <button className="bc-confirm-modal-ok" onClick={() => { setConfirmSend(false); handleSend(); }}>Отправить</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1164,7 +1171,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         <div className="bc-tag-filter" ref={tagRef}>
           <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
             <Tag size={14} />
-            <span>{selectedTags.length === 0 ? 'Все теги' : `Тегов: ${selectedTags.length}`}</span>
+            <span>{selectedTags.length === 0 ? 'Выберите теги' : `Тегов: ${selectedTags.length}`}</span>
             <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
           </button>
           {showTagDD && (
@@ -1185,8 +1192,8 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               )}
               <div className="bc-tag-options-list">
                 {(!tagSearch.trim()) && (
-                  <div className={`bc-tag-option ${selectedTags.length === 0 ? 'active' : ''}`} onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
-                    Все теги
+                  <div className="bc-tag-option" onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
+                    Сбросить все
                   </div>
                 )}
                 {tags
@@ -1660,15 +1667,6 @@ function DraftsTab({ onSendResult, onEditDraft }) {
                     title="Редактировать"
                   >
                     <Edit3 size={13} /> Редактировать
-                  </button>
-                  <button
-                    className="bc-draft-action-btn bc-draft-send-btn"
-                    onClick={() => setConfirmSend(d)}
-                    disabled={sendingId === d.id}
-                    title="Отправить сейчас"
-                  >
-                    {sendingId === d.id ? <Loader size={13} className="spin" /> : <Play size={13} />}
-                    Отправить
                   </button>
                   <button
                     className="bc-draft-action-btn bc-draft-delete-btn"
