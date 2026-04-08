@@ -876,18 +876,46 @@ input[type="checkbox"]:checked {
 }
 
 .bc-poll-stats-modal {
-  max-width: 520px;
+  max-width: 560px;
 }
-.bc-poll-question {
+.bc-poll-stats-question {
   padding: 14px 18px 6px;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
 }
-.bc-poll-total {
-  padding: 0 18px 12px;
+.bc-poll-stats-total {
+  padding: 4px 18px 14px;
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bc-poll-all-voters-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.bc-poll-all-voters-btn:hover {
+  background: rgba(255, 126, 0, 0.08);
+  border-color: rgba(255, 126, 0, 0.2);
+  color: var(--color-orange);
+}
+.bc-poll-all-voters-btn.active {
+  background: rgba(255, 126, 0, 0.1);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: var(--color-orange);
 }
 .bc-poll-options {
   padding: 0 18px 18px;
@@ -961,36 +989,78 @@ input[type="checkbox"]:checked {
 /* ─── Poll Voters ─── */
 .bc-poll-voters-loading {
   display: flex; align-items: center; gap: 8px;
-  padding: 12px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;
+  padding: 16px 18px; color: rgba(255,255,255,0.5); font-size: 0.85rem;
 }
 .bc-poll-voters {
-  margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 18px 18px;
 }
 .bc-poll-voters-header {
   display: flex; align-items: center; justify-content: space-between;
-  font-size: 0.85rem; color: rgba(255,255,255,0.6); margin-bottom: 8px;
+  font-size: 0.85rem; color: rgba(255,255,255,0.6); margin-bottom: 10px; font-weight: 600;
 }
 .bc-poll-voters-count {
   background: rgba(255,126,0,0.15); color: var(--color-orange);
-  padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: 600;
+  padding: 2px 10px; border-radius: 10px; font-size: 0.78rem; font-weight: 600;
 }
 .bc-poll-voters-empty {
   color: rgba(255,255,255,0.35); font-size: 0.85rem; padding: 8px 0;
 }
 .bc-poll-voters-list {
-  max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+  max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
 .bc-poll-voter {
   display: flex; align-items: center; gap: 10px;
-  padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.03);
+  padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.02);
+  border: 1px solid transparent; transition: all 0.15s;
 }
-.bc-poll-voter:hover { background: rgba(255,255,255,0.06); }
+.bc-poll-voter:hover { background: rgba(255,255,255,0.05); }
+.bc-poll-voter--winner {
+  background: rgba(255,126,0,0.1) !important;
+  border-color: rgba(255,126,0,0.3);
+  box-shadow: 0 0 16px rgba(255,126,0,0.12);
+}
+.bc-poll-voter-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.5);
+}
+.bc-poll-voter--winner .bc-poll-voter-avatar {
+  background: var(--color-orange); color: #fff;
+}
+.bc-poll-voter-info {
+  display: flex; flex-direction: column; min-width: 0; flex: 1;
+}
 .bc-poll-voter-name {
-  color: var(--color-white); font-size: 0.85rem; font-weight: 500;
+  color: var(--color-white); font-size: 0.84rem; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .bc-poll-voter-username {
-  color: rgba(255,255,255,0.35); font-size: 0.8rem;
+  color: rgba(255,255,255,0.3); font-size: 0.74rem;
 }
+.bc-poll-voter-opt {
+  flex-shrink: 0; font-size: 0.7rem; color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.05); padding: 3px 8px; border-radius: 6px;
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bc-poll-random-btn {
+  width: 100%; margin-top: 12px; padding: 10px;
+  background: linear-gradient(135deg, rgba(255,126,0,0.12), rgba(255,126,0,0.06));
+  border: 1px solid rgba(255,126,0,0.25);
+  border-radius: 10px; color: var(--color-orange);
+  font-size: 0.84rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all 0.2s;
+}
+.bc-poll-random-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(255,126,0,0.2), rgba(255,126,0,0.12));
+  border-color: rgba(255,126,0,0.4);
+}
+.bc-poll-random-btn--spin {
+  animation: bc-pulse 0.3s ease-in-out infinite alternate;
+}
+@keyframes bc-pulse { from { opacity: 0.7; } to { opacity: 1; } }
 
 /* ===== ТАБЫ ===== */
 /* ===== АККОРДЕОН ===== */

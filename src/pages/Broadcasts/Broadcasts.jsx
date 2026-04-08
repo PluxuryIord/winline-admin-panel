@@ -1873,10 +1873,12 @@ export default function Broadcasts() {
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
   const [filterType, setFilterType] = useState(''); // channels|users|groups
   const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
-  const [pollStatsModal, setPollStatsModal] = useState(null); // { question, stats, totalVotes, ... }
+  const [pollStatsModal, setPollStatsModal] = useState(null);
   const [pollStatsLoading, setPollStatsLoading] = useState(false);
-  const [pollVoters, setPollVoters] = useState(null); // { optionIndex, optionText, voters: [] }
+  const [pollVoters, setPollVoters] = useState(null); // { optionIndex, optionText, voters: [] }  optionIndex='all' for all
   const [pollVotersLoading, setPollVotersLoading] = useState(false);
+  const [randomWinner, setRandomWinner] = useState(null);
+  const [spinning, setSpinning] = useState(false);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1902,6 +1904,7 @@ export default function Broadcasts() {
 
   const loadPollVoters = async (pollId, optionIndex, optionText) => {
     setPollVotersLoading(true);
+    setRandomWinner(null);
     try {
       const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${optionIndex}`);
       if (!res.ok) throw new Error();
@@ -1909,6 +1912,42 @@ export default function Broadcasts() {
       setPollVoters({ optionIndex, optionText, voters });
     } catch { setPollVoters(null); }
     setPollVotersLoading(false);
+  };
+
+  const loadAllPollVoters = async (pollId, options) => {
+    setPollVotersLoading(true);
+    setRandomWinner(null);
+    try {
+      const all = [];
+      for (let i = 0; i < options.length; i++) {
+        const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${i}`);
+        if (res.ok) {
+          const list = await res.json();
+          list.forEach(v => all.push({ ...v, optionIndex: i, optionText: options[i] }));
+        }
+      }
+      setPollVoters({ optionIndex: 'all', optionText: 'Все', voters: all });
+    } catch { setPollVoters(null); }
+    setPollVotersLoading(false);
+  };
+
+  const pickRandomVoter = () => {
+    if (!pollVoters || pollVoters.voters.length === 0) return;
+    setSpinning(true);
+    setRandomWinner(null);
+    let count = 0;
+    const total = 12 + Math.floor(Math.random() * 6);
+    const iv = setInterval(() => {
+      const idx = Math.floor(Math.random() * pollVoters.voters.length);
+      setRandomWinner(pollVoters.voters[idx]);
+      count++;
+      if (count >= total) {
+        clearInterval(iv);
+        const finalIdx = Math.floor(Math.random() * pollVoters.voters.length);
+        setRandomWinner(pollVoters.voters[finalIdx]);
+        setSpinning(false);
+      }
+    }, 80 + count * 8);
   };
 
   const handleSendResult = (data) => {
@@ -2199,14 +2238,24 @@ export default function Broadcasts() {
       )}
 
       {pollStatsModal && (
-        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); }}>
+        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); }}>
           <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
             <div className="bc-delivery-modal-header">
-              <h3>{pollStatsModal.type === 'quiz' ? '🧠 Викторина' : '📊 Опрос'}</h3>
-              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); }}><X size={18} /></button>
+              <h3>{pollStatsModal.type === 'quiz' ? 'Викторина' : 'Опрос'}</h3>
+              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); }}><X size={18} /></button>
             </div>
-            <div className="bc-poll-question">{pollStatsModal.question}</div>
-            <div className="bc-poll-total">Всего голосов: <b>{pollStatsModal.totalVotes}</b></div>
+            <div className="bc-poll-stats-question">{pollStatsModal.question}</div>
+            <div className="bc-poll-stats-total">
+              <span>Всего голосов: <b>{pollStatsModal.totalVotes}</b></span>
+              {pollStatsModal.totalVotes > 0 && (
+                <button
+                  className={`bc-poll-all-voters-btn ${pollVoters?.optionIndex === 'all' ? 'active' : ''}`}
+                  onClick={() => loadAllPollVoters(pollStatsModal.id, (pollStatsModal.stats || []).map(s => s.option))}
+                >
+                  <Users size={13} /> Все проголосовавшие
+                </button>
+              )}
+            </div>
             <div className="bc-poll-options">
               {(pollStatsModal.stats || []).map((s, i) => (
                 <div
@@ -2219,7 +2268,7 @@ export default function Broadcasts() {
                       {pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i && <Check size={14} className="bc-poll-correct-icon" />}
                       {s.option}
                     </span>
-                    <span className="bc-poll-option-count">{s.count} ({s.percent}%) <Users size={12} /></span>
+                    <span className="bc-poll-option-count">{s.count} ({s.percent}%)</span>
                   </div>
                   <div className="bc-poll-bar">
                     <div className="bc-poll-bar-fill" style={{ width: `${s.percent}%` }} />
@@ -2228,25 +2277,36 @@ export default function Broadcasts() {
               ))}
             </div>
 
-            {/* Voters list */}
+            {/* Voters panel */}
             {pollVotersLoading && <div className="bc-poll-voters-loading"><Loader size={16} className="spin" /> Загрузка...</div>}
             {pollVoters && !pollVotersLoading && (
               <div className="bc-poll-voters">
                 <div className="bc-poll-voters-header">
-                  <span>Проголосовали за «{pollVoters.optionText}»</span>
+                  <span>{pollVoters.optionIndex === 'all' ? 'Все проголосовавшие' : `Вариант: «${pollVoters.optionText}»`}</span>
                   <span className="bc-poll-voters-count">{pollVoters.voters.length}</span>
                 </div>
                 {pollVoters.voters.length === 0 ? (
                   <div className="bc-poll-voters-empty">Нет голосов</div>
                 ) : (
-                  <div className="bc-poll-voters-list">
-                    {pollVoters.voters.map((v, vi) => (
-                      <div key={vi} className="bc-poll-voter">
-                        <span className="bc-poll-voter-name">{v.fullName || v.username || `ID: ${v.userId}`}</span>
-                        {v.username && <span className="bc-poll-voter-username">@{v.username}</span>}
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div className="bc-poll-voters-list">
+                      {pollVoters.voters.map((v, vi) => (
+                        <div key={vi} className={`bc-poll-voter${randomWinner?.userId === v.userId && !spinning ? ' bc-poll-voter--winner' : ''}`}>
+                          <div className="bc-poll-voter-avatar">{(v.fullName || v.username || '?').charAt(0).toUpperCase()}</div>
+                          <div className="bc-poll-voter-info">
+                            <span className="bc-poll-voter-name">{v.fullName || 'Без имени'}</span>
+                            {v.username && <span className="bc-poll-voter-username">@{v.username}</span>}
+                          </div>
+                          {pollVoters.optionIndex === 'all' && v.optionText && (
+                            <span className="bc-poll-voter-opt">{v.optionText}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button className={`bc-poll-random-btn${spinning ? ' bc-poll-random-btn--spin' : ''}`} onClick={pickRandomVoter} disabled={spinning}>
+                      {spinning ? 'Выбираем...' : randomWinner && !spinning ? `Победитель: ${randomWinner.fullName || randomWinner.username || 'ID: ' + randomWinner.userId}` : 'Случайный победитель'}
+                    </button>
+                  </>
                 )}
               </div>
             )}
