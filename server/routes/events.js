@@ -577,9 +577,18 @@ router.put('/questions/reorder', async (req, res, next) => {
 });
 
 // GET /api/events/spreadsheet-url — get Google Sheets link
-router.get('/spreadsheet-url', (req, res) => {
-  const url = getSpreadsheetUrl();
-  res.json({ url });
+router.get('/spreadsheet-url', async (req, res) => {
+  const settings = await getSettings();
+  res.json({ url: settings.spreadsheet_url || null });
+});
+
+// PUT /api/events/spreadsheet-url — save Google Sheets link
+router.put('/spreadsheet-url', async (req, res) => {
+  const { url } = req.body;
+  const settings = await getSettings();
+  settings.spreadsheet_url = (url || '').trim();
+  await saveSettings(settings);
+  res.json({ ok: true });
 });
 
 // POST /api/events/questions/new-sheet — create new sheet tab with current questions

@@ -79,8 +79,9 @@ function AnketaQuestionManager() {
   const [editType, setEditType] = useState('text');
   const [editOptions, setEditOptions] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState(null);
-  const [creatingSheet, setCreatingSheet] = useState(false);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlDraft, setUrlDraft] = useState('');
   const [sheetToast, setSheetToast] = useState(null);
 
   const load = async () => {
@@ -94,7 +95,7 @@ function AnketaQuestionManager() {
 
   useEffect(() => {
     load();
-    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setSpreadsheetUrl(d.url)).catch(() => {});
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setSpreadsheetUrl(d.url || '')).catch(() => {});
   }, []);
 
   const handleAdd = async () => {
@@ -138,21 +139,6 @@ function AnketaQuestionManager() {
     await load();
   };
 
-  const createNewSheet = async () => {
-    setCreatingSheet(true);
-    try {
-      const res = await api.post('/api/events/questions/new-sheet');
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setSheetToast(`Лист «${data.sheetTitle}» создан`);
-      } else {
-        setSheetToast(data.error || 'Ошибка создания листа');
-      }
-    } catch { setSheetToast('Ошибка соединения'); }
-    setCreatingSheet(false);
-    setTimeout(() => setSheetToast(null), 3000);
-  };
-
   const startEdit = (q) => {
     setEditingId(q.id);
     setEditText(q.question_text);
@@ -176,15 +162,34 @@ function AnketaQuestionManager() {
       <p className="anketa-manager-hint">Добавляйте вопросы, которые бот задаст пользователю при заполнении анкеты</p>
 
       <div className="anketa-sheet-actions">
-        {spreadsheetUrl && (
+        {spreadsheetUrl ? (
           <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
             <ExternalLink size={14} /> Google Таблица
           </a>
+        ) : (
+          <span className="anketa-sheet-hint">Ссылка на таблицу не указана</span>
         )}
-        <button className="anketa-new-sheet-btn" onClick={createNewSheet} disabled={creatingSheet || questions.length === 0}>
-          {creatingSheet ? <Loader size={14} className="sc-spinner" /> : <Plus size={14} />}
-          Новый лист
-        </button>
+        {editingUrl ? (
+          <div className="anketa-url-edit">
+            <input
+              className="anketa-q-input"
+              value={urlDraft}
+              onChange={e => setUrlDraft(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              autoFocus
+            />
+            <button className="anketa-q-save-btn" onClick={async () => {
+              await api.put('/api/events/spreadsheet-url', { url: urlDraft });
+              setSpreadsheetUrl(urlDraft.trim());
+              setEditingUrl(false);
+            }}><Check size={14} /></button>
+            <button className="anketa-q-cancel-btn" onClick={() => setEditingUrl(false)}><X size={14} /></button>
+          </div>
+        ) : (
+          <button className="anketa-url-edit-btn" onClick={() => { setUrlDraft(spreadsheetUrl); setEditingUrl(true); }}>
+            {spreadsheetUrl ? 'Изменить ссылку' : 'Указать ссылку'}
+          </button>
+        )}
         {sheetToast && <span className="anketa-sheet-toast">{sheetToast}</span>}
       </div>
 

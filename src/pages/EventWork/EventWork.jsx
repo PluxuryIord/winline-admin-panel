@@ -520,7 +520,7 @@ function EventToggle() {
 function SpreadsheetButton() {
   const [url, setUrl] = useState(null);
   useEffect(() => {
-    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setUrl(d.url)).catch(() => {});
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => { if (d.url) setUrl(d.url); }).catch(() => {});
   }, []);
   if (!url) return null;
   return (

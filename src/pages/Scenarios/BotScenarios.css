@@ -1651,15 +1651,19 @@
   text-decoration: none; transition: all 0.15s;
 }
 .anketa-sheet-link-btn:hover { background: rgba(66,133,244,0.2); }
-.anketa-new-sheet-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 7px 14px; border-radius: 8px;
-  background: rgba(255,126,0,0.1); border: 1px solid rgba(255,126,0,0.25);
-  color: var(--color-orange); font-size: 0.82rem; font-weight: 600;
-  font-family: inherit; cursor: pointer; transition: all 0.15s;
+.anketa-sheet-hint {
+  font-size: 0.8rem; color: rgba(255,255,255,0.35); font-style: italic;
 }
-.anketa-new-sheet-btn:hover:not(:disabled) { background: rgba(255,126,0,0.18); }
-.anketa-new-sheet-btn:disabled { opacity: 0.5; cursor: default; }
+.anketa-url-edit {
+  display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
+}
+.anketa-url-edit .anketa-q-input { flex: 1; font-size: 0.82rem; padding: 6px 10px; }
+.anketa-url-edit-btn {
+  padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-family: inherit;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.anketa-url-edit-btn:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
 .anketa-sheet-toast {
   font-size: 0.78rem; color: rgba(255,255,255,0.5); font-style: italic;
 }
