@@ -106,9 +106,13 @@ function AnketaQuestionManager() {
   };
 
   const handleDelete = async () => {
-    if (!deleteConfirm) return;
-    await api.delete(`/api/events/questions/${deleteConfirm}`);
+    const id = deleteConfirm;
+    if (!id) return;
     setDeleteConfirm(null);
+    try {
+      const res = await api.delete(`/api/events/questions/${id}`);
+      if (!res.ok) { console.error('Delete failed:', res.status); }
+    } catch (e) { console.error('Delete error:', e); }
     await load();
   };
 
