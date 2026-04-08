@@ -105,14 +105,15 @@ function AnketaQuestionManager() {
     setAdding(false);
   };
 
-  const handleDelete = async () => {
-    const id = deleteConfirm;
+  const handleDelete = async (idOverride) => {
+    const id = idOverride || deleteConfirm;
     if (!id) return;
     setDeleteConfirm(null);
     try {
-      const res = await api.delete(`/api/events/questions/${id}`);
-      if (!res.ok) { console.error('Delete failed:', res.status); }
-    } catch (e) { console.error('Delete error:', e); }
+      const res = await fetch(`/api/events/questions/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      const data = await res.json();
+      console.log('[anketa] delete result:', id, res.status, data);
+    } catch (e) { console.error('[anketa] Delete error:', e); }
     await load();
   };
 
@@ -223,7 +224,7 @@ function AnketaQuestionManager() {
             <div className="anketa-confirm-text">Вопрос будет удалён из анкеты без возможности восстановления</div>
             <div className="anketa-confirm-actions">
               <button className="anketa-confirm-cancel" onClick={() => setDeleteConfirm(null)}>Отмена</button>
-              <button className="anketa-confirm-delete" onClick={handleDelete}><Trash2 size={13} /> Удалить</button>
+              <button className="anketa-confirm-delete" onClick={() => handleDelete(deleteConfirm)}><Trash2 size={13} /> Удалить</button>
             </div>
           </div>
         </div>
