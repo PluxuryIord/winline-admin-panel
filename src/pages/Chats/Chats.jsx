@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X, List, LayoutGrid, Plus, Folder, FolderInput } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
@@ -28,6 +28,7 @@ function formatTime(iso) {
 
 export default function Chats() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [chats, setChats] = useState([]);
   const [users, setUsers] = useState([]);
   const [viewMode, setViewMode] = useState('list');
@@ -35,7 +36,12 @@ export default function Chats() {
   const { unreadChats } = useUnread();
 
   const [folders, setFolders] = useState([]);
-  const [activeFolderId, setActiveFolderId] = useState(null); // null = All, 0 = "Без папки"
+  const initFolder = searchParams.get('folder');
+  const [activeFolderId, setActiveFolderId] = useState(
+    initFolder === '__unread' ? '__unread'
+      : initFolder && initFolder !== '' && initFolder !== 'null' ? Number(initFolder)
+        : null
+  ); // null = All, 0 = "Без папки"
   const [createPrompt, setCreatePrompt] = useState(false);
   const [renamePrompt, setRenamePrompt] = useState(null); // folder obj
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState(null); // folder obj for delete confirm
@@ -230,7 +236,7 @@ export default function Chats() {
             <div
               key={chat.id}
               className={`chat-item${unreadChats.has(chat.id) ? ' chat-item--unread' : ''}`}
-              onClick={() => navigate(`/chats/${chat.id}`)}
+              onClick={() => navigate(`/chats/${chat.id}?folder=${activeFolderId ?? ''}`)}
             >
               <div className={`chat-item-avatar${chat.banned ? ' chat-item-avatar--banned' : ''}`}>
                 {chatName.charAt(0)}

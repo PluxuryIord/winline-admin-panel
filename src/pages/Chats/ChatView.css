@@ -580,6 +580,16 @@
   cursor: pointer;
 }
 
+.chatview-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-orange);
+  border-radius: 50%;
+  animation: cv-spin 0.7s linear infinite;
+}
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+
 /* ===== ПРЕВЬЮ ПРИКРЕПЛЕНИЙ (glass) ===== */
 .chatview-attach-bar {
   display: flex;

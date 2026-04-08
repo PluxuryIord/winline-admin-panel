@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send, X, Plus, Paperclip, FileText, ChevronDown } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
@@ -115,6 +115,9 @@ function albumGridClass(count) {
 export default function ChatView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const folderParam = searchParams.get('folder') || '';
+  const [loading, setLoading] = useState(true);
   const [chat, setChat] = useState(null);
   const [user, setUser] = useState(null);
   const [input, setInput] = useState('');
@@ -149,6 +152,7 @@ export default function ChatView() {
       .then(chats => {
         const found = chats.find(c => c.id === Number(id));
         setChat(found || null);
+        setLoading(false);
         if (found?.userId) {
           api.get(`/api/users/${found.userId}`)
             .then(r => r.ok ? r.json() : null)
@@ -156,7 +160,7 @@ export default function ChatView() {
             .catch(() => {});
         }
       })
-      .catch(() => {});
+      .catch(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
@@ -325,11 +329,22 @@ export default function ChatView() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [lightboxUrl]);
 
+  const goBack = () => navigate(folderParam ? `/chats?folder=${folderParam}` : '/chats');
+
+  if (loading) {
+    return (
+      <div className="chatview-not-found">
+        <div className="chatview-loading-spinner" />
+        <p>Загрузка чата...</p>
+      </div>
+    );
+  }
+
   if (!chat) {
     return (
       <div className="chatview-not-found">
         <p>Чат не найден</p>
-        <button onClick={() => navigate(-1)}>Назад к чатам</button>
+        <button onClick={goBack}>Назад к чатам</button>
       </div>
     );
   }
@@ -343,7 +358,7 @@ export default function ChatView() {
         <div className="chatview-main">
           {/* Шапка */}
           <div className="chatview-header">
-            <button className="chatview-back-btn" onClick={() => navigate(-1)}>
+            <button className="chatview-back-btn" onClick={goBack}>
               <ArrowLeft size={18} />
             </button>
             {user && (
