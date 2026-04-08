@@ -1569,7 +1569,8 @@ function DraftsTab({ onSendResult, onEditDraft }) {
     try {
       const res = await api.get('/api/broadcasts/drafts');
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-      setDrafts(await res.json());
+      const all = await res.json();
+      setDrafts(all.filter(d => !(d.scheduleId && d.scheduleStatus === 'pending')));
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
