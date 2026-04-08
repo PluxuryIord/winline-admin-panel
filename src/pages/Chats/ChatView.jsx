@@ -329,7 +329,7 @@ export default function ChatView() {
     return (
       <div className="chatview-not-found">
         <p>Чат не найден</p>
-        <button onClick={() => navigate('/chats')}>Назад к чатам</button>
+        <button onClick={() => navigate(-1)}>Назад к чатам</button>
       </div>
     );
   }
@@ -343,7 +343,7 @@ export default function ChatView() {
         <div className="chatview-main">
           {/* Шапка */}
           <div className="chatview-header">
-            <button className="chatview-back-btn" onClick={() => navigate('/chats')}>
+            <button className="chatview-back-btn" onClick={() => navigate(-1)}>
               <ArrowLeft size={18} />
             </button>
             {user && (
