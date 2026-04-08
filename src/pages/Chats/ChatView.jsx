@@ -61,42 +61,156 @@ function getMediaList(msg) {
 function PollBubble({ poll, userId }) {
   const [vote, setVote] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [votersPanel, setVotersPanel] = useState(null); // null | 'all' | optionIndex
+  const [voters, setVoters] = useState([]);
+  const [votersLoading, setVotersLoading] = useState(false);
+  const [randomWinner, setRandomWinner] = useState(null);
+  const [spinning, setSpinning] = useState(false);
 
   useEffect(() => {
-    if (!poll.pollId || !userId) return;
-    setLoading(true);
-    api.get(`/api/broadcasts/poll/${poll.pollId}/user-vote/${userId}`)
+    if (!poll.pollId) return;
+    // Load user vote
+    if (userId) {
+      setLoading(true);
+      api.get(`/api/broadcasts/poll/${poll.pollId}/user-vote/${userId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setVote(data); })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+    // Load stats
+    api.get(`/api/broadcasts/poll/${poll.pollId}/stats`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setVote(data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then(data => { if (data) setStats(data); })
+      .catch(() => {});
   }, [poll.pollId, userId]);
+
+  const loadVoters = async (optIdx) => {
+    setVotersLoading(true);
+    setVoters([]);
+    setRandomWinner(null);
+    try {
+      const res = await api.get(`/api/broadcasts/poll/${poll.pollId}/voters/${optIdx}`);
+      if (res.ok) setVoters(await res.json());
+    } catch {}
+    setVotersLoading(false);
+  };
+
+  const loadAllVoters = async () => {
+    setVotersLoading(true);
+    setVoters([]);
+    setRandomWinner(null);
+    try {
+      const options = poll.options || [];
+      const all = [];
+      for (let i = 0; i < options.length; i++) {
+        const res = await api.get(`/api/broadcasts/poll/${poll.pollId}/voters/${i}`);
+        if (res.ok) {
+          const list = await res.json();
+          list.forEach(v => all.push({ ...v, optionIndex: i }));
+        }
+      }
+      setVoters(all);
+    } catch {}
+    setVotersLoading(false);
+  };
+
+  const openVoters = (optIdx) => {
+    if (votersPanel === optIdx) { setVotersPanel(null); return; }
+    setVotersPanel(optIdx);
+    if (optIdx === 'all') loadAllVoters();
+    else loadVoters(optIdx);
+  };
+
+  const pickRandom = () => {
+    if (voters.length === 0) return;
+    setSpinning(true);
+    setRandomWinner(null);
+    // Animate through random names
+    let count = 0;
+    const total = 12 + Math.floor(Math.random() * 6);
+    const interval = setInterval(() => {
+      const idx = Math.floor(Math.random() * voters.length);
+      setRandomWinner(voters[idx]);
+      count++;
+      if (count >= total) {
+        clearInterval(interval);
+        // Final pick
+        const finalIdx = Math.floor(Math.random() * voters.length);
+        setRandomWinner(voters[finalIdx]);
+        setSpinning(false);
+      }
+    }, 80 + count * 8);
+  };
 
   const isQuiz = poll.pollType === 'quiz';
   const options = poll.options || [];
 
   return (
     <div className={`cv-poll ${isQuiz ? 'cv-poll--quiz' : ''}`}>
-      <div className="cv-poll-badge">{isQuiz ? 'Викторина' : 'Опрос'}{poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}</div>
+      <div className="cv-poll-header">
+        <div className="cv-poll-badge">{isQuiz ? 'Викторина' : 'Опрос'}{poll.allowsMultipleAnswers ? ' · мультивыбор' : ''}</div>
+        {stats && <div className="cv-poll-total" onClick={() => openVoters('all')}>
+          {stats.totalVotes} голос{stats.totalVotes === 1 ? '' : stats.totalVotes < 5 ? 'а' : 'ов'}
+        </div>}
+      </div>
       <div className="cv-poll-question">{poll.question}</div>
       <div className="cv-poll-divider" />
       <div className="cv-poll-options">
         {options.map((opt, i) => {
           const isVoted = vote?.voted && vote.optionIndex === i;
+          const stat = stats?.stats?.[i];
+          const isActive = votersPanel === i;
           return (
-            <div key={i} className={`cv-poll-opt${isVoted ? ' cv-poll-opt--voted' : ''}`}>
+            <div key={i} className={`cv-poll-opt${isVoted ? ' cv-poll-opt--voted' : ''}${isActive ? ' cv-poll-opt--active' : ''}`} onClick={() => openVoters(i)}>
               <span className="cv-poll-opt-num">{i + 1}</span>
               <span className="cv-poll-opt-text">{opt}</span>
+              {stat && <span className="cv-poll-opt-stat">{stat.count} ({stat.percent}%)</span>}
               {isVoted && <span className="cv-poll-opt-check">✓</span>}
             </div>
           );
         })}
       </div>
+
       {vote?.voted && (
         <div className="cv-poll-status cv-poll-status--voted">Ответ: вариант {vote.optionIndex + 1}</div>
       )}
       {!loading && poll.pollId && !vote?.voted && (
         <div className="cv-poll-status cv-poll-status--pending">Ожидает ответа</div>
+      )}
+
+      {/* Voters panel */}
+      {votersPanel !== null && (
+        <div className="cv-poll-voters">
+          <div className="cv-poll-voters-header">
+            <span>{votersPanel === 'all' ? 'Все проголосовавшие' : `Вариант ${votersPanel + 1}: ${options[votersPanel]}`}</span>
+            <button className="cv-poll-voters-close" onClick={() => setVotersPanel(null)}><X size={14} /></button>
+          </div>
+          {votersLoading ? (
+            <div className="cv-poll-voters-loading">Загрузка...</div>
+          ) : voters.length === 0 ? (
+            <div className="cv-poll-voters-empty">Нет голосов</div>
+          ) : (
+            <>
+              <div className="cv-poll-voters-list">
+                {voters.map((v, idx) => (
+                  <div key={idx} className={`cv-poll-voter${randomWinner?.userId === v.userId && !spinning ? ' cv-poll-voter--winner' : ''}`}>
+                    <div className="cv-poll-voter-avatar">{(v.fullName || v.username || '?').charAt(0)}</div>
+                    <div className="cv-poll-voter-info">
+                      <span className="cv-poll-voter-name">{v.fullName || 'Без имени'}</span>
+                      {v.username && <span className="cv-poll-voter-username">@{v.username}</span>}
+                    </div>
+                    {votersPanel === 'all' && <span className="cv-poll-voter-opt">вар. {(v.optionIndex ?? 0) + 1}</span>}
+                  </div>
+                ))}
+              </div>
+              <button className={`cv-poll-random-btn${spinning ? ' cv-poll-random-btn--spinning' : ''}`} onClick={pickRandom} disabled={spinning}>
+                🎲 {spinning ? 'Выбираем...' : randomWinner && !spinning ? `Победитель: ${randomWinner.fullName || randomWinner.username}` : 'Случайный победитель'}
+              </button>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
