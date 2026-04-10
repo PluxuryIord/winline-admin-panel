@@ -649,8 +649,8 @@ router.post('/users', async (req, res, next) => {
         results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: false, error: err.message });
         await markBlockedIfNeeded(row.user_id, err.message);
       }
-      // Throttle: ~10 msg/sec, well under Telegram's 30/sec global limit
-      await new Promise(r => setTimeout(r, 100));
+      // Throttle: 1 msg/sec — safely under Telegram's per-chat and global limits
+      await new Promise(r => setTimeout(r, 1000));
     }
 
     // Limit results to avoid exceeding DB column size
