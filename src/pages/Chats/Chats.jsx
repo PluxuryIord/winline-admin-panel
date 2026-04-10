@@ -48,6 +48,11 @@ export default function Chats() {
   const [moveMenu, setMoveMenu] = useState(null); // { chatId, x, y }
   const moveMenuRef = useRef(null);
 
+  // Infinite scroll: render chats in chunks instead of all at once
+  const PAGE_SIZE = 30;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const loadMoreRef = useRef(null);
+
   useEffect(() => {
     api.get('/api/chats').then(r => r.json()).then(setChats).catch(() => {});
     api.get('/api/users?limit=200').then(r => r.json()).then(data => setUsers(data.users || data)).catch(() => {});
@@ -172,6 +177,31 @@ export default function Chats() {
     return timeB - timeA;
   });
 
+  // Reset visible window whenever the active folder or total count changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeFolderId, sortedChats.length]);
+
+  const renderedChats = sortedChats.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedChats.length;
+
+  // Observe the sentinel and load more chats when it enters viewport
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(c => Math.min(c + PAGE_SIZE, sortedChats.length));
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, sortedChats.length]);
+
   return (
     <div className="chats-container">
       <div className="chats-toolbar">
@@ -228,7 +258,7 @@ export default function Chats() {
         {sortedChats.length === 0 && (
           <p className="chats-empty">Чатов пока нет</p>
         )}
-        {sortedChats.map(chat => {
+        {renderedChats.map(chat => {
           const user = getUser(chat.userId);
           const chatName = chat.fullName || (user ? user.fullName : null) || `Пользователь #${chat.userId}`;
           const msg = lastMsg(chat);
@@ -276,6 +306,11 @@ export default function Chats() {
             </div>
           );
         })}
+        {hasMore && (
+          <div ref={loadMoreRef} className="chats-load-more-sentinel">
+            Загрузка…
+          </div>
+        )}
       </div>
 
       {moveMenu && (
