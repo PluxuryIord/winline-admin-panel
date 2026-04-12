@@ -319,9 +319,49 @@ router.put('/', async (req, res, next) => {
     };
     const oldClean = stripVisual(oldData);
     const newClean = stripVisual(req.body);
-    // Only log audit if there are real content changes
-    if (JSON.stringify(oldClean) !== JSON.stringify(newClean)) {
-      logAudit(req.user.id, userName, 'update', 'scenarios', null, 'full save', oldClean, newClean);
+    // Log per-screen changes instead of one giant "full save"
+    const oldScreens = oldClean?.screens || {};
+    const newScreens = newClean?.screens || {};
+    const allScreenIds = new Set([...Object.keys(oldScreens), ...Object.keys(newScreens)]);
+    let hasChanges = false;
+    for (const sid of allScreenIds) {
+      const oldS = oldScreens[sid];
+      const newS = newScreens[sid];
+      if (JSON.stringify(oldS) === JSON.stringify(newS)) continue;
+      hasChanges = true;
+      const screenTitle = newS?.title || oldS?.title || sid;
+      if (!oldS) {
+        logAudit(req.user.id, userName, 'create', 'scenarios', sid, `Добавлен экран «${screenTitle}»`, null, newS);
+      } else if (!newS) {
+        logAudit(req.user.id, userName, 'delete', 'scenarios', sid, `Удалён экран «${screenTitle}»`, oldS, null);
+      } else {
+        // Find what changed inside the screen
+        const changes = [];
+        const oldMsgs = oldS.messages || {};
+        const newMsgs = newS.messages || {};
+        for (const mk of new Set([...Object.keys(oldMsgs), ...Object.keys(newMsgs)])) {
+          if (JSON.stringify(oldMsgs[mk]) !== JSON.stringify(newMsgs[mk])) {
+            changes.push(newMsgs[mk]?.label || mk);
+          }
+        }
+        const oldBtns = oldS.buttons || {};
+        const newBtns = newS.buttons || {};
+        for (const bk of new Set([...Object.keys(oldBtns), ...Object.keys(newBtns)])) {
+          if (JSON.stringify(oldBtns[bk]) !== JSON.stringify(newBtns[bk])) {
+            changes.push(`кнопка «${newBtns[bk]?.label || oldBtns[bk]?.label || bk}»`);
+          }
+        }
+        const label = changes.length > 0
+          ? `${screenTitle}: ${changes.join(', ')}`
+          : screenTitle;
+        logAudit(req.user.id, userName, 'update', 'scenarios', sid, label, oldS, newS);
+      }
+    }
+    // Check non-screen fields too (customScreenOrder, etc.)
+    const nonScreenOld = { ...oldClean }; delete nonScreenOld.screens;
+    const nonScreenNew = { ...newClean }; delete nonScreenNew.screens;
+    if (!hasChanges && JSON.stringify(nonScreenOld) !== JSON.stringify(nonScreenNew)) {
+      logAudit(req.user.id, userName, 'update', 'scenarios', null, 'Настройки сценариев', nonScreenOld, nonScreenNew);
     }
     createDailySnapshot('scenarios', req.user.id, userName);
     res.json({ ok: true });
