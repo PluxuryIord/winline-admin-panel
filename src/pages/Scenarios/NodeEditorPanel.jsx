@@ -18,6 +18,8 @@ const SCREEN_ICONS = {
 // Точки входа — нельзя направлять стрелки В эти блоки
 const ENTRY_POINTS = new Set(['start_menu', 'event_flow', 'group_menu']);
 
+const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wfqrdL30DicmCikX_PBaYHTxbEoJwA8wQgF2jQowA4A/edit';
+
 // Блоки с заблокированными связями — нельзя менять targetScreen кнопок
 const LOCKED_CONNECTIONS = new Set([
   'start_menu', 'registration_flow', 'auth_flow',
@@ -79,7 +81,7 @@ function AnketaQuestionManager() {
   const [editType, setEditType] = useState('text');
   const [editOptions, setEditOptions] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState(FALLBACK_SHEET_URL);
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [sheetToast, setSheetToast] = useState(null);
@@ -95,7 +97,7 @@ function AnketaQuestionManager() {
 
   useEffect(() => {
     load();
-    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => setSpreadsheetUrl(d.url || '')).catch(() => {});
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => { if (d.url) setSpreadsheetUrl(d.url); }).catch(() => {});
   }, []);
 
   const handleAdd = async () => {

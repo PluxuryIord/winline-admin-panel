@@ -517,12 +517,13 @@ function EventToggle() {
   );
 }
 
+const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wfqrdL30DicmCikX_PBaYHTxbEoJwA8wQgF2jQowA4A/edit';
+
 function SpreadsheetButton() {
-  const [url, setUrl] = useState(null);
+  const [url, setUrl] = useState(FALLBACK_SHEET_URL);
   useEffect(() => {
     api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => { if (d.url) setUrl(d.url); }).catch(() => {});
   }, []);
-  if (!url) return null;
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="ew-spreadsheet-btn">
       <ExternalLink size={16} /> Google Таблица
