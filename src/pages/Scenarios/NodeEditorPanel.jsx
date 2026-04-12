@@ -82,9 +82,6 @@ function AnketaQuestionManager() {
   const [editOptions, setEditOptions] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState(FALLBACK_SHEET_URL);
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [urlDraft, setUrlDraft] = useState('');
-  const [sheetToast, setSheetToast] = useState(null);
 
   const load = async () => {
     try {
@@ -164,35 +161,9 @@ function AnketaQuestionManager() {
       <p className="anketa-manager-hint">Добавляйте вопросы, которые бот задаст пользователю при заполнении анкеты</p>
 
       <div className="anketa-sheet-actions">
-        {spreadsheetUrl ? (
-          <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
-            <ExternalLink size={14} /> Google Таблица
-          </a>
-        ) : (
-          <span className="anketa-sheet-hint">Ссылка на таблицу не указана</span>
-        )}
-        {editingUrl ? (
-          <div className="anketa-url-edit">
-            <input
-              className="anketa-q-input"
-              value={urlDraft}
-              onChange={e => setUrlDraft(e.target.value)}
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-              autoFocus
-            />
-            <button className="anketa-q-save-btn" onClick={async () => {
-              await api.put('/api/events/spreadsheet-url', { url: urlDraft });
-              setSpreadsheetUrl(urlDraft.trim());
-              setEditingUrl(false);
-            }}><Check size={14} /></button>
-            <button className="anketa-q-cancel-btn" onClick={() => setEditingUrl(false)}><X size={14} /></button>
-          </div>
-        ) : (
-          <button className="anketa-url-edit-btn" onClick={() => { setUrlDraft(spreadsheetUrl); setEditingUrl(true); }}>
-            {spreadsheetUrl ? 'Изменить ссылку' : 'Указать ссылку'}
-          </button>
-        )}
-        {sheetToast && <span className="anketa-sheet-toast">{sheetToast}</span>}
+        <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
+          <ExternalLink size={14} /> Google Таблица
+        </a>
       </div>
 
       {/* Question list */}
