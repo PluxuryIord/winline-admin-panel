@@ -1667,3 +1667,22 @@
 .anketa-sheet-toast {
   font-size: 0.78rem; color: rgba(255,255,255,0.5); font-style: italic;
 }
+
+.anketa-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  z-index: 9999;
+  animation: anketaToastIn 0.2s ease-out;
+  backdrop-filter: blur(12px);
+}
+@keyframes anketaToastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

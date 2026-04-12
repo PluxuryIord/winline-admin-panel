@@ -81,7 +81,13 @@ function AnketaQuestionManager() {
   const [editType, setEditType] = useState('text');
   const [editOptions, setEditOptions] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [toast, setToast] = useState(null);
   const [spreadsheetUrl, setSpreadsheetUrl] = useState(FALLBACK_SHEET_URL);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
 
   const load = async () => {
     try {
@@ -107,6 +113,7 @@ function AnketaQuestionManager() {
       if (!res.ok) { const err = await res.text(); console.error('Add question failed:', err); alert('Ошибка: ' + err); setAdding(false); return; }
       setNewText(''); setNewType('text'); setNewOptions('');
       await load();
+      showToast('Вопрос добавлен');
     } catch (e) { console.error('Add question error:', e); alert('Ошибка при добавлении: ' + e.message); }
     setAdding(false);
   };
@@ -116,11 +123,12 @@ function AnketaQuestionManager() {
     if (!id) return;
     setDeleteConfirm(null);
     try {
-      const res = await fetch(`/api/events/questions/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      const res = await api.delete(`/api/events/questions/${id}`);
       const data = await res.json();
       console.log('[anketa] delete result:', id, res.status, data);
     } catch (e) { console.error('[anketa] Delete error:', e); }
     await load();
+    showToast('Вопрос удалён');
   };
 
   const handleToggle = async (q) => {
@@ -151,6 +159,7 @@ function AnketaQuestionManager() {
     await api.put(`/api/events/questions/${editingId}`, { question_text: editText, question_type: editType, options: opts });
     setEditingId(null);
     await load();
+    showToast('Вопрос сохранён');
   };
 
   if (loading) return <div style={{ padding: 16, color: '#888' }}><Loader size={16} className="sc-spinner" /> Загрузка...</div>;
@@ -241,6 +250,7 @@ function AnketaQuestionManager() {
           </div>
         </div>
       )}
+      {toast && <div className="anketa-toast">{toast}</div>}
     </div>
   );
 }

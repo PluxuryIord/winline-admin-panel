@@ -540,6 +540,18 @@ router.post('/questions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PUT /api/events/questions/reorder — [{id, order}, ...] (MUST be before :id)
+router.put('/questions/reorder', async (req, res, next) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Array expected' });
+    for (const item of items) {
+      await dbPool.query('UPDATE event_questions SET `order` = ? WHERE id = ?', [item.order, item.id]);
+    }
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/events/questions/:id
 router.put('/questions/:id', async (req, res, next) => {
   try {
@@ -585,17 +597,7 @@ router.delete('/questions/:id', async (req, res, next) => {
   }
 });
 
-// PUT /api/events/questions/reorder — [{id, order}, ...]
-router.put('/questions/reorder', async (req, res, next) => {
-  try {
-    const items = req.body;
-    if (!Array.isArray(items)) return res.status(400).json({ error: 'Array expected' });
-    for (const item of items) {
-      await dbPool.query('UPDATE event_questions SET `order` = ? WHERE id = ?', [item.order, item.id]);
-    }
-    res.json({ ok: true });
-  } catch (err) { next(err); }
-});
+
 
 // GET /api/events/spreadsheet-url — get Google Sheets link
 router.get('/spreadsheet-url', async (req, res) => {
