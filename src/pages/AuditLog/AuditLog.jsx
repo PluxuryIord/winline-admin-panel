@@ -110,7 +110,17 @@ function describeChange(log) {
 function renderDetails(log) {
   const oldVal = parseVal(log.old_value);
   const newVal = parseVal(log.new_value);
-  if (!oldVal && !newVal) return null;
+  // If JSON was truncated and can't parse, show raw preview
+  if (!oldVal && !newVal) {
+    const raw = log.new_value || log.old_value;
+    if (!raw) return null;
+    return (
+      <div className="audit-details">
+        <div className="audit-detail-label">{log.entity_label || log.entity_id || '\u0414\u0430\u043D\u043D\u044B\u0435'}</div>
+        <div className="audit-detail-diff audit-detail-new">{truncate(String(raw), 300)}</div>
+      </div>
+    );
+  }
 
   // Tags
   if (log.entity_type?.includes('tags')) {
