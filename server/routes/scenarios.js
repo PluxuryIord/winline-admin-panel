@@ -309,7 +309,20 @@ router.put('/', async (req, res, next) => {
     await saveScenarios(req.body, dbId);
     notifyBotReload();  // non-blocking
     const userName = req.user.displayName || req.user.username;
-    logAudit(req.user.id, userName, 'update', 'scenarios', null, 'full save', oldData, req.body);
+    // Strip visual-only fields before audit comparison
+    const visualKeys = ['bendOffsets', 'positions'];
+    const stripVisual = (obj) => {
+      if (!obj || typeof obj !== 'object') return obj;
+      const copy = { ...obj };
+      for (const k of visualKeys) delete copy[k];
+      return copy;
+    };
+    const oldClean = stripVisual(oldData);
+    const newClean = stripVisual(req.body);
+    // Only log audit if there are real content changes
+    if (JSON.stringify(oldClean) !== JSON.stringify(newClean)) {
+      logAudit(req.user.id, userName, 'update', 'scenarios', null, 'full save', oldClean, newClean);
+    }
     createDailySnapshot('scenarios', req.user.id, userName);
     res.json({ ok: true });
   } catch (err) { next(err); }
