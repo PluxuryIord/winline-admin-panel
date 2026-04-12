@@ -142,7 +142,56 @@ function renderDetails(log) {
         </div>
       );
     }
-    return null;
+    // Full save or other scenario changes without screen/field split
+    if (log.entity_label === 'full save') {
+      // Try to show a summary of what screens changed
+      const oldScreens = oldVal ? Object.keys(oldVal) : [];
+      const newScreens = newVal ? Object.keys(newVal) : [];
+      const allScreens = [...new Set([...oldScreens, ...newScreens])];
+      const changedScreens = allScreens.filter(s =>
+        JSON.stringify(oldVal?.[s]) !== JSON.stringify(newVal?.[s])
+      );
+      return (
+        <div className="audit-details">
+          <div className="audit-detail-label">{'\u041F\u043E\u043B\u043D\u043E\u0435 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0441\u0446\u0435\u043D\u0430\u0440\u0438\u0435\u0432'}</div>
+          {changedScreens.length > 0 ? (
+            changedScreens.map(screen => (
+              <span key={screen} className="audit-tag audit-tag-added">{screen}</span>
+            ))
+          ) : (
+            <span className="audit-tag audit-tag-kept">{'\u0411\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439'}</span>
+          )}
+        </div>
+      );
+    }
+
+    // Other scenario entries — fallback to generic diff
+    const allKeys = new Set([...Object.keys(oldVal || {}), ...Object.keys(newVal || {})]);
+    const changed = [...allKeys].filter(k => JSON.stringify(oldVal?.[k]) !== JSON.stringify(newVal?.[k]));
+    if (changed.length === 0) {
+      return (
+        <div className="audit-details">
+          <div className="audit-detail-label">{log.entity_label || log.entity_id || '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438'}</div>
+          <span className="audit-tag audit-tag-kept">{'\u0411\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439'}</span>
+        </div>
+      );
+    }
+    return (
+      <div className="audit-details">
+        <div className="audit-detail-label">{log.entity_label || log.entity_id || '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438'}</div>
+        {changed.map(k => {
+          const oldText = oldVal?.[k] !== undefined ? truncate(stripHtml(String(typeof oldVal[k] === 'object' ? JSON.stringify(oldVal[k]) : oldVal[k])), 150) : '';
+          const newText = newVal?.[k] !== undefined ? truncate(stripHtml(String(typeof newVal[k] === 'object' ? JSON.stringify(newVal[k]) : newVal[k])), 150) : '';
+          return (
+            <div key={k} className="audit-detail-row">
+              <span className="audit-detail-key">{k}</span>
+              {oldText && <span className="audit-detail-diff audit-detail-old">{oldText}</span>}
+              {newText && <span className="audit-detail-diff audit-detail-new">{newText}</span>}
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   // Knowledge

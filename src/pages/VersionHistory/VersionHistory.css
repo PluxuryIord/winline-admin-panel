@@ -73,7 +73,7 @@
 }
 .version-item.current {
   background: rgba(255,126,0,0.04);
-  border-left: 3px solid var(--color-orange);
+  box-shadow: inset 3px 0 0 var(--color-orange);
 }
 
 .version-item-info {
