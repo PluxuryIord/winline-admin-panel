@@ -72,8 +72,7 @@
   background: rgba(255,255,255,0.03);
 }
 .version-item.current {
-  background: rgba(255,126,0,0.04);
-  box-shadow: inset 3px 0 0 var(--color-orange);
+  background: rgba(255,255,255,0.02);
 }
 
 .version-item-info {

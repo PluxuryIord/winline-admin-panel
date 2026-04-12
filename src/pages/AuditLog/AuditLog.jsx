@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown, ChevronRight, Loader } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader, Check } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import IosDatePicker from '../../components/UI/IosDatePicker';
@@ -245,6 +245,41 @@ function truncate(s, max) {
   return s.length > max ? s.slice(0, max) + '...' : s;
 }
 
+function CustomSelect({ options, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = options.find(o => o.value === value) || options[0];
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="custom-select" ref={ref}>
+      <button className="custom-select-trigger" onClick={() => setOpen(!open)}>
+        <span>{selected.label}</span>
+        <ChevronDown size={14} className={`custom-select-arrow ${open ? 'rotated' : ''}`} />
+      </button>
+      {open && (
+        <div className="custom-select-dropdown">
+          {options.map(o => (
+            <div
+              key={o.value}
+              className={`custom-select-option ${o.value === value ? 'active' : ''}`}
+              onClick={() => { onChange(o.value); setOpen(false); }}
+            >
+              <span>{o.label}</span>
+              {o.value === value && <Check size={14} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AuditLog() {
   const { user, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -318,15 +353,11 @@ export default function AuditLog() {
       <h1 className="audit-log-title">{'\u0416\u0443\u0440\u043D\u0430\u043B \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439'}</h1>
 
       <div className="audit-filters">
-        <select
-          className="audit-filter-select"
+        <CustomSelect
+          options={ENTITY_OPTIONS}
           value={entityType}
-          onChange={(e) => { setEntityType(e.target.value); }}
-        >
-          {ENTITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          onChange={setEntityType}
+        />
         <IosDatePicker
           compact
           value={dateFrom}
