@@ -107,6 +107,75 @@ function describeChange(log) {
   return parts;
 }
 
+function renderDetails(log) {
+  const oldVal = parseVal(log.old_value);
+  const newVal = parseVal(log.new_value);
+  if (!oldVal && !newVal) return null;
+
+  // Tags
+  if (log.entity_type?.includes('tags')) {
+    const oldTags = oldVal?.tags || [];
+    const newTags = newVal?.tags || [];
+    const added = newTags.filter(t => !oldTags.includes(t));
+    const removed = oldTags.filter(t => !newTags.includes(t));
+    const kept = newTags.filter(t => oldTags.includes(t));
+    return (
+      <div className="audit-details">
+        {removed.map(t => <span key={'r-' + t} className="audit-tag audit-tag-removed">{t}</span>)}
+        {added.map(t => <span key={'a-' + t} className="audit-tag audit-tag-added">{t}</span>)}
+        {kept.map(t => <span key={'k-' + t} className="audit-tag audit-tag-kept">{t}</span>)}
+      </div>
+    );
+  }
+
+  // Scenarios
+  if (log.entity_type === 'scenarios') {
+    if (log.entity_id?.includes('/')) {
+      const [screen, key] = log.entity_id.split('/');
+      const oldText = oldVal?.text ?? oldVal?.label ?? '';
+      const newText = newVal?.text ?? newVal?.label ?? '';
+      return (
+        <div className="audit-details">
+          <div className="audit-detail-label">{'\u042D\u043A\u0440\u0430\u043D'}: <strong>{screen}</strong> &rarr; {key}</div>
+          {oldText && <div className="audit-detail-diff audit-detail-old">{stripHtml(String(oldText))}</div>}
+          {newText && <div className="audit-detail-diff audit-detail-new">{stripHtml(String(newText))}</div>}
+        </div>
+      );
+    }
+    return null;
+  }
+
+  // Knowledge
+  if (log.entity_type === 'knowledge') {
+    const title = newVal?.title || oldVal?.title || log.entity_label || '';
+    const oldContent = oldVal?.content ? stripHtml(oldVal.content) : '';
+    const newContent = newVal?.content ? stripHtml(newVal.content) : '';
+    return (
+      <div className="audit-details">
+        {title && <div className="audit-detail-label">{'\u0421\u0442\u0430\u0442\u044C\u044F'}: <strong>{title}</strong></div>}
+        {oldContent && <div className="audit-detail-diff audit-detail-old">{truncate(oldContent, 200)}</div>}
+        {newContent && <div className="audit-detail-diff audit-detail-new">{truncate(newContent, 200)}</div>}
+      </div>
+    );
+  }
+
+  // Fallback: show key-value pairs
+  const allKeys = new Set([...Object.keys(oldVal || {}), ...Object.keys(newVal || {})]);
+  const changed = [...allKeys].filter(k => JSON.stringify(oldVal?.[k]) !== JSON.stringify(newVal?.[k]));
+  if (changed.length === 0) return null;
+  return (
+    <div className="audit-details">
+      {changed.map(k => (
+        <div key={k} className="audit-detail-row">
+          <span className="audit-detail-key">{k}</span>
+          {oldVal?.[k] !== undefined && <span className="audit-detail-diff audit-detail-old">{String(oldVal[k])}</span>}
+          {newVal?.[k] !== undefined && <span className="audit-detail-diff audit-detail-new">{String(newVal[k])}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function stripHtml(html) {
   if (!html) return '';
   return html.replace(/<[^>]+>/g, '').replace(/&\w+;/g, ' ').trim();
@@ -254,22 +323,7 @@ export default function AuditLog() {
                   </div>
                 )}
 
-                {isExpanded && (log.old_value || log.new_value) && (
-                  <div className="audit-card-raw">
-                    {log.old_value && (
-                      <details>
-                        <summary>{'\u0421\u0442\u0430\u0440\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
-                        <pre className="audit-raw-json">{JSON.stringify(parseVal(log.old_value), null, 2)}</pre>
-                      </details>
-                    )}
-                    {log.new_value && (
-                      <details>
-                        <summary>{'\u041D\u043E\u0432\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
-                        <pre className="audit-raw-json">{JSON.stringify(parseVal(log.new_value), null, 2)}</pre>
-                      </details>
-                    )}
-                  </div>
-                )}
+                {isExpanded && renderDetails(log)}
               </div>
             );
           })}
