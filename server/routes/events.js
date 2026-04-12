@@ -474,6 +474,21 @@ router.put('/toggle', async (req, res, next) => {
 
 // ─── Anketa Questions CRUD ──────────────────────────────────────────────────
 
+// Auto-create a new Google Sheet tab when questions change
+async function autoCreateSheet() {
+  try {
+    const [rows] = await dbPool.query(
+      'SELECT question_text FROM event_questions WHERE is_active = 1 ORDER BY `order` ASC'
+    );
+    const questions = rows.map(r => r.question_text);
+    if (questions.length === 0) return;
+    const title = await createSheetForQuestions(questions);
+    if (title) console.log(`[events] Auto-created sheet "${title}" after question change`);
+  } catch (err) {
+    console.error('[events] Auto-create sheet failed:', err.message);
+  }
+}
+
 // Ensure table exists (lazy, called before first query)
 let _tableReady = false;
 async function ensureQuestionsTable() {
@@ -521,6 +536,7 @@ router.post('/questions', async (req, res, next) => {
       [question_text.trim(), question_type, options ? JSON.stringify(options) : null, nextOrder]
     );
     res.json({ id: result.insertId, question_text: question_text.trim(), question_type, options, order: nextOrder, is_active: true });
+    autoCreateSheet(); // fire-and-forget
   } catch (err) { next(err); }
 });
 
@@ -540,6 +556,10 @@ router.put('/questions/:id', async (req, res, next) => {
     params.push(id);
     await dbPool.query(`UPDATE event_questions SET ${updates.join(', ')} WHERE id = ?`, params);
     res.json({ ok: true });
+    // Auto-create sheet if question content changed (not just reorder/toggle)
+    if (req.body.question_text !== undefined || req.body.question_type !== undefined || req.body.options !== undefined) {
+      autoCreateSheet();
+    }
   } catch (err) { next(err); }
 });
 
@@ -558,6 +578,7 @@ router.delete('/questions/:id', async (req, res, next) => {
       return res.status(404).json({ ok: false, error: 'Вопрос не найден в БД', id });
     }
     res.json({ ok: true, deleted: id });
+    autoCreateSheet(); // fire-and-forget
   } catch (err) {
     console.error('[events] Delete question error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -579,7 +600,7 @@ router.put('/questions/reorder', async (req, res, next) => {
 // GET /api/events/spreadsheet-url — get Google Sheets link
 router.get('/spreadsheet-url', async (req, res) => {
   const settings = await getSettings();
-  res.json({ url: settings.spreadsheet_url || null });
+  res.json({ url: settings.spreadsheet_url || getSpreadsheetUrl() || null });
 });
 
 // PUT /api/events/spreadsheet-url — save Google Sheets link
