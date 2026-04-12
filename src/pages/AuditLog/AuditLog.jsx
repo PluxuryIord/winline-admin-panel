@@ -175,31 +175,84 @@ function renderDetails(log) {
       );
     }
 
-    // Other scenario entries — fallback to generic diff
-    const allKeys = new Set([...Object.keys(oldVal || {}), ...Object.keys(newVal || {})]);
-    const changed = [...allKeys].filter(k => JSON.stringify(oldVal?.[k]) !== JSON.stringify(newVal?.[k]));
-    if (changed.length === 0) {
+    // Per-screen scenario diff — show changed messages & buttons in detail
+    const diffs = [];
+
+    // Compare messages
+    const oldMsgs = oldVal?.messages || {};
+    const newMsgs = newVal?.messages || {};
+    for (const mk of new Set([...Object.keys(oldMsgs), ...Object.keys(newMsgs)])) {
+      if (JSON.stringify(oldMsgs[mk]) !== JSON.stringify(newMsgs[mk])) {
+        const label = newMsgs[mk]?.label || oldMsgs[mk]?.label || mk;
+        const oText = stripHtml(String(oldMsgs[mk]?.text || ''));
+        const nText = stripHtml(String(newMsgs[mk]?.text || ''));
+        if (oText !== nText) {
+          diffs.push({ type: 'msg', label, old: oText, new: nText });
+        }
+        // Check media change
+        const oMedia = oldMsgs[mk]?.media?.url || '';
+        const nMedia = newMsgs[mk]?.media?.url || '';
+        if (oMedia !== nMedia) {
+          diffs.push({ type: 'media', label, old: oMedia ? 'Было фото' : '', new: nMedia ? 'Добавлено фото' : 'Фото удалено' });
+        }
+      }
+    }
+
+    // Compare buttons
+    const oldBtns = oldVal?.buttons || {};
+    const newBtns = newVal?.buttons || {};
+    for (const bk of new Set([...Object.keys(oldBtns), ...Object.keys(newBtns)])) {
+      if (JSON.stringify(oldBtns[bk]) !== JSON.stringify(newBtns[bk])) {
+        const oBtn = oldBtns[bk];
+        const nBtn = newBtns[bk];
+        if (!oBtn) {
+          diffs.push({ type: 'btn', label: nBtn?.label || bk, old: '', new: 'Добавлена кнопка' });
+        } else if (!nBtn) {
+          diffs.push({ type: 'btn', label: oBtn?.label || bk, old: 'Удалена кнопка', new: '' });
+        } else {
+          if (oBtn.label !== nBtn.label) {
+            diffs.push({ type: 'btn', label: bk, old: oBtn.label, new: nBtn.label });
+          }
+          if (oBtn.action !== nBtn.action) {
+            diffs.push({ type: 'btn', label: nBtn.label || bk, old: `Действие: ${oBtn.action || '—'}`, new: `Действие: ${nBtn.action || '—'}` });
+          }
+        }
+      }
+    }
+
+    // Compare other top-level fields (title, description, buttonOrder)
+    const skipKeys = new Set(['messages', 'buttons', 'title', 'description']);
+    for (const k of new Set([...Object.keys(oldVal || {}), ...Object.keys(newVal || {})])) {
+      if (skipKeys.has(k)) continue;
+      if (JSON.stringify(oldVal?.[k]) !== JSON.stringify(newVal?.[k])) {
+        if (k === 'buttonOrder') {
+          diffs.push({ type: 'order', label: 'Порядок кнопок', old: '', new: 'Изменён' });
+        } else {
+          diffs.push({ type: 'other', label: k, old: String(oldVal?.[k] ?? ''), new: String(newVal?.[k] ?? '') });
+        }
+      }
+    }
+
+    if (diffs.length === 0) {
       return (
         <div className="audit-details">
-          <div className="audit-detail-label">{log.entity_label || log.entity_id || '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438'}</div>
-          <span className="audit-tag audit-tag-kept">{'\u0411\u0435\u0437 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439'}</span>
+          <div className="audit-detail-label">{log.entity_label || log.entity_id || 'Сценарии'}</div>
+          <span className="audit-tag audit-tag-kept">Без видимых изменений</span>
         </div>
       );
     }
+
     return (
       <div className="audit-details">
-        <div className="audit-detail-label">{log.entity_label || log.entity_id || '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438'}</div>
-        {changed.map(k => {
-          const oldText = oldVal?.[k] !== undefined ? truncate(stripHtml(String(typeof oldVal[k] === 'object' ? JSON.stringify(oldVal[k]) : oldVal[k])), 150) : '';
-          const newText = newVal?.[k] !== undefined ? truncate(stripHtml(String(typeof newVal[k] === 'object' ? JSON.stringify(newVal[k]) : newVal[k])), 150) : '';
-          return (
-            <div key={k} className="audit-detail-row">
-              <span className="audit-detail-key">{k}</span>
-              {oldText && <span className="audit-detail-diff audit-detail-old">{oldText}</span>}
-              {newText && <span className="audit-detail-diff audit-detail-new">{newText}</span>}
-            </div>
-          );
-        })}
+        {diffs.map((d, i) => (
+          <div key={i} className="audit-detail-row">
+            <span className="audit-detail-key">
+              {d.type === 'msg' ? '💬 ' : d.type === 'btn' ? '🔘 ' : d.type === 'media' ? '🖼 ' : ''}{d.label}
+            </span>
+            {d.old && <span className="audit-detail-diff audit-detail-old">{truncate(d.old, 200)}</span>}
+            {d.new && <span className="audit-detail-diff audit-detail-new">{truncate(d.new, 200)}</span>}
+          </div>
+        ))}
       </div>
     );
   }
