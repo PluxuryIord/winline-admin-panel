@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronRight, Loader } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -6,10 +6,10 @@ import IosDatePicker from '../../components/UI/IosDatePicker';
 import './AuditLog.css';
 
 const ACTION_LABELS = {
-  create: 'Создание',
-  update: 'Изменение',
-  delete: 'Удаление',
-  rollback: 'Откат',
+  create: '\u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435',
+  update: '\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0435',
+  delete: '\u0423\u0434\u0430\u043B\u0435\u043D\u0438\u0435',
+  rollback: '\u041E\u0442\u043A\u0430\u0442',
 };
 
 const ACTION_COLORS = {
@@ -20,22 +20,24 @@ const ACTION_COLORS = {
 };
 
 const ENTITY_LABELS = {
-  tag: 'Теги',
-  user_tags: 'Теги пользователя',
-  channel_tags: 'Теги канала',
-  group_tags: 'Теги группы',
-  scenarios: 'Сценарии',
-  knowledge: 'База знаний',
+  tag: '\u0422\u0435\u0433\u0438',
+  user_tags: '\u0422\u0435\u0433\u0438 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F',
+  channel_tags: '\u0422\u0435\u0433\u0438 \u043A\u0430\u043D\u0430\u043B\u0430',
+  group_tags: '\u0422\u0435\u0433\u0438 \u0433\u0440\u0443\u043F\u043F\u044B',
+  scenarios: '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438',
+  knowledge: '\u0411\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439',
 };
 
 const ENTITY_OPTIONS = [
-  { value: '', label: 'Все типы' },
-  { value: 'scenarios', label: 'Сценарии' },
-  { value: 'knowledge', label: 'База знаний' },
-  { value: 'user_tags', label: 'Теги пользователей' },
-  { value: 'channel_tags', label: 'Теги каналов' },
-  { value: 'group_tags', label: 'Теги групп' },
+  { value: '', label: '\u0412\u0441\u0435 \u0442\u0438\u043F\u044B' },
+  { value: 'scenarios', label: '\u0421\u0446\u0435\u043D\u0430\u0440\u0438\u0438' },
+  { value: 'knowledge', label: '\u0411\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439' },
+  { value: 'user_tags', label: '\u0422\u0435\u0433\u0438 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439' },
+  { value: 'channel_tags', label: '\u0422\u0435\u0433\u0438 \u043A\u0430\u043D\u0430\u043B\u043E\u0432' },
+  { value: 'group_tags', label: '\u0422\u0435\u0433\u0438 \u0433\u0440\u0443\u043F\u043F' },
 ];
+
+const LIMIT = 20;
 
 function formatDate(d) {
   if (!d) return '\u2014';
@@ -119,40 +121,69 @@ export default function AuditLog() {
   const { user, loading: authLoading } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [entityType, setEntityType] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [expandedId, setExpandedId] = useState(null);
-  const limit = 20;
+  const loadMoreRef = useRef(null);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
+  const hasMore = logs.length < total;
+
+  const fetchLogs = useCallback(async (reset = false) => {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      const params = new URLSearchParams({ limit, offset: (page - 1) * limit });
+      const offset = reset ? 0 : logs.length;
+      const params = new URLSearchParams({ limit: LIMIT, offset });
       if (entityType) params.set('entity_type', entityType);
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
       const res = await api.get(`/api/audit-log?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setLogs(data.items || []);
+        const items = data.items || [];
+        setLogs(prev => reset ? items : [...prev, ...items]);
         setTotal(data.total || 0);
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [page, entityType, dateFrom, dateTo]);
+  }, [logs.length, entityType, dateFrom, dateTo]);
 
+  // Initial load & filter changes
   useEffect(() => {
     if (authLoading || !user) return;
-    fetchLogs();
-  }, [fetchLogs, authLoading, user]);
+    setLogs([]);
+    setTotal(0);
+    fetchLogs(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityType, dateFrom, dateTo, authLoading, user]);
 
-  const totalPages = Math.ceil(total / limit) || 1;
+  // Infinite scroll via IntersectionObserver on workspace scroll container
+  useEffect(() => {
+    if (!hasMore || loadingMore || loading) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchLogs(false);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, fetchLogs]);
 
   return (
     <div className="audit-log-container">
@@ -162,7 +193,7 @@ export default function AuditLog() {
         <select
           className="audit-filter-select"
           value={entityType}
-          onChange={(e) => { setEntityType(e.target.value); setPage(1); }}
+          onChange={(e) => { setEntityType(e.target.value); }}
         >
           {ENTITY_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -171,91 +202,83 @@ export default function AuditLog() {
         <IosDatePicker
           compact
           value={dateFrom}
-          onChange={(v) => { setDateFrom(v); setPage(1); }}
+          onChange={(v) => { setDateFrom(v); }}
         />
         <IosDatePicker
           compact
           value={dateTo}
-          onChange={(v) => { setDateTo(v); setPage(1); }}
+          onChange={(v) => { setDateTo(v); }}
         />
       </div>
 
-      <div className="audit-table-wrap">
-        {loading ? (
-          <div className="audit-loading"><Loader size={24} className="spin" /></div>
-        ) : logs.length === 0 ? (
-          <div className="audit-empty">{'\u041D\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u0435\u0439'}</div>
-        ) : (
-          <div className="audit-list">
-            {logs.map((log) => {
-              const changes = describeChange(log);
-              const isExpanded = expandedId === log.id;
-              return (
-                <div key={log.id} className={`audit-card ${isExpanded ? 'expanded' : ''}`}>
-                  <div className="audit-card-header" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
-                    <div className="audit-card-left">
-                      <span
-                        className="audit-action-dot"
-                        style={{ background: ACTION_COLORS[log.action] || '#888' }}
-                      />
-                      <span className="audit-action-label">
-                        {ACTION_LABELS[log.action] || log.action}
-                      </span>
-                      <span className="audit-entity-label">
-                        {ENTITY_LABELS[log.entity_type] || log.entity_type}
-                      </span>
-                    </div>
-                    <div className="audit-card-right">
-                      <span className="audit-user">{log.user_name || '\u2014'}</span>
-                      <span className="audit-date">{formatDate(log.created_at)}</span>
-                      {(log.old_value || log.new_value) && (
-                        isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-                      )}
-                    </div>
+      {loading ? (
+        <div className="audit-loading"><Loader size={24} className="spin" /></div>
+      ) : logs.length === 0 ? (
+        <div className="audit-empty">{'\u041D\u0435\u0442 \u0437\u0430\u043F\u0438\u0441\u0435\u0439'}</div>
+      ) : (
+        <div className="audit-list">
+          {logs.map((log) => {
+            const changes = describeChange(log);
+            const isExpanded = expandedId === log.id;
+            return (
+              <div key={log.id} className={`audit-card ${isExpanded ? 'expanded' : ''}`}>
+                <div className="audit-card-header" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
+                  <div className="audit-card-left">
+                    <span
+                      className="audit-action-dot"
+                      style={{ background: ACTION_COLORS[log.action] || '#888' }}
+                    />
+                    <span className="audit-action-label">
+                      {ACTION_LABELS[log.action] || log.action}
+                    </span>
+                    <span className="audit-entity-label">
+                      {ENTITY_LABELS[log.entity_type] || log.entity_type}
+                    </span>
                   </div>
-
-                  {changes.length > 0 && (
-                    <div className="audit-card-summary">
-                      {changes.map((line, i) => (
-                        <div key={i} className={`audit-change-line ${i > 0 ? 'audit-change-detail' : ''}`}>
-                          {line}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {isExpanded && (log.old_value || log.new_value) && (
-                    <div className="audit-card-raw">
-                      {log.old_value && (
-                        <details>
-                          <summary>{'\u0421\u0442\u0430\u0440\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
-                          <pre className="audit-raw-json">{JSON.stringify(parseVal(log.old_value), null, 2)}</pre>
-                        </details>
-                      )}
-                      {log.new_value && (
-                        <details>
-                          <summary>{'\u041D\u043E\u0432\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
-                          <pre className="audit-raw-json">{JSON.stringify(parseVal(log.new_value), null, 2)}</pre>
-                        </details>
-                      )}
-                    </div>
-                  )}
+                  <div className="audit-card-right">
+                    <span className="audit-user">{log.user_name || '\u2014'}</span>
+                    <span className="audit-date">{formatDate(log.created_at)}</span>
+                    {(log.old_value || log.new_value) && (
+                      isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                    )}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      {totalPages > 1 && (
-        <div className="audit-pagination">
-          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-            {'\u041D\u0430\u0437\u0430\u0434'}
-          </button>
-          <span className="page-info">{page} / {totalPages}</span>
-          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-            {'\u0412\u043F\u0435\u0440\u0451\u0434'}
-          </button>
+                {changes.length > 0 && (
+                  <div className="audit-card-summary">
+                    {changes.map((line, i) => (
+                      <div key={i} className={`audit-change-line ${i > 0 ? 'audit-change-detail' : ''}`}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {isExpanded && (log.old_value || log.new_value) && (
+                  <div className="audit-card-raw">
+                    {log.old_value && (
+                      <details>
+                        <summary>{'\u0421\u0442\u0430\u0440\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
+                        <pre className="audit-raw-json">{JSON.stringify(parseVal(log.old_value), null, 2)}</pre>
+                      </details>
+                    )}
+                    {log.new_value && (
+                      <details>
+                        <summary>{'\u041D\u043E\u0432\u043E\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (JSON)'}</summary>
+                        <pre className="audit-raw-json">{JSON.stringify(parseVal(log.new_value), null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {hasMore && (
+        <div ref={loadMoreRef} className="audit-load-more">
+          {loadingMore && <Loader size={20} className="spin" />}
         </div>
       )}
     </div>
