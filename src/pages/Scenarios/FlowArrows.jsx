@@ -27,7 +27,11 @@ function getPreviewHeight(screen) {
 function getNodeHeight(screen) {
   const btnCount = (screen.buttons?._order || []).length;
   const previewH = getPreviewHeight(screen);
-  return NODE_HEADER_H + previewH + 8 + btnCount * BTN_ROW_H + 10;
+  // text_input anketa nodes have one pseudo-button row for "next"
+  const extraRows = (screen.scenario === 5 && screen.stepType === 'text_input') ? 1 : 0;
+  // answerKey row adds ~18px
+  const answerKeyH = (screen.scenario === 5 && screen.answerKey) ? 18 : 0;
+  return NODE_HEADER_H + answerKeyH + previewH + 8 + (btnCount + extraRows) * BTN_ROW_H + 10;
 }
 
 export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOffsets, onBendChange, zoom }) {
@@ -136,6 +140,66 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
         highlighted, mid, angle, sx, sy, tx, ty,
       });
     });
+
+    // Draw arrow for text_input anketa nextScreen
+    if (screen.scenario === 5 && screen.stepType === 'text_input' && screen.nextScreen && screens[screen.nextScreen]) {
+      const target = screens[screen.nextScreen];
+      const tgtX = target.x ?? 0;
+      const tgtY = target.y ?? 0;
+      const tgtH = getNodeHeight(target);
+
+      const srcPreviewH = getPreviewHeight(screen);
+      const btnCount = order.length;
+      const pseudoBtnY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnCount * BTN_ROW_H + BTN_ROW_H / 2;
+
+      const dx = (tgtX + NODE_W / 2) - (srcX + NODE_W / 2);
+      const absDx = Math.abs(dx);
+      const dy2 = (tgtY + tgtH / 2) - pseudoBtnY;
+      const absDy = Math.abs(dy2);
+
+      let sx2, sy2, tx2, ty2, cp1x2, cp1y2, cp2x2, cp2y2;
+      if (absDx > absDy * 0.6) {
+        if (dx > 0) {
+          sx2 = srcX + NODE_W; sy2 = pseudoBtnY;
+          tx2 = tgtX; ty2 = tgtY + tgtH / 2;
+          const cpOff = Math.max(60, absDx * 0.4);
+          cp1x2 = sx2 + cpOff; cp1y2 = sy2; cp2x2 = tx2 - cpOff; cp2y2 = ty2;
+        } else {
+          sx2 = srcX; sy2 = pseudoBtnY;
+          tx2 = tgtX + NODE_W; ty2 = tgtY + tgtH / 2;
+          const cpOff = Math.max(60, absDx * 0.4);
+          cp1x2 = sx2 - cpOff; cp1y2 = sy2; cp2x2 = tx2 + cpOff; cp2y2 = ty2;
+        }
+      } else {
+        if (dy2 > 0) {
+          sx2 = srcX + NODE_W / 2; sy2 = srcY + srcH;
+          tx2 = tgtX + NODE_W / 2; ty2 = tgtY;
+          const cpOff = Math.max(60, absDy * 0.4);
+          cp1x2 = sx2; cp1y2 = sy2 + cpOff; cp2x2 = tx2; cp2y2 = ty2 - cpOff;
+        } else {
+          sx2 = srcX + NODE_W / 2; sy2 = srcY;
+          tx2 = tgtX + NODE_W / 2; ty2 = tgtY + tgtH;
+          const cpOff = Math.max(60, absDy * 0.4);
+          cp1x2 = sx2; cp1y2 = sy2 - cpOff; cp2x2 = tx2; cp2y2 = ty2 + cpOff;
+        }
+      }
+
+      const arrowKey2 = `${srcId}-__next__`;
+      const bend2 = bendOffsets?.[arrowKey2] || { x: 0, y: 0 };
+      cp1x2 += bend2.x; cp1y2 += bend2.y;
+      cp2x2 += bend2.x; cp2y2 += bend2.y;
+
+      const isHL = srcId === activeScreen || screen.nextScreen === activeScreen ||
+                   (hoveredNode && (srcId === hoveredNode || screen.nextScreen === hoveredNode));
+      const mid2 = bezierPoint(sx2, sy2, cp1x2, cp1y2, cp2x2, cp2y2, tx2, ty2, 0.5);
+      const angle2 = bezierAngle(sx2, sy2, cp1x2, cp1y2, cp2x2, cp2y2, tx2, ty2, 0.5);
+
+      arrows.push({
+        key: arrowKey2,
+        d: `M ${sx2},${sy2} C ${cp1x2},${cp1y2} ${cp2x2},${cp2y2} ${tx2},${ty2}`,
+        highlighted: isHL, mid: mid2, angle: angle2, sx: sx2, sy: sy2, tx: tx2, ty: ty2,
+      });
+    }
   }
 
   return (

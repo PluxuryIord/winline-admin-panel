@@ -143,6 +143,9 @@ export default function BotScenarios() {
   const [newBtnLabel, setNewBtnLabel] = useState('');
   const [newBtnType, setNewBtnType] = useState('block'); // 'block' or 'url'
   const [newBtnUrl, setNewBtnUrl] = useState('');
+  const [newBlockIsAnketa, setNewBlockIsAnketa] = useState(false);
+  const [newBlockStepType, setNewBlockStepType] = useState('choice');
+  const [newBlockAnswerKey, setNewBlockAnswerKey] = useState('');
 
   // Feature 3: Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -406,26 +409,56 @@ export default function BotScenarios() {
   const openCreateModal = () => {
     setNewBlockName('');
     setNewBlockDesc('');
+    setNewBlockIsAnketa(false);
+    setNewBlockStepType('choice');
+    setNewBlockAnswerKey('');
     setShowCreateModal(true);
   };
 
   const confirmCreateScreen = () => {
     if (!newBlockName.trim()) return;
     const id = `custom_${Date.now()}`;
-    updateScenarios(prev => {
-      const next = { ...prev, screens: { ...prev.screens } };
-      next.screens[id] = {
-        title: newBlockName.trim(),
-        description: newBlockDesc.trim() || 'Кастомный экран',
-        x: 300,
-        y: 300,
-        messages: {
-          main_text: { label: 'Текст сообщения', text: '<b>' + newBlockName.trim() + '</b>' },
-        },
-        buttons: { _order: [] },
-      };
-      return next;
-    });
+
+    if (newBlockIsAnketa) {
+      // Anketa flow screen
+      const answerKey = newBlockAnswerKey.trim() || newBlockName.trim().toLowerCase().replace(/\s+/g, '_');
+      updateScenarios(prev => {
+        const next = { ...prev, screens: { ...prev.screens } };
+        next.screens[id] = {
+          title: newBlockName.trim(),
+          description: newBlockDesc.trim() || 'Вопрос анкеты',
+          scenario: 5,
+          stepType: newBlockStepType,
+          answerKey,
+          x: 1600,
+          y: Object.values(next.screens).filter(s => s.scenario === 5).length * 250 + 60,
+          messages: {
+            question_text: { label: 'Текст вопроса', text: '<b>' + newBlockName.trim() + '</b>' },
+          },
+          buttons: newBlockStepType === 'choice' ? { _order: [] } : { _order: [] },
+        };
+        // For text_input, add a nextScreen field
+        if (newBlockStepType === 'text_input') {
+          next.screens[id].nextScreen = '';
+        }
+        return next;
+      });
+    } else {
+      updateScenarios(prev => {
+        const next = { ...prev, screens: { ...prev.screens } };
+        next.screens[id] = {
+          title: newBlockName.trim(),
+          description: newBlockDesc.trim() || 'Кастомный экран',
+          x: 300,
+          y: 300,
+          messages: {
+            main_text: { label: 'Текст сообщения', text: '<b>' + newBlockName.trim() + '</b>' },
+          },
+          buttons: { _order: [] },
+        };
+        return next;
+      });
+    }
     setDirty(true);
     setSaved(false);
     setShowCreateModal(false);
@@ -518,6 +551,13 @@ export default function BotScenarios() {
     setDirty(true);
     setSaved(false);
     setShowAddBtnModal(false);
+  };
+
+  // Update arbitrary field on editData (for anketa stepType, answerKey, nextScreen)
+  const updateField = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+    setDirty(true);
+    setSaved(false);
   };
 
   // Delete button from current screen
@@ -623,6 +663,52 @@ export default function BotScenarios() {
                   onKeyDown={e => e.key === 'Enter' && confirmCreateScreen()}
                 />
               </div>
+
+              {/* Anketa toggle */}
+              <div className="sc-modal-field">
+                <label className="sc-anketa-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={newBlockIsAnketa}
+                    onChange={e => setNewBlockIsAnketa(e.target.checked)}
+                  />
+                  <span>Блок анкеты (сценарий 5)</span>
+                </label>
+              </div>
+
+              {newBlockIsAnketa && (
+                <>
+                  <div className="sc-modal-field">
+                    <label>Тип вопроса</label>
+                    <div className="sc-btn-type-toggle">
+                      <button
+                        className={`sc-btn-type-option ${newBlockStepType === 'choice' ? 'active' : ''}`}
+                        onClick={() => setNewBlockStepType('choice')}
+                        type="button"
+                      >
+                        🔘 С кнопками
+                      </button>
+                      <button
+                        className={`sc-btn-type-option ${newBlockStepType === 'text_input' ? 'active' : ''}`}
+                        onClick={() => setNewBlockStepType('text_input')}
+                        type="button"
+                      >
+                        ✏️ Текстовый ввод
+                      </button>
+                    </div>
+                  </div>
+                  <div className="sc-modal-field">
+                    <label>Ключ ответа <span className="sc-modal-optional">(для Google Таблицы)</span></label>
+                    <input
+                      className="sc-modal-input"
+                      value={newBlockAnswerKey}
+                      onChange={e => setNewBlockAnswerKey(e.target.value)}
+                      placeholder="role, traffic_type, subscription..."
+                      onKeyDown={e => e.key === 'Enter' && confirmCreateScreen()}
+                    />
+                  </div>
+                </>
+              )}
             </div>
             <div className="sc-modal-footer">
               <button className="sc-modal-cancel" onClick={() => setShowCreateModal(false)}>Отмена</button>
@@ -745,6 +831,7 @@ export default function BotScenarios() {
           dirty={dirty}
           saving={saving}
           saved={saved}
+          onUpdateField={updateField}
         />
       )}
     </div>

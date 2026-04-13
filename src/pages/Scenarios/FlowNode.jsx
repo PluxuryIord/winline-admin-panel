@@ -100,7 +100,8 @@ export default function FlowNode({
   };
 
   const buttonOrder = screen.buttons?._order || [];
-  const icon = SCREEN_ICONS[screenId] || '📄';
+  const icon = screen.scenario === 5 ? (screen.stepType === 'text_input' ? '✏️' : '🔘') : (SCREEN_ICONS[screenId] || '📄');
+  const isAnketa = screen.scenario === 5;
 
   // Get first message text for preview
   const messages = screen.messages || {};
@@ -133,7 +134,11 @@ export default function FlowNode({
         <div className="flow-node-header">
           <span className="flow-node-icon">{icon}</span>
           <span className="flow-node-title">{screen.title}</span>
+          {isAnketa && <span className="flow-node-anketa-badge">анкета</span>}
         </div>
+        {isAnketa && screen.answerKey && (
+          <div className="flow-node-answer-key">🔑 {screen.answerKey}</div>
+        )}
         {previewHtml && (
           <div className="flow-node-preview" dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }} />
         )}
@@ -153,6 +158,15 @@ export default function FlowNode({
                 </div>
               );
             })}
+          </div>
+        )}
+        {/* Text input anketa: show input indicator + nextScreen arrow */}
+        {isAnketa && screen.stepType === 'text_input' && (
+          <div className="flow-node-buttons">
+            <div className="flow-node-btn flow-node-btn-text-input" data-btn-key="__next__">
+              <span className="flow-node-btn-label">✏️ Ввод текста → далее</span>
+              {screen.nextScreen && <div className="flow-node-anchor flow-node-anchor-btn" />}
+            </div>
           </div>
         )}
       </div>

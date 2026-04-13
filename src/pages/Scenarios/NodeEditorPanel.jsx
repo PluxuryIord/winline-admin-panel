@@ -260,6 +260,7 @@ export default function NodeEditorPanel({
   onUpdateMessage, onUpdateMessageMedia, onUpdateButtonLabel, onUpdateButtonAction,
   onUpdateButtonTarget, onMoveButton, onReorderButtons, onAddButton, onDeleteButton,
   onDeleteScreen, onClose, onSave, dirty, saving, saved,
+  onUpdateField,
 }) {
 
   const [uploadingMedia, setUploadingMedia] = useState(null);
@@ -379,6 +380,47 @@ export default function NodeEditorPanel({
 
       {/* Anketa Questions — FIRST, only for event_anketa screen */}
       {screenId === 'event_anketa' && <AnketaQuestionManager />}
+
+      {/* Anketa flow fields — for scenario:5 screens */}
+      {editData.scenario === 5 && (
+        <div className="sc-section anketa-flow-fields">
+          <h3 className="sc-section-title"><ClipboardList size={16} /> Настройки вопроса</h3>
+          <div className="anketa-field-row">
+            <label>Тип вопроса</label>
+            <AnketaTypeDropdown
+              value={editData.stepType || 'choice'}
+              onChange={val => onUpdateField?.('stepType', val)}
+              options={TYPE_OPTIONS}
+            />
+          </div>
+          <div className="anketa-field-row">
+            <label>Ключ ответа <span className="sc-modal-optional">(для таблицы)</span></label>
+            <input
+              className="sc-modal-input"
+              value={editData.answerKey || ''}
+              onChange={e => onUpdateField?.('answerKey', e.target.value)}
+              placeholder="role, traffic_type..."
+            />
+          </div>
+          {editData.stepType === 'text_input' && (
+            <div className="anketa-field-row">
+              <label>Следующий экран (после ввода текста)</label>
+              <select
+                className="node-editor-target-select"
+                value={editData.nextScreen || ''}
+                onChange={e => onUpdateField?.('nextScreen', e.target.value)}
+              >
+                <option value="">— Нет перехода —</option>
+                {Object.entries(allScreens)
+                  .filter(([id]) => !ENTRY_POINTS.has(id) && id !== screenId)
+                  .map(([id, s]) => (
+                    <option key={id} value={id}>{SCREEN_ICONS[id] || '📄'} {s.title}</option>
+                  ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Read-only notice */}
       {editData.readOnly && (

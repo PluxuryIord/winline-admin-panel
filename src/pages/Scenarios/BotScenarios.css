@@ -125,6 +125,29 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.flow-node-anketa-badge {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.flow-node-answer-key {
+  padding: 2px 16px 4px;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.flow-node-btn-text-input {
+  background: rgba(255, 126, 0, 0.08) !important;
+  border: 1px dashed rgba(255, 126, 0, 0.25) !important;
+}
+
 .flow-node-preview {
   padding: 6px 16px 8px;
   font-size: 0.7rem;
@@ -1685,4 +1708,43 @@
 @keyframes anketaToastIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Anketa Flow Fields ─── */
+.anketa-flow-fields {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 16px;
+}
+.anketa-field-row {
+  margin-bottom: 12px;
+}
+.anketa-field-row > label {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 6px;
+}
+.anketa-field-row > label .sc-modal-optional {
+  color: rgba(255,255,255,0.3);
+}
+.anketa-field-row .sc-modal-input {
+  width: 100%;
+}
+.anketa-field-row .node-editor-target-select {
+  width: 100%;
+}
+
+/* ─── Anketa Toggle in Create Modal ─── */
+.sc-anketa-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+}
+.sc-anketa-toggle-label input[type="checkbox"] {
+  accent-color: var(--color-orange);
+  width: 16px;
+  height: 16px;
 }

@@ -10,6 +10,7 @@ const SCENARIO_GROUPS = {
   'Сценарий 2': ['auth_flow', 'main_menu', 'offer_page', 'promo_page', 'socials_page'],
   'Сценарий 3': ['event_flow', 'event_anketa'],
   'Сценарий 4': ['group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb'],
+  'Анкета': [],  // Dynamic — filled from screens with scenario:5
 };
 
 // Центральный блок для каждого сценария
@@ -18,6 +19,7 @@ const SCENARIO_CENTER = {
   'Сценарий 2': 'auth_flow',
   'Сценарий 3': 'event_flow',
   'Сценарий 4': 'group_menu',
+  'Анкета': 'event_anketa',
 };
 
 export default function FlowCanvas({
@@ -65,6 +67,11 @@ export default function FlowCanvas({
         if (!btn?.targetScreen) continue;
         if (srcId === hoveredNode) connected.add(btn.targetScreen);
         if (btn.targetScreen === hoveredNode) connected.add(srcId);
+      }
+      // Also handle anketa nextScreen connections
+      if (screen.nextScreen) {
+        if (srcId === hoveredNode) connected.add(screen.nextScreen);
+        if (screen.nextScreen === hoveredNode) connected.add(srcId);
       }
     }
     return connected;
@@ -170,11 +177,20 @@ export default function FlowCanvas({
     // Add custom blocks based on their scenario field
     for (const [id, screen] of Object.entries(screens)) {
       if (screen.scenario) {
-        const groupName = `Сценарий ${screen.scenario}`;
-        if (groups[groupName] && !groups[groupName].includes(id)) {
-          groups[groupName].push(id);
+        if (screen.scenario === 5) {
+          // Anketa screens go to "Анкета" group
+          if (!groups['Анкета'].includes(id)) groups['Анкета'].push(id);
+        } else {
+          const groupName = `Сценарий ${screen.scenario}`;
+          if (groups[groupName] && !groups[groupName].includes(id)) {
+            groups[groupName].push(id);
+          }
         }
       }
+    }
+    // Always include event_anketa in Анкета group as entry point
+    if (!groups['Анкета'].includes('event_anketa')) {
+      groups['Анкета'].unshift('event_anketa');
     }
     return groups;
   }, [screens]);
