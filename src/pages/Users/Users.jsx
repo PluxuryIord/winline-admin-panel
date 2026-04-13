@@ -358,19 +358,17 @@ export default function Users() {
             </button>
             {showTagDropdown && (
               <div className="tag-filter-dropdown">
-                {allTags.length > 5 && (
-                  <div className="tag-filter-search-wrap">
-                    <Search size={13} className="tag-filter-search-icon" />
-                    <input
-                      className="tag-filter-search-input"
-                      type="text"
-                      placeholder="Поиск тега..."
-                      value={tagSearch}
-                      onChange={e => setTagSearch(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                )}
+                <div className="tag-filter-search-wrap">
+                  <Search size={13} className="tag-filter-search-icon" />
+                  <input
+                    className="tag-filter-search-input"
+                    type="text"
+                    placeholder="Поиск тега..."
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
                 <div className="tag-filter-options">
                   {!tagSearch.trim() && (
                     <div className={`tag-filter-option${filterTags.length === 0 ? ' active' : ''}`} onClick={() => setFilterTags([])}>

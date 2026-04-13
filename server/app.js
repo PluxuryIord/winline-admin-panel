@@ -32,7 +32,7 @@ app.set('trust proxy', 1); // Trust reverse proxy (nginx/caddy) for secure cooki
 // === Rate limiting ===
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 минут
-  max: 5,
+  max: 15,
   message: { error: 'Слишком много попыток входа, попробуйте через 15 минут' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,7 +40,7 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 минута
-  max: 100,
+  max: 500,
   message: { error: 'Слишком много запросов, попробуйте позже' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -154,6 +154,8 @@ app.use('/api/audit-log', auditLogRouter);
 app.use('/api/snapshots', snapshotsRouter);
 import chatFoldersRouter from './routes/chatFolders.js';
 app.use('/api/chat-folders', chatFoldersRouter);
+import broadcastFoldersRouter from './routes/broadcastFolders.js';
+app.use('/api/broadcast-folders', broadcastFoldersRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {

@@ -916,12 +916,46 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Folders
+  const [folders, setFolders] = useState([]);
+  const [activeFolderId, setActiveFolderId] = useState(null);
+  const [folderMap, setFolderMap] = useState({});
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+
+  const loadFolders = useCallback(() => {
+    api.get('/api/broadcast-folders?type=channels').then(r => r.json()).then(setFolders).catch(() => {});
+    api.get('/api/broadcast-folders/map?type=channels').then(r => r.json()).then(setFolderMap).catch(() => {});
+  }, []);
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  const createFolder = async () => {
+    const res = await api.post('/api/broadcast-folders', { name: 'Новая папка', type: 'channels' });
+    if (res.ok) loadFolders();
+  };
+  const renameFolder = async (id, name) => {
+    if (!name.trim()) return;
+    await api.put(`/api/broadcast-folders/${id}`, { name: name.trim() });
+    setEditingFolderId(null);
+    loadFolders();
+  };
+  const deleteFolder = async (id) => {
+    await api.delete(`/api/broadcast-folders/${id}`);
+    if (activeFolderId === id) setActiveFolderId(null);
+    loadFolders();
+  };
+  const assignFolder = async (chatId, folderId) => {
+    await api.put('/api/broadcast-folders/assign', { chatId, entityType: 'channels', folderId });
+    loadFolders();
+  };
+
   // Channel tags
   const [allChannelTags, setAllChannelTags] = useState([]);
   const [filterChannelTags, setFilterChannelTags] = useState([]);
   const [channelTagsMap, setChannelTagsMap] = useState({});
   const [showChTagDD, setShowChTagDD] = useState(false);
   const [chTagSearch, setChTagSearch] = useState('');
+  const [chListSearch, setChListSearch] = useState('');
   const chTagRef = useRef(null);
 
   const loadAllChannelTags = useCallback(() => {
@@ -1002,9 +1036,17 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setFilterChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
-  const filteredChannels = filterChannelTags.length > 0
-    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t)))
-    : channels;
+  const filteredChannels = channels.filter(ch => {
+    if (activeFolderId !== null && (folderMap[ch.chatId] || null) !== activeFolderId) return false;
+    if (filterChannelTags.length > 0 && !(channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t))) return false;
+    if (chListSearch.trim()) {
+      const q = chListSearch.trim().toLowerCase();
+      const titleMatch = ch.title?.toLowerCase().includes(q);
+      const tagMatch = (channelTagsMap[ch.chatId] || []).some(t => t.toLowerCase().includes(q));
+      if (!titleMatch && !tagMatch) return false;
+    }
+    return true;
+  });
 
   const toggleChannel = (chatId) => {
     setSelectedChannels(prev =>
@@ -1055,19 +1097,17 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 </button>
                 {showChTagDD && (
                   <div className="bc-tag-dropdown">
-                    {allChannelTags.length > 5 && (
-                      <div className="bc-tag-search-wrap">
-                        <Search size={12} className="bc-tag-search-icon" />
-                        <input
-                          className="bc-tag-search-input"
-                          type="text"
-                          placeholder="Поиск..."
-                          value={chTagSearch}
-                          onChange={e => setChTagSearch(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
-                    )}
+                    <div className="bc-tag-search-wrap">
+                      <Search size={12} className="bc-tag-search-icon" />
+                      <input
+                        className="bc-tag-search-input"
+                        type="text"
+                        placeholder="Поиск..."
+                        value={chTagSearch}
+                        onChange={e => setChTagSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
                     <div className="bc-tag-options-list">
                       <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
                         Все теги
@@ -1089,9 +1129,6 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
             </button>
-            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-              <Plus size={16} /> Добавить
-            </button>
           </div>
         </div>
 
@@ -1107,13 +1144,43 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         )}
 
+        {/* Folder tabs */}
+        {(folders.length > 0 || channels.length > 5) && (
+          <div className="bc-folder-tabs">
+            <button className={`bc-folder-tab${activeFolderId === null ? ' active' : ''}`} onClick={() => setActiveFolderId(null)}>Все</button>
+            {folders.map(f => (
+              <div key={f.id} className={`bc-folder-tab${activeFolderId === f.id ? ' active' : ''}`}
+                onClick={() => setActiveFolderId(f.id)}
+                onDoubleClick={() => { setEditingFolderId(f.id); setEditingFolderName(f.name); }}
+              >
+                {editingFolderId === f.id ? (
+                  <input className="bc-folder-rename-input" value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)}
+                    onBlur={() => renameFolder(f.id, editingFolderName)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameFolder(f.id, editingFolderName); if (e.key === 'Escape') setEditingFolderId(null); }}
+                    autoFocus onClick={e => e.stopPropagation()} />
+                ) : f.name}
+                {editingFolderId === f.id && (
+                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                )}
+              </div>
+            ))}
+            <button className="bc-folder-tab bc-folder-tab--add" onClick={createFolder} title="Новая папка"><Plus size={13} /></button>
+          </div>
+        )}
+
         {/* Active channels list */}
         {channels.length === 0 ? (
           <div className="bc-channels-empty">
-            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
+            Каналы не добавлены.
           </div>
         ) : (
           <div className="bc-list-view">
+            {channels.length > 3 && (
+              <div className="bc-list-search-wrap">
+                <Search size={13} />
+                <input type="text" placeholder="Поиск по каналам и тегам..." value={chListSearch} onChange={e => setChListSearch(e.target.value)} />
+              </div>
+            )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
               <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
@@ -1124,7 +1191,18 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{ch.title}</span>
+                  {(channelTagsMap[ch.chatId] || []).length > 0 && (
+                    <span className="bc-list-inline-tags">
+                      {(channelTagsMap[ch.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}
+                    </span>
+                  )}
                 </label>
+                {folders.length > 0 && (
+                  <select className="bc-folder-select" value={folderMap[ch.chatId] || ''} onChange={e => assignFolder(ch.chatId, e.target.value ? Number(e.target.value) : null)} title="Папка" onClick={e => e.stopPropagation()}>
+                    <option value="">—</option>
+                    {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                )}
                 <ItemActionsMenu chatId={ch.chatId} entityType="channels" allTags={allChannelTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(ch.id)} />
               </div>
             ))}
@@ -1433,12 +1511,46 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Folders
+  const [grFolders, setGrFolders] = useState([]);
+  const [grActiveFolderId, setGrActiveFolderId] = useState(null);
+  const [grFolderMap, setGrFolderMap] = useState({});
+  const [grEditingFolderId, setGrEditingFolderId] = useState(null);
+  const [grEditingFolderName, setGrEditingFolderName] = useState('');
+
+  const loadGrFolders = useCallback(() => {
+    api.get('/api/broadcast-folders?type=groups').then(r => r.json()).then(setGrFolders).catch(() => {});
+    api.get('/api/broadcast-folders/map?type=groups').then(r => r.json()).then(setGrFolderMap).catch(() => {});
+  }, []);
+  useEffect(() => { loadGrFolders(); }, [loadGrFolders]);
+
+  const createGrFolder = async () => {
+    const res = await api.post('/api/broadcast-folders', { name: 'Новая папка', type: 'groups' });
+    if (res.ok) loadGrFolders();
+  };
+  const renameGrFolder = async (id, name) => {
+    if (!name.trim()) return;
+    await api.put(`/api/broadcast-folders/${id}`, { name: name.trim() });
+    setGrEditingFolderId(null);
+    loadGrFolders();
+  };
+  const deleteGrFolder = async (id) => {
+    await api.delete(`/api/broadcast-folders/${id}`);
+    if (grActiveFolderId === id) setGrActiveFolderId(null);
+    loadGrFolders();
+  };
+  const assignGrFolder = async (chatId, folderId) => {
+    await api.put('/api/broadcast-folders/assign', { chatId, entityType: 'groups', folderId });
+    loadGrFolders();
+  };
+
   // Group tags (separate table from channels)
   const [allGroupTags, setAllGroupTags] = useState([]);
   const [filterGroupTags, setFilterGroupTags] = useState([]);
   const [groupTagsMap, setGroupTagsMap] = useState({});
   const [showGrTagDD, setShowGrTagDD] = useState(false);
   const [grTagSearch, setGrTagSearch] = useState('');
+  const [grListSearch, setGrListSearch] = useState('');
   const grTagRef = useRef(null);
 
   const loadAllGroupTags = useCallback(() => {
@@ -1519,9 +1631,17 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setFilterGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
-  const filteredGroups = filterGroupTags.length > 0
-    ? groups.filter(g => (groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t)))
-    : groups;
+  const filteredGroups = groups.filter(g => {
+    if (grActiveFolderId !== null && (grFolderMap[g.chatId] || null) !== grActiveFolderId) return false;
+    if (filterGroupTags.length > 0 && !(groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t))) return false;
+    if (grListSearch.trim()) {
+      const q = grListSearch.trim().toLowerCase();
+      const titleMatch = g.title?.toLowerCase().includes(q);
+      const tagMatch = (groupTagsMap[g.chatId] || []).some(t => t.toLowerCase().includes(q));
+      if (!titleMatch && !tagMatch) return false;
+    }
+    return true;
+  });
 
   const toggleGroup = (chatId) => {
     setSelectedGroups(prev =>
@@ -1572,19 +1692,17 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 </button>
                 {showGrTagDD && (
                   <div className="bc-tag-dropdown">
-                    {allGroupTags.length > 5 && (
-                      <div className="bc-tag-search-wrap">
-                        <Search size={12} className="bc-tag-search-icon" />
-                        <input
-                          className="bc-tag-search-input"
-                          type="text"
-                          placeholder="Поиск..."
-                          value={grTagSearch}
-                          onChange={e => setGrTagSearch(e.target.value)}
-                          autoFocus
-                        />
-                      </div>
-                    )}
+                    <div className="bc-tag-search-wrap">
+                      <Search size={12} className="bc-tag-search-icon" />
+                      <input
+                        className="bc-tag-search-input"
+                        type="text"
+                        placeholder="Поиск..."
+                        value={grTagSearch}
+                        onChange={e => setGrTagSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
                     <div className="bc-tag-options-list">
                       <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
                         Все теги
@@ -1606,9 +1724,6 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
             </button>
-            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-              <Plus size={16} /> Добавить
-            </button>
           </div>
         </div>
 
@@ -1624,12 +1739,42 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         )}
 
+        {/* Group folder tabs */}
+        {(grFolders.length > 0 || groups.length > 5) && (
+          <div className="bc-folder-tabs">
+            <button className={`bc-folder-tab${grActiveFolderId === null ? ' active' : ''}`} onClick={() => setGrActiveFolderId(null)}>Все</button>
+            {grFolders.map(f => (
+              <div key={f.id} className={`bc-folder-tab${grActiveFolderId === f.id ? ' active' : ''}`}
+                onClick={() => setGrActiveFolderId(f.id)}
+                onDoubleClick={() => { setGrEditingFolderId(f.id); setGrEditingFolderName(f.name); }}
+              >
+                {grEditingFolderId === f.id ? (
+                  <input className="bc-folder-rename-input" value={grEditingFolderName} onChange={e => setGrEditingFolderName(e.target.value)}
+                    onBlur={() => renameGrFolder(f.id, grEditingFolderName)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameGrFolder(f.id, grEditingFolderName); if (e.key === 'Escape') setGrEditingFolderId(null); }}
+                    autoFocus onClick={e => e.stopPropagation()} />
+                ) : f.name}
+                {grEditingFolderId === f.id && (
+                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteGrFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                )}
+              </div>
+            ))}
+            <button className="bc-folder-tab bc-folder-tab--add" onClick={createGrFolder} title="Новая папка"><Plus size={13} /></button>
+          </div>
+        )}
+
         {groups.length === 0 ? (
           <div className="bc-channels-empty">
-            Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
+            Группы не добавлены.
           </div>
         ) : (
           <div className="bc-list-view">
+            {groups.length > 3 && (
+              <div className="bc-list-search-wrap">
+                <Search size={13} />
+                <input type="text" placeholder="Поиск по группам и тегам..." value={grListSearch} onChange={e => setGrListSearch(e.target.value)} />
+              </div>
+            )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
               <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
@@ -1640,7 +1785,18 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
                   <span className="bc-list-title">{g.title}</span>
+                  {(groupTagsMap[g.chatId] || []).length > 0 && (
+                    <span className="bc-list-inline-tags">
+                      {(groupTagsMap[g.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}
+                    </span>
+                  )}
                 </label>
+                {grFolders.length > 0 && (
+                  <select className="bc-folder-select" value={grFolderMap[g.chatId] || ''} onChange={e => assignGrFolder(g.chatId, e.target.value ? Number(e.target.value) : null)} title="Папка" onClick={e => e.stopPropagation()}>
+                    <option value="">—</option>
+                    {grFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                )}
                 <ItemActionsMenu chatId={g.chatId} entityType="groups" allTags={allGroupTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(g.id)} />
               </div>
             ))}

@@ -25,11 +25,12 @@ function mapUserRow(r, userTags, comment = '') {
   };
 }
 
-// User counts as "active chat" only if they sent at least one DM themselves
+// User counts as "active chat" if they sent a message in the last 7 days
 const HAS_USER_CHAT_EXPR = `(EXISTS (
   SELECT 1 FROM wl_admin_chat_messages m
   INNER JOIN wl_admin_chats c ON c.id = m.chat_id
   WHERE c.user_id = u.user_id AND m.sender = 'user'
+    AND m.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
 ))`;
 
 // Получить теги, комментарии и editedIds для массива user_id из MySQL (один запрос вместо двух)

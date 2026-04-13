@@ -268,6 +268,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: visible;
 }
 
 .bc-section--grow { min-height: 0; }
@@ -384,7 +385,7 @@ input[type="checkbox"]:checked {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 12px;
   padding: 4px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .bc-list-item {
@@ -503,7 +504,7 @@ input[type="checkbox"]:checked {
   position: absolute;
   right: 0;
   top: 100%;
-  z-index: 50;
+  z-index: 999;
   min-width: 220px;
   background: var(--color-panel);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2597,3 +2598,115 @@ input[type="checkbox"]:checked {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* ─── Inline tags on channel/group list items ─── */
+.bc-list-inline-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: 4px;
+}
+.bc-inline-tag {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 126, 0, 0.12);
+  color: rgba(255, 126, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* ─── Channel/group search bar ─── */
+.bc-list-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.bc-list-search-wrap input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.bc-list-search-wrap input::placeholder { color: rgba(255,255,255,0.3); }
+.bc-list-search-wrap svg { color: rgba(255,255,255,0.3); flex-shrink: 0; }
+
+/* ─── Folder tabs ─── */
+.bc-folder-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+.bc-folder-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.5);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.bc-folder-tab:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+.bc-folder-tab.active {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+}
+.bc-folder-tab--add {
+  background: none;
+  color: rgba(255,255,255,0.25);
+  padding: 5px 8px;
+}
+.bc-folder-tab--add:hover { color: var(--color-orange); background: rgba(255,126,0,0.08); }
+.bc-folder-rename-input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-orange);
+  color: #fff;
+  font-size: 0.75rem;
+  width: 80px;
+  padding: 0;
+  outline: none;
+  font-family: inherit;
+}
+.bc-folder-delete {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: rgba(255,80,80,0.7);
+  cursor: pointer;
+  padding: 0;
+}
+.bc-folder-delete:hover { color: #ff4444; }
+
+/* ─── Folder assign select ─── */
+.bc-folder-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  cursor: pointer;
+  max-width: 70px;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.bc-folder-select:hover { border-color: rgba(255,126,0,0.3); }
+.bc-folder-select:focus { outline: none; border-color: var(--color-orange); }
