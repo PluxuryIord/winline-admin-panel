@@ -27,6 +27,10 @@ async function markBlockedIfNeeded(userId, errorText) {
 
 function verifyBroadcastWebhook(req) {
   if (!WEBHOOK_SECRET) return false;
+  // Accept plain secret match (x-webhook-secret header)
+  const plainSecret = req.headers['x-webhook-secret'];
+  if (plainSecret && plainSecret === WEBHOOK_SECRET) return true;
+  // Also accept HMAC signature (x-webhook-signature header)
   const sig = req.headers['x-webhook-signature'];
   if (!sig) return false;
   try {
