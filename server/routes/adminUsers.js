@@ -157,20 +157,15 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'Нельзя удалить самого себя' });
     }
 
-    // Ensure profile exists then deactivate
-    await dbPool.query(
-      'INSERT IGNORE INTO wl_admin_user_profiles (user_id) VALUES (?)',
-      [userId]
-    );
-    await dbPool.query(
-      'UPDATE wl_admin_user_profiles SET is_active = 0 WHERE user_id = ?',
-      [userId]
-    );
+    const [nameRows] = await dbPool.query('SELECT username FROM wl_admin_users WHERE id = ?', [userId]);
+    const username = nameRows[0]?.username || String(userId);
+
+    // Fully delete user
+    await dbPool.query('DELETE FROM wl_admin_user_profiles WHERE user_id = ?', [userId]);
+    await dbPool.query('DELETE FROM wl_admin_users WHERE id = ?', [userId]);
 
     invalidateProfileCache(userId);
-    const [nameRows] = await dbPool.query('SELECT username FROM wl_admin_users WHERE id = ?', [userId]);
-    logAudit(req.user.id, actorName(req), 'delete', 'admin_user', userId,
-      nameRows[0]?.username || String(userId), { is_active: 1 }, { is_active: 0 });
+    logAudit(req.user.id, actorName(req), 'delete', 'admin_user', userId, username, { username }, null);
 
     res.json({ ok: true });
   } catch (err) { next(err); }

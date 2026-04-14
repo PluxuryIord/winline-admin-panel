@@ -143,7 +143,7 @@ export default function AdminUsers() {
                     <Pencil size={15} />
                   </button>
                   {u.id !== currentUser?.id && (
-                    <button className="icon-btn danger" onClick={() => setConfirmDelete(u)} title="Деактивировать">
+                    <button className="icon-btn danger" onClick={() => setConfirmDelete(u)} title="Удалить">
                       <Trash2 size={15} />
                     </button>
                   )}
@@ -217,15 +217,15 @@ export default function AdminUsers() {
         <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
           <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Деактивация</h2>
+              <h2>Удаление</h2>
               <button className="icon-btn" onClick={() => setConfirmDelete(null)}><X size={18} /></button>
             </div>
             <div className="modal-body">
-              <p>Вы уверены, что хотите деактивировать пользователя <strong>{confirmDelete.display_name || confirmDelete.username}</strong>?</p>
+              <p>Вы уверены, что хотите удалить пользователя <strong>{confirmDelete.display_name || confirmDelete.username}</strong>? Это действие необратимо.</p>
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setConfirmDelete(null)}>Отмена</button>
-              <button className="btn-danger" onClick={() => handleDeactivate(confirmDelete.id)}>Деактивировать</button>
+              <button className="btn-danger" onClick={() => handleDeactivate(confirmDelete.id)}>Удалить</button>
             </div>
           </div>
         </div>
