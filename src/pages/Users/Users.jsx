@@ -142,6 +142,7 @@ export default function Users() {
 
   // Массовый выбор пользователей
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [allSelected, setAllSelected] = useState(false); // true = all users (server-side)
   const [bulkModal, setBulkModal] = useState(null); // { mode: 'add'|'remove', value: '' }
   const [bulkSaving, setBulkSaving] = useState(false);
 
@@ -152,7 +153,7 @@ export default function Users() {
       return next;
     });
   };
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => { setSelectedIds(new Set()); setAllSelected(false); };
 
   const submitBulk = async () => {
     if (!bulkModal) return;
@@ -165,8 +166,16 @@ export default function Users() {
         add: bulkModal.mode === 'add' ? [tag] : [],
         remove: bulkModal.mode === 'remove' ? [tag] : [],
       };
-      await api.post('/api/users/tags/bulk', body);
-      // Reload all users from server to get fresh tags
+      if (allSelected) {
+        // Server-side: apply to ALL users matching current filter
+        await api.post('/api/users/tags/bulk-all', {
+          add: bulkModal.mode === 'add' ? [tag] : [],
+          remove: bulkModal.mode === 'remove' ? [tag] : [],
+          filterTags,
+        });
+      } else {
+        await api.post('/api/users/tags/bulk', body);
+      }
       loadTags();
       setBulkModal(null);
       clearSelection();
@@ -424,15 +433,27 @@ export default function Users() {
       </div>
 
       {/* Панель массовых действий */}
-      {selectedIds.size > 0 && (
+      {(selectedIds.size > 0 || allSelected) && (
         <div className="bulk-bar">
-          <span className="bulk-bar-count">Выбрано: {selectedIds.size}</span>
-          <button
-            className="bulk-bar-btn"
-            onClick={() => setSelectedIds(new Set(filteredAndSortedUsers.map(u => u.id)))}
-          >
-            Выбрать всех на странице
-          </button>
+          <span className="bulk-bar-count">
+            {allSelected ? `Выбрано: все (${total})` : `Выбрано: ${selectedIds.size}`}
+          </span>
+          {!allSelected && (
+            <button
+              className="bulk-bar-btn"
+              onClick={() => setSelectedIds(new Set(filteredAndSortedUsers.map(u => u.id)))}
+            >
+              Всех на странице
+            </button>
+          )}
+          {!allSelected && (
+            <button
+              className="bulk-bar-btn bulk-bar-btn--accent"
+              onClick={() => { setAllSelected(true); setSelectedIds(new Set(filteredAndSortedUsers.map(u => u.id))); }}
+            >
+              Выбрать всех ({total})
+            </button>
+          )}
           <button className="bulk-bar-btn bulk-bar-add" onClick={() => setBulkModal({ mode: 'add', value: '' })}>
             <Plus size={14} /> Добавить тег
           </button>
@@ -592,7 +613,7 @@ export default function Users() {
             <button className="tag-modal-close" onClick={() => setBulkModal(null)}><X size={18} /></button>
             <h3>{bulkModal.mode === 'add' ? 'Добавить тег' : 'Удалить тег'}</h3>
             <p className="tag-modal-desc">
-              {bulkModal.mode === 'add' ? 'Тег будет добавлен' : 'Тег будет удалён у'} у <strong>{selectedIds.size}</strong> пользователей
+              {bulkModal.mode === 'add' ? 'Тег будет добавлен' : 'Тег будет удалён'} у <strong>{allSelected ? `всех (${total})` : selectedIds.size}</strong> пользователей
             </p>
             <div className="tag-modal-field">
               <label>Тег</label>
