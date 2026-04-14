@@ -311,6 +311,8 @@ function SettingsModal({ onClose }) {
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [savingLimit, setSavingLimit] = useState(false);
+  const [savedLimit, setSavedLimit] = useState(false);
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -338,6 +340,15 @@ function SettingsModal({ onClose }) {
       if (data.ok) setEventStarts(data.event_starts);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setToggling(false); }
+  };
+
+  const handleSaveLimit = async () => {
+    setSavingLimit(true); setSavedLimit(false);
+    try {
+      await api.put('/api/events/settings', { code_limit: Number(codeLimit) });
+      setSavedLimit(true); setTimeout(() => setSavedLimit(false), 2000);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setSavingLimit(false); }
   };
 
   const handleSave = async () => {
@@ -456,6 +467,9 @@ function SettingsModal({ onClose }) {
               <p className="ew-settings-desc">Максимальное количество кодов. 0 = безлимит.</p>
               <div className="ew-settings-row">
                 <input type="number" className="ew-settings-input" value={codeLimit} onChange={e => setCodeLimit(e.target.value)} min={0} />
+                <button className={`ew-save-btn ${savedLimit ? 'saved' : ''}`} onClick={handleSaveLimit} disabled={savingLimit}>
+                  {savedLimit ? <><Check size={14} /> Сохранено</> : savingLimit ? 'Сохранение...' : 'Сохранить'}
+                </button>
               </div>
             </div>
 
