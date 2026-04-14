@@ -68,6 +68,9 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
       } else {
         await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
       }
+      // Remove from archive if re-added
+      const archiveTable = isChannel ? 'wl_admin_channels_archive' : 'wl_admin_groups_archive';
+      await dbPool.query(`DELETE FROM ${archiveTable} WHERE chat_id = ?`, [chatIdStr]);
       console.log(`[bot-membership] ${isChannel ? 'Channel' : 'Group'} added: ${chatIdStr} "${title}"`);
       res.json({ ok: true, action: 'added' });
     } else if (action === 'removed') {

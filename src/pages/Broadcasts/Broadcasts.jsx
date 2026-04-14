@@ -1211,6 +1211,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   ) : (
                     <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }}>{ch.title}</span>
                   )}
+                  <span className="bc-list-chatid">ID: {ch.chatId}</span>
                   {renamingId !== ch.id && (
                     <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }} title="Переименовать">
                       <Pencil size={11} />
@@ -1247,6 +1248,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <Hash size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{ch.title}</span>
+                      <span className="bc-list-chatid">ID: {ch.chatId}</span>
                         </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(ch.id)} title="Восстановить">
                       <RotateCcw size={14} />
@@ -1830,6 +1832,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                   ) : (
                     <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }}>{g.title}</span>
                   )}
+                  <span className="bc-list-chatid">ID: {g.chatId}</span>
                   {grRenamingId !== g.id && (
                     <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }} title="Переименовать">
                       <Pencil size={11} />
@@ -1865,6 +1868,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <MessageCircle size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{g.title}</span>
+                      <span className="bc-list-chatid">ID: {g.chatId}</span>
                         </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(g.id)} title="Восстановить">
                       <RotateCcw size={14} />
