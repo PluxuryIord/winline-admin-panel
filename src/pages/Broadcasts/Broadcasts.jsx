@@ -1158,7 +1158,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         )}
 
         {/* Folder tabs */}
-        {(folders.length > 0 || channels.length > 5) && (
+        {channels.length > 0 && (
           <div className="bc-folder-tabs">
             <button className={`bc-folder-tab${activeFolderId === null ? ' active' : ''}`} onClick={() => setActiveFolderId(null)}>Все</button>
             {folders.map(f => (
@@ -1787,7 +1787,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         )}
 
         {/* Group folder tabs */}
-        {(grFolders.length > 0 || groups.length > 5) && (
+        {groups.length > 0 && (
           <div className="bc-folder-tabs">
             <button className={`bc-folder-tab${grActiveFolderId === null ? ' active' : ''}`} onClick={() => setGrActiveFolderId(null)}>Все</button>
             {grFolders.map(f => (
