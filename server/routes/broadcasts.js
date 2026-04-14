@@ -66,8 +66,12 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
       if (existing.length) {
         await dbPool.query(`UPDATE ${table} SET title = ? WHERE chat_id = ?`, [title || chatIdStr, chatIdStr]);
       } else {
-        const approved = isChannel ? 1 : 0;
-        await dbPool.query(`INSERT INTO ${table} (chat_id, title, approved) VALUES (?, ?, ?)`, [chatIdStr, title || chatIdStr, approved]);
+        try {
+          const approved = isChannel ? 1 : 0;
+          await dbPool.query(`INSERT INTO ${table} (chat_id, title, approved) VALUES (?, ?, ?)`, [chatIdStr, title || chatIdStr, approved]);
+        } catch {
+          await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
+        }
       }
       // Remove from archive if re-added
       const archiveTable = isChannel ? 'wl_admin_channels_archive' : 'wl_admin_groups_archive';
@@ -342,7 +346,12 @@ router.delete('/channels/:id', async (req, res, next) => {
 
 router.get('/groups', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, IFNULL(approved, 1) AS approved FROM wl_admin_groups ORDER BY id ASC');
+    let rows;
+    try {
+      [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, IFNULL(approved, 1) AS approved FROM wl_admin_groups ORDER BY id ASC');
+    } catch {
+      [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, 1 AS approved FROM wl_admin_groups ORDER BY id ASC');
+    }
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -396,6 +405,8 @@ router.post('/groups/restore/:id', async (req, res, next) => {
 // Approve group
 router.put('/groups/:id/approve', async (req, res, next) => {
   try {
+    // Ensure column exists
+    await dbPool.query('ALTER TABLE wl_admin_groups ADD COLUMN approved TINYINT(1) DEFAULT 1').catch(() => {});
     const [result] = await dbPool.query('UPDATE wl_admin_groups SET approved = 1 WHERE id = ?', [Number(req.params.id)]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
     res.json({ success: true });
@@ -405,7 +416,12 @@ router.put('/groups/:id/approve', async (req, res, next) => {
 // Check if group is approved (for bot)
 router.get('/groups/check-approved/:chatId', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query('SELECT IFNULL(approved, 1) AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
+    let rows;
+    try {
+      [rows] = await dbPool.query('SELECT IFNULL(approved, 1) AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
+    } catch {
+      [rows] = await dbPool.query('SELECT 1 AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
+    }
     if (!rows.length) return res.json({ approved: false });
     res.json({ approved: !!rows[0].approved });
   } catch (err) { next(err); }
