@@ -66,11 +66,10 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
       if (existing.length) {
         await dbPool.query(`UPDATE ${table} SET title = ? WHERE chat_id = ?`, [title || chatIdStr, chatIdStr]);
       } else {
-        try {
-          const approved = isChannel ? 1 : 0;
-          await dbPool.query(`INSERT INTO ${table} (chat_id, title, approved) VALUES (?, ?, ?)`, [chatIdStr, title || chatIdStr, approved]);
-        } catch {
-          await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
+        await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
+        // New groups need approval (channels auto-approved)
+        if (!isChannel) {
+          await dbPool.query(`INSERT IGNORE INTO wl_admin_groups_approved (chat_id, approved) VALUES (?, 0)`, [chatIdStr]);
         }
       }
       // Remove from archive if re-added
@@ -108,8 +107,12 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
       id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
       added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-    // Add approved column to groups if not exists
-    await dbPool.query(`ALTER TABLE wl_admin_groups ADD COLUMN approved TINYINT(1) DEFAULT 1`).catch(() => {});
+    // Separate table for group approval status
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_groups_approved (
+      chat_id VARCHAR(100) PRIMARY KEY,
+      approved TINYINT(1) DEFAULT 0,
+      approved_at DATETIME DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   } catch (err) {
     console.error('[broadcasts] Failed to create archive tables:', err.message);
   }
@@ -346,12 +349,13 @@ router.delete('/channels/:id', async (req, res, next) => {
 
 router.get('/groups', async (req, res, next) => {
   try {
-    let rows;
-    try {
-      [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, IFNULL(approved, 1) AS approved FROM wl_admin_groups ORDER BY id ASC');
-    } catch {
-      [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, 1 AS approved FROM wl_admin_groups ORDER BY id ASC');
-    }
+    const [rows] = await dbPool.query(`
+      SELECT g.id, g.chat_id AS chatId, g.title, g.added_at AS addedAt,
+             IFNULL(a.approved, 1) AS approved
+      FROM wl_admin_groups g
+      LEFT JOIN wl_admin_groups_approved a ON a.chat_id = g.chat_id
+      ORDER BY g.id ASC
+    `);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -405,10 +409,14 @@ router.post('/groups/restore/:id', async (req, res, next) => {
 // Approve group
 router.put('/groups/:id/approve', async (req, res, next) => {
   try {
-    // Ensure column exists
-    await dbPool.query('ALTER TABLE wl_admin_groups ADD COLUMN approved TINYINT(1) DEFAULT 1').catch(() => {});
-    const [result] = await dbPool.query('UPDATE wl_admin_groups SET approved = 1 WHERE id = ?', [Number(req.params.id)]);
-    if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    const [rows] = await dbPool.query('SELECT chat_id FROM wl_admin_groups WHERE id = ?', [Number(req.params.id)]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const chatId = rows[0].chat_id;
+    await dbPool.query(
+      `INSERT INTO wl_admin_groups_approved (chat_id, approved, approved_at) VALUES (?, 1, NOW())
+       ON DUPLICATE KEY UPDATE approved = 1, approved_at = NOW()`,
+      [chatId]
+    );
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -416,13 +424,10 @@ router.put('/groups/:id/approve', async (req, res, next) => {
 // Check if group is approved (for bot)
 router.get('/groups/check-approved/:chatId', async (req, res, next) => {
   try {
-    let rows;
-    try {
-      [rows] = await dbPool.query('SELECT IFNULL(approved, 1) AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
-    } catch {
-      [rows] = await dbPool.query('SELECT 1 AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
-    }
-    if (!rows.length) return res.json({ approved: false });
+    const chatId = String(req.params.chatId);
+    // If no row in approved table → group existed before feature, treat as approved
+    const [rows] = await dbPool.query('SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [chatId]);
+    if (!rows.length) return res.json({ approved: true });
     res.json({ approved: !!rows[0].approved });
   } catch (err) { next(err); }
 });
