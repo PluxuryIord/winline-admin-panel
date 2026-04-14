@@ -2,14 +2,22 @@
  * One-time script: adds event_flow screen with welcome message to bot_scenarios.
  * Run: node scripts/add_event_flow.js
  */
-import 'dotenv/config';
+import { readFileSync } from 'fs';
 import mysql from 'mysql2/promise';
 
+// Parse .env manually
+const envFile = readFileSync(new URL('../.env', import.meta.url), 'utf8');
+const env = {};
+for (const line of envFile.split('\n')) {
+  const m = line.match(/^([^#=]+)=(.*)$/);
+  if (m) env[m[1].trim()] = m[2].trim().replace(/^['"]|['"]$/g, '');
+}
+
 const conn = await mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: env.DB_HOST,
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
 });
 
 const [rows] = await conn.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
