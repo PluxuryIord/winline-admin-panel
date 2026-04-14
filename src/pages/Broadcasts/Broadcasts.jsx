@@ -1220,7 +1220,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
-              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
+              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : activeFolderId !== null ? `Каналы в папке (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
             {filteredChannels.map(ch => (
               <div key={ch.id} className="bc-list-item bc-list-item--with-menu">
@@ -1842,7 +1842,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
-              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
+              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : grActiveFolderId !== null ? `Группы в папке (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
             {filteredGroups.map(g => (
               <div key={g.id} className="bc-list-item bc-list-item--with-menu">
