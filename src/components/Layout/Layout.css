@@ -9,12 +9,78 @@
 .sidebar {
   width: 280px;
   background-color: var(--color-black);
-  /* Еле заметная линия справа, чтобы отделить меню от рабочего поля */
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  /* Убрали нижний padding, чтобы профиль встал ровно */
-  padding: 24px 16px 0 16px; 
+  padding: 24px 16px 0 16px;
+  transition: width 0.25s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+  width: 72px;
+  padding: 24px 8px 0 8px;
+}
+
+/* --- КНОПКА СВОРАЧИВАНИЯ --- */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+.sidebar-collapse-btn:hover {
+  color: var(--color-white);
+  background: rgba(255, 255, 255, 0.06);
+}
+.sidebar.collapsed .sidebar-collapse-btn {
+  margin: 0 auto;
+}
+
+/* --- COLLAPSED MENU ITEMS --- */
+.sidebar.collapsed .menu-item {
+  justify-content: center;
+  padding: 12px;
+}
+.sidebar.collapsed .menu-item .icon-wrapper {
+  margin: 0;
+}
+.sidebar.collapsed .menu-label {
+  display: none;
+}
+.sidebar.collapsed .menu-unread-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin-left: 0;
+}
+.sidebar.collapsed .sidebar-section-label {
+  display: none;
+}
+.sidebar.collapsed .admin-profile {
+  justify-content: center;
+  padding: 16px 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+}
+.sidebar.collapsed .admin-info {
+  display: none;
+}
+.sidebar.collapsed .logout-icon {
+  margin-right: 0;
+}
+.sidebar.collapsed .logo-area {
+  padding: 0;
+  justify-content: center;
 }
 
 /* --- ЛОГОТИП WINLINE --- */

@@ -2,23 +2,26 @@ import { NavLink } from 'react-router-dom';
 import {
   Users, MessageSquare, Send, BookOpen,
   Database, BarChart, Calendar, LogOut, X,
-  Shield, FileText, History
+  Shield, FileText, History, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
 
-export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
+export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, onToggleCollapse }) {
   const { user, logout } = useAuth();
   const { hasUnread } = useUnread();
   return (
-    <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="logo-area">
-        <img src="/logo.svg" alt="Winline Partners" className="sidebar-logo" />
+        {!collapsed && <img src="/logo.svg" alt="Winline Partners" className="sidebar-logo" />}
+        <button className="sidebar-collapse-btn" onClick={onToggleCollapse} title={collapsed ? 'Развернуть' : 'Свернуть'}>
+          {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+        </button>
         <button className="mobile-close-btn" onClick={closeMobileMenu}>
           <X size={24} />
         </button>
       </div>
-      
+
       <nav className="menu">
         {[
           { name: 'Пользователи', path: '/users', icon: <Users size={18} /> },
@@ -29,23 +32,25 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
           { name: 'Аналитика', path: '/analytics', icon: <BarChart size={18} /> },
           { name: 'Работа на ивенте', path: '/events', icon: <Calendar size={18} /> },
         ].map((item) => (
-          <NavLink 
-            to={item.path} 
-            key={item.path} 
+          <NavLink
+            to={item.path}
+            key={item.path}
             onClick={closeMobileMenu}
             className={({ isActive }) => isActive ? "menu-item active" : "menu-item"}
+            title={collapsed ? item.name : undefined}
           >
             <div className="icon-wrapper">
               {item.icon}
             </div>
-            {item.name}
+            {!collapsed && <span className="menu-label">{item.name}</span>}
             {item.path === '/chats' && hasUnread && <span className="menu-unread-dot" />}
           </NavLink>
         ))}
       </nav>
 
-      <div className="sidebar-divider" />
-      <div className="sidebar-section-label">Администрирование</div>
+      {!collapsed && <div className="sidebar-divider" />}
+      {!collapsed && <div className="sidebar-section-label">Администрирование</div>}
+      {collapsed && <div className="sidebar-divider" />}
       <nav className="menu menu-admin">
         {[
           ...(user?.role === 'admin' ? [{ name: 'Пользователи', path: '/admin-users', icon: <Shield size={18} /> }] : []),
@@ -57,20 +62,23 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu }) {
             key={item.path}
             onClick={closeMobileMenu}
             className={({ isActive }) => isActive ? "menu-item active" : "menu-item"}
+            title={collapsed ? item.name : undefined}
           >
             <div className="icon-wrapper">
               {item.icon}
             </div>
-            {item.name}
+            {!collapsed && <span className="menu-label">{item.name}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="admin-profile">
         <div className="admin-avatar">{(user?.username || 'AD').slice(0, 2).toUpperCase()}</div>
-        <div className="admin-info">
-          <span className="admin-name">{user?.username || 'admin'}</span>
-        </div>
+        {!collapsed && (
+          <div className="admin-info">
+            <span className="admin-name">{user?.username || 'admin'}</span>
+          </div>
+        )}
         <LogOut size={18} className="logout-icon" onClick={logout} title="Выйти" />
       </div>
     </aside>
