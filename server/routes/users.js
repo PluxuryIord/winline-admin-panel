@@ -77,10 +77,14 @@ function buildTagsForUser(userId, tagsMap, editedIds, dateReg) {
   } else {
     tags = [];
   }
-  // Автотег "Старый пользователь" для всех кто зарегался до cutoff
-  const isOldUser = dateReg && new Date(dateReg) < OLD_USER_CUTOFF;
-  if (isOldUser && !tags.includes('Старый пользователь')) {
-    tags.unshift('Старый пользователь');
+  // Автотег "Старый пользователь" — только если юзер НЕ редактировался вручную
+  // и у него нет записей в таблице тегов (т.е. первый показ)
+  const wasEdited = tagsMap[uid] || editedIds.has(uid);
+  if (!wasEdited) {
+    const isOldUser = dateReg && new Date(dateReg) < OLD_USER_CUTOFF;
+    if (isOldUser) {
+      tags.unshift('Старый пользователь');
+    }
   }
   return tags;
 }
