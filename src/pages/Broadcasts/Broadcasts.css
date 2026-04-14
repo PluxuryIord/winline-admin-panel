@@ -2741,19 +2741,52 @@ input[type="checkbox"]:checked {
 .bc-folder-select {
   appearance: none;
   -webkit-appearance: none;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.3)'/%3E%3C/svg%3E") no-repeat right 6px center;
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 6px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.6);
   font-size: 0.65rem;
-  padding: 2px 6px;
+  padding: 4px 20px 4px 8px;
   cursor: pointer;
-  max-width: 70px;
+  max-width: 100px;
   flex-shrink: 0;
   font-family: inherit;
 }
+.bc-folder-select option {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 6px 8px;
+}
 .bc-folder-select:hover { border-color: rgba(255,126,0,0.3); }
 .bc-folder-select:focus { outline: none; border-color: var(--color-orange); }
+
+/* ─── Folder list in action menu ─── */
+.bc-item-menu-folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.bc-item-menu-folder-option {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.78rem;
+  padding: 7px 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.bc-item-menu-folder-option:hover {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+.bc-item-menu-folder-option.active {
+  background: rgba(255,126,0,0.12);
+  color: var(--color-orange);
+}
 
 /* ─── Rename inline ─── */
 .bc-rename-input {

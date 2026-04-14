@@ -763,9 +763,9 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 
   );
 }
 
-function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive }) {
+function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive, folders, currentFolderId, onAssignFolder }) {
   const [open, setOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState(null); // 'comment' | 'tags'
+  const [activePanel, setActivePanel] = useState(null); // 'comment' | 'tags' | 'folder'
   const menuRef = useRef(null);
 
   // Comment state
@@ -834,10 +834,34 @@ function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive 
                 <Tag size={13} /> Теги
                 {tags.length > 0 && <span className="bc-item-menu-hint">{tags.length}</span>}
               </button>
+              {folders && folders.length > 0 && (
+                <button className="bc-item-menu-option" onClick={() => setActivePanel('folder')}>
+                  <Filter size={13} /> Папка
+                  {currentFolderId && <span className="bc-item-menu-hint">{folders.find(f => f.id === currentFolderId)?.name || ''}</span>}
+                </button>
+              )}
               <button className="bc-item-menu-option bc-item-menu-option--archive" onClick={() => { setOpen(false); onArchive(); }}>
                 <Archive size={13} /> В архив
               </button>
             </>
+          )}
+          {activePanel === 'folder' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>←</button>
+                <span>Папка</span>
+              </div>
+              <div className="bc-item-menu-folder-list">
+                <button className={`bc-item-menu-folder-option${!currentFolderId ? ' active' : ''}`} onClick={() => { onAssignFolder?.(chatId, null); setOpen(false); setActivePanel(null); }}>
+                  — Без папки
+                </button>
+                {folders.map(f => (
+                  <button key={f.id} className={`bc-item-menu-folder-option${currentFolderId === f.id ? ' active' : ''}`} onClick={() => { onAssignFolder?.(chatId, f.id); setOpen(false); setActivePanel(null); }}>
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           {activePanel === 'comment' && (
             <div className="bc-item-menu-panel">
@@ -1223,13 +1247,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     </span>
                   )}
                 </label>
-                {folders.length > 0 && (
-                  <select className="bc-folder-select" value={folderMap[ch.chatId] || ''} onChange={e => assignFolder(ch.chatId, e.target.value ? Number(e.target.value) : null)} title="Папка" onClick={e => e.stopPropagation()}>
-                    <option value="">—</option>
-                    {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                )}
-                <ItemActionsMenu chatId={ch.chatId} entityType="channels" allTags={allChannelTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(ch.id)} />
+                <ItemActionsMenu chatId={ch.chatId} entityType="channels" allTags={allChannelTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(ch.id)} folders={folders} currentFolderId={folderMap[ch.chatId] || null} onAssignFolder={assignFolder} />
               </div>
             ))}
           </div>
@@ -1861,13 +1879,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     </span>
                   )}
                 </label>
-                {grFolders.length > 0 && (
-                  <select className="bc-folder-select" value={grFolderMap[g.chatId] || ''} onChange={e => assignGrFolder(g.chatId, e.target.value ? Number(e.target.value) : null)} title="Папка" onClick={e => e.stopPropagation()}>
-                    <option value="">—</option>
-                    {grFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                )}
-                <ItemActionsMenu chatId={g.chatId} entityType="groups" allTags={allGroupTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(g.id)} />
+                <ItemActionsMenu chatId={g.chatId} entityType="groups" allTags={allGroupTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(g.id)} folders={grFolders} currentFolderId={grFolderMap[g.chatId] || null} onAssignFolder={assignGrFolder} />
               </div>
             ))}
           </div>
