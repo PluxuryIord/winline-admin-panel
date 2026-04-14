@@ -2710,3 +2710,31 @@ input[type="checkbox"]:checked {
 }
 .bc-folder-select:hover { border-color: rgba(255,126,0,0.3); }
 .bc-folder-select:focus { outline: none; border-color: var(--color-orange); }
+
+/* ─── Rename inline ─── */
+.bc-rename-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--color-orange);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+}
+.bc-rename-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.2);
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.bc-list-item:hover .bc-rename-btn { opacity: 1; }
+.bc-rename-btn:hover { color: var(--color-orange); }

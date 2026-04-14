@@ -3,7 +3,7 @@ import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
   BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye,
-  Save, Clock, Calendar, Play, Edit3, FileBox, MoreVertical
+  Save, Clock, Calendar, Play, Edit3, FileBox, MoreVertical, Pencil
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
@@ -916,6 +916,19 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Rename
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const handleRenameChannel = async (id) => {
+    if (!renameValue.trim()) { setRenamingId(null); return; }
+    try {
+      await api.put(`/api/broadcasts/channels/${id}/rename`, { title: renameValue.trim() });
+      setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, title: renameValue.trim() } : ch));
+    } catch {}
+    setRenamingId(null);
+  };
+
   // Folders
   const [folders, setFolders] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -1190,7 +1203,19 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
-                  <span className="bc-list-title">{ch.title}</span>
+                  {renamingId === ch.id ? (
+                    <input className="bc-rename-input" value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                      onBlur={() => handleRenameChannel(ch.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameChannel(ch.id); if (e.key === 'Escape') setRenamingId(null); }}
+                      autoFocus onClick={e => e.preventDefault()} />
+                  ) : (
+                    <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }}>{ch.title}</span>
+                  )}
+                  {renamingId !== ch.id && (
+                    <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }} title="Переименовать">
+                      <Pencil size={11} />
+                    </button>
+                  )}
                   {(channelTagsMap[ch.chatId] || []).length > 0 && (
                     <span className="bc-list-inline-tags">
                       {(channelTagsMap[ch.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}
@@ -1511,6 +1536,19 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Rename
+  const [grRenamingId, setGrRenamingId] = useState(null);
+  const [grRenameValue, setGrRenameValue] = useState('');
+
+  const handleRenameGroup = async (id) => {
+    if (!grRenameValue.trim()) { setGrRenamingId(null); return; }
+    try {
+      await api.put(`/api/broadcasts/groups/${id}/rename`, { title: grRenameValue.trim() });
+      setGroups(prev => prev.map(g => g.id === id ? { ...g, title: grRenameValue.trim() } : g));
+    } catch {}
+    setGrRenamingId(null);
+  };
+
   // Folders
   const [grFolders, setGrFolders] = useState([]);
   const [grActiveFolderId, setGrActiveFolderId] = useState(null);
@@ -1784,7 +1822,19 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
-                  <span className="bc-list-title">{g.title}</span>
+                  {grRenamingId === g.id ? (
+                    <input className="bc-rename-input" value={grRenameValue} onChange={e => setGrRenameValue(e.target.value)}
+                      onBlur={() => handleRenameGroup(g.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameGroup(g.id); if (e.key === 'Escape') setGrRenamingId(null); }}
+                      autoFocus onClick={e => e.preventDefault()} />
+                  ) : (
+                    <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }}>{g.title}</span>
+                  )}
+                  {grRenamingId !== g.id && (
+                    <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }} title="Переименовать">
+                      <Pencil size={11} />
+                    </button>
+                  )}
                   {(groupTagsMap[g.chatId] || []).length > 0 && (
                     <span className="bc-list-inline-tags">
                       {(groupTagsMap[g.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}

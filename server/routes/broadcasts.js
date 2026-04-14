@@ -896,6 +896,26 @@ router.put('/channels/:chatId/comment', (req, res, next) => putComment('channels
 router.get('/groups/:chatId/comment', (req, res, next) => getComment('groups', req.params.chatId, res, next));
 router.put('/groups/:chatId/comment', (req, res, next) => putComment('groups', req.params.chatId, req.body, res, next));
 
+// ===================== ПЕРЕИМЕНОВАНИЕ =====================
+
+router.put('/channels/:id/rename', async (req, res, next) => {
+  try {
+    const { title } = req.body || {};
+    if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
+    await dbPool.query('UPDATE wl_admin_channels SET title = ? WHERE id = ?', [title.trim(), Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+router.put('/groups/:id/rename', async (req, res, next) => {
+  try {
+    const { title } = req.body || {};
+    if (!title || !title.trim()) return res.status(400).json({ error: 'title required' });
+    await dbPool.query('UPDATE wl_admin_groups SET title = ? WHERE id = ?', [title.trim(), Number(req.params.id)]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // ===================== ЧЕРНОВИКИ И ЗАПЛАНИРОВАННЫЕ =====================
 
 // Ensure drafts & scheduled tables exist
