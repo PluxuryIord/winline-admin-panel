@@ -22,7 +22,7 @@ function StatsBar() {
     } catch {}
   }, []);
 
-  useEffect(() => { fetchStats(); const i = setInterval(fetchStats, 30000); return () => clearInterval(i); }, [fetchStats]);
+  useEffect(() => { fetchStats(); const i = setInterval(fetchStats, 5000); return () => clearInterval(i); }, [fetchStats]);
 
   if (!stats) return null;
 
@@ -87,7 +87,7 @@ function CodesSection() {
     }
   }, [page, search, statusFilter]);
 
-  useEffect(() => { fetchCodes(); }, [fetchCodes]);
+  useEffect(() => { fetchCodes(); const i = setInterval(fetchCodes, 5000); return () => clearInterval(i); }, [fetchCodes]);
 
   const handleSearch = (e) => { e.preventDefault(); setPage(0); setSearch(searchInput.trim()); };
 
