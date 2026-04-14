@@ -79,7 +79,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
             <span className="admin-name">{user?.username || 'admin'}</span>
           </div>
         )}
-        <LogOut size={18} className="logout-icon" onClick={logout} title="Выйти" />
+        {!collapsed && <LogOut size={18} className="logout-icon" onClick={logout} title="Выйти" />}
       </div>
     </aside>
   );
