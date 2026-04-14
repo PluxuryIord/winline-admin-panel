@@ -14,11 +14,17 @@ const PAGE_SIZE = 30;
 
 function StatsBar() {
   const [stats, setStats] = useState(null);
+  const statsRef = useRef('');
 
   const fetchStats = useCallback(async () => {
     try {
       const res = await api.get('/api/events/stats');
-      setStats(await res.json());
+      const data = await res.json();
+      const hash = JSON.stringify(data);
+      if (hash !== statsRef.current) {
+        statsRef.current = hash;
+        setStats(data);
+      }
     } catch {}
   }, []);
 
@@ -69,25 +75,33 @@ function CodesSection() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [qrModal, setQrModal] = useState(null);
+  const codesRef = useRef('');
+  const isFirstLoad = useRef(true);
 
   const fetchCodes = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoad.current) setLoading(true);
     try {
       const params = new URLSearchParams({ limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       const res = await api.get(`/api/events/codes?${params}`);
       const data = await res.json();
-      setCodes(data.codes || []);
-      setTotal(data.total || 0);
+      const newCodes = data.codes || [];
+      const newTotal = data.total || 0;
+      const hash = JSON.stringify(newCodes);
+      if (hash !== codesRef.current) {
+        codesRef.current = hash;
+        setCodes(newCodes);
+        setTotal(newTotal);
+      }
     } catch (e) {
       console.error('Failed to load codes:', e);
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) { setLoading(false); isFirstLoad.current = false; }
     }
   }, [page, search, statusFilter]);
 
-  useEffect(() => { fetchCodes(); const i = setInterval(fetchCodes, 5000); return () => clearInterval(i); }, [fetchCodes]);
+  useEffect(() => { isFirstLoad.current = true; fetchCodes(); const i = setInterval(fetchCodes, 5000); return () => clearInterval(i); }, [fetchCodes]);
 
   const handleSearch = (e) => { e.preventDefault(); setPage(0); setSearch(searchInput.trim()); };
 
