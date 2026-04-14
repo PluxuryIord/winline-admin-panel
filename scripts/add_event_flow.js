@@ -14,10 +14,11 @@ for (const line of envFile.split('\n')) {
 }
 
 const conn = await mysql.createConnection({
-  host: env.DB_HOST,
-  user: env.DB_USER,
-  password: env.DB_PASSWORD,
-  database: env.DB_NAME,
+  host: env.MYSQL_HOST,
+  port: env.MYSQL_PORT || 3306,
+  user: env.MYSQL_USER,
+  password: env.MYSQL_PASSWORD,
+  database: env.MYSQL_DATABASE,
 });
 
 const [rows] = await conn.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
