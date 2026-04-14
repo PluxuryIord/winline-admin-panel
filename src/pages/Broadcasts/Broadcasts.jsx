@@ -2112,6 +2112,7 @@ export default function Broadcasts() {
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
   const [filterType, setFilterType] = useState(''); // channels|users|groups
   const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
+  const [filterContent, setFilterContent] = useState(''); // text|poll|quiz
   const [pollStatsModal, setPollStatsModal] = useState(null);
   const [pollStatsLoading, setPollStatsLoading] = useState(false);
   const [pollVoters, setPollVoters] = useState(null); // { optionIndex, optionText, voters: [] }  optionIndex='all' for all
@@ -2275,6 +2276,14 @@ export default function Broadcasts() {
     if (search && !(b.text || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (filterType && b.type !== filterType) return false;
     if (filterStatus && b.status !== filterStatus) return false;
+    if (filterContent) {
+      const t = (b.text || '');
+      const isQuiz = t.startsWith('[Викторина]');
+      const isPoll = t.startsWith('[Опрос]');
+      if (filterContent === 'quiz' && !isQuiz) return false;
+      if (filterContent === 'poll' && !isPoll) return false;
+      if (filterContent === 'text' && (isQuiz || isPoll)) return false;
+    }
     return true;
   });
 
@@ -2369,6 +2378,12 @@ export default function Broadcasts() {
             <span className="bc-filter-label">Статус:</span>
             {[['', 'Все'], ['published', 'Доставлена'], ['partial', 'Частично'], ['failed', 'Ошибка'], ['scheduled', 'Отложена']].map(([v, l]) => (
               <button key={v} className={`bc-filter-chip ${filterStatus === v ? 'active' : ''}`} onClick={() => { setFilterStatus(v); setVisibleCount(20); }}>{l}</button>
+            ))}
+          </div>
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Контент:</span>
+            {[['', 'Все'], ['text', '📝 Текст'], ['poll', '📊 Опрос'], ['quiz', '🧠 Викторина']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterContent === v ? 'active' : ''}`} onClick={() => { setFilterContent(v); setVisibleCount(20); }}>{l}</button>
             ))}
           </div>
         </div>
