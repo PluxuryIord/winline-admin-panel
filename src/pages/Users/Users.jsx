@@ -166,17 +166,11 @@ export default function Users() {
         remove: bulkModal.mode === 'remove' ? [tag] : [],
       };
       await api.post('/api/users/tags/bulk', body);
-      // Local patch
-      setUsers(prev => prev.map(u => {
-        if (!selectedIds.has(u.id)) return u;
-        const tags = new Set(u.tags || []);
-        if (bulkModal.mode === 'add') tags.add(tag);
-        else tags.delete(tag);
-        return { ...u, tags: [...tags] };
-      }));
+      // Reload all users from server to get fresh tags
       loadTags();
       setBulkModal(null);
       clearSelection();
+      fetchUsers(0, debouncedSearch, filterTags);
     } catch (err) {
       alert('Ошибка: ' + err.message);
     }
