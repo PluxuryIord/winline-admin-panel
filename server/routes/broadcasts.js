@@ -45,6 +45,17 @@ function verifyBroadcastWebhook(req) {
 
 export const broadcastWebhookRouter = Router();
 export const pollVoteRouter = Router();
+export const groupApprovalRouter = Router();
+
+// Public endpoint — bot checks if group is approved (no JWT)
+groupApprovalRouter.get('/:chatId', async (req, res, next) => {
+  try {
+    const chatId = String(req.params.chatId);
+    const [rows] = await dbPool.query('SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [chatId]);
+    if (!rows.length) return res.json({ approved: true });
+    res.json({ approved: !!rows[0].approved });
+  } catch (err) { next(err); }
+});
 
 broadcastWebhookRouter.post('/', async (req, res, next) => {
   if (!verifyBroadcastWebhook(req)) {
@@ -421,16 +432,6 @@ router.put('/groups/:id/approve', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Check if group is approved (for bot)
-router.get('/groups/check-approved/:chatId', async (req, res, next) => {
-  try {
-    const chatId = String(req.params.chatId);
-    // If no row in approved table → group existed before feature, treat as approved
-    const [rows] = await dbPool.query('SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [chatId]);
-    if (!rows.length) return res.json({ approved: true });
-    res.json({ approved: !!rows[0].approved });
-  } catch (err) { next(err); }
-});
 
 // Get archived groups
 router.get('/groups/archive', async (req, res, next) => {
