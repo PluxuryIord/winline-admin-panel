@@ -443,6 +443,41 @@ input[type="checkbox"]:checked {
   opacity: 0.8;
 }
 
+.bc-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  color: #f0a020;
+  background: rgba(240, 160, 32, 0.12);
+  border: 1px solid rgba(240, 160, 32, 0.3);
+  border-radius: 8px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.bc-approve-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.12);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
+  transition: background 0.15s;
+}
+.bc-approve-btn:hover {
+  background: rgba(76, 175, 80, 0.25);
+}
+
 .bc-list-id {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.25);

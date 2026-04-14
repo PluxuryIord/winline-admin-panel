@@ -1632,6 +1632,13 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     loadGroups();
   };
 
+  const handleApprove = async (id) => {
+    try {
+      await api.put(`/api/broadcasts/groups/${id}/approve`);
+      setGroups(prev => prev.map(g => g.id === id ? { ...g, approved: 1 } : g));
+    } catch (e) { alert('Ошибка: ' + e.message); }
+  };
+
   const handleArchive = async (id) => {
     try {
       await api.post(`/api/broadcasts/groups/${id}/archive`);
@@ -1833,6 +1840,16 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }}>{g.title}</span>
                   )}
                   <span className="bc-list-chatid">ID: {g.chatId}</span>
+                  {!g.approved && (
+                    <span className="bc-pending-badge" title="Ожидает подтверждения">
+                      <Clock size={12} /> Ожидает
+                    </span>
+                  )}
+                  {!g.approved && (
+                    <button className="bc-approve-btn" onClick={(e) => { e.preventDefault(); handleApprove(g.id); }} title="Подтвердить">
+                      <Check size={12} /> Принять
+                    </button>
+                  )}
                   {grRenamingId !== g.id && (
                     <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }} title="Переименовать">
                       <Pencil size={11} />

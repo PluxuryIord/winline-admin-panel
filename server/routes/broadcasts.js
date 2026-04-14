@@ -66,7 +66,8 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
       if (existing.length) {
         await dbPool.query(`UPDATE ${table} SET title = ? WHERE chat_id = ?`, [title || chatIdStr, chatIdStr]);
       } else {
-        await dbPool.query(`INSERT INTO ${table} (chat_id, title) VALUES (?, ?)`, [chatIdStr, title || chatIdStr]);
+        const approved = isChannel ? 1 : 0;
+        await dbPool.query(`INSERT INTO ${table} (chat_id, title, approved) VALUES (?, ?, ?)`, [chatIdStr, title || chatIdStr, approved]);
       }
       // Remove from archive if re-added
       const archiveTable = isChannel ? 'wl_admin_channels_archive' : 'wl_admin_groups_archive';
@@ -103,6 +104,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
       id INT AUTO_INCREMENT PRIMARY KEY, chat_id VARCHAR(100), title VARCHAR(500),
       added_at DATETIME, archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // Add approved column to groups if not exists
+    await dbPool.query(`ALTER TABLE wl_admin_groups ADD COLUMN approved TINYINT(1) DEFAULT 1`).catch(() => {});
   } catch (err) {
     console.error('[broadcasts] Failed to create archive tables:', err.message);
   }
@@ -339,7 +342,7 @@ router.delete('/channels/:id', async (req, res, next) => {
 
 router.get('/groups', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt FROM wl_admin_groups ORDER BY id ASC');
+    const [rows] = await dbPool.query('SELECT id, chat_id AS chatId, title, added_at AS addedAt, IFNULL(approved, 1) AS approved FROM wl_admin_groups ORDER BY id ASC');
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -388,6 +391,24 @@ router.post('/groups/restore/:id', async (req, res, next) => {
     await conn.commit();
     res.json({ success: true });
   } catch (err) { await conn.rollback().catch(() => {}); next(err); } finally { conn.release(); }
+});
+
+// Approve group
+router.put('/groups/:id/approve', async (req, res, next) => {
+  try {
+    const [result] = await dbPool.query('UPDATE wl_admin_groups SET approved = 1 WHERE id = ?', [Number(req.params.id)]);
+    if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Check if group is approved (for bot)
+router.get('/groups/check-approved/:chatId', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query('SELECT IFNULL(approved, 1) AS approved FROM wl_admin_groups WHERE chat_id = ?', [String(req.params.chatId)]);
+    if (!rows.length) return res.json({ approved: false });
+    res.json({ approved: !!rows[0].approved });
+  } catch (err) { next(err); }
 });
 
 // Get archived groups
