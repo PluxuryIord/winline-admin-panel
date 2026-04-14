@@ -132,8 +132,10 @@ export default function Users() {
       const data = await res.json();
       if (data.ok) {
         loadTags();
-        fetchUsers(0, debouncedSearch, filterTags);
-        if (filterTags.includes(tagModal.tag)) setFilterTags(filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t));
+        const newFilterTags = filterTags.includes(tagModal.tag) ? filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t) : filterTags;
+        setFilterTags(newFilterTags);
+        setUsers([]);
+        fetchUsers(0, debouncedSearch, newFilterTags);
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
     setTagModalSaving(false);
