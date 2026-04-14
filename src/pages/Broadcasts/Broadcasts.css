@@ -436,10 +436,11 @@ input[type="checkbox"]:checked {
 
 .bc-list-chatid {
   font-size: 0.7rem;
-  color: var(--color-gray-400, #888);
+  color: #999;
   white-space: nowrap;
-  margin-left: 6px;
+  margin-left: 4px;
   flex-shrink: 0;
+  opacity: 0.8;
 }
 
 .bc-list-id {
