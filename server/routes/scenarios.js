@@ -210,9 +210,147 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_fill_anketa', 'btn_become_partner'],
-        btn_fill_anketa: { label: 'Заполнить анкету', action: 'callback:client_event_anketa' },
-        btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner' },
+        btn_fill_anketa: { label: 'Заполнить анкету', action: 'callback:client_event_anketa', targetScreen: 'anketa_role' },
+        btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner', targetScreen: 'registration_flow' },
       },
+    },
+
+    // ── Анкета: Ваша роль (точка входа) ──
+    anketa_role: {
+      title: 'Ваша роль',
+      description: 'Выбор роли: трафик / рекламодатель / другое',
+      scenario: 5,
+      stepType: 'choice',
+      answerKey: 'role',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Ваша роль</b>' },
+      },
+      buttons: {
+        _order: ['btn_traffic', 'btn_advertiser', 'btn_other'],
+        btn_traffic: { label: 'Продаю трафик', action: 'callback:anketa_answer', targetScreen: 'anketa_traffic_company' },
+        btn_advertiser: { label: 'Рекламодатель', action: 'callback:anketa_answer', targetScreen: 'anketa_adv_company' },
+        btn_other: { label: 'Другое', action: 'callback:anketa_answer', targetScreen: 'anketa_other_occupation' },
+      },
+    },
+
+    // ── Ветка 1: Продаю трафик ──
+    anketa_traffic_company: {
+      title: 'Название компании / команды',
+      description: 'Ветка «Продаю трафик» — шаг 1',
+      scenario: 5,
+      stepType: 'text_input',
+      answerKey: 'company',
+      nextScreen: 'anketa_traffic_category',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Название вашей компании / команды</b>' },
+      },
+      buttons: { _order: [] },
+    },
+    anketa_traffic_category: {
+      title: 'Категория трафика',
+      description: 'Ветка «Продаю трафик» — шаг 2',
+      scenario: 5,
+      stepType: 'choice',
+      answerKey: 'traffic_type',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Выберите категорию вашего трафика</b>' },
+      },
+      buttons: {
+        _order: ['btn_cpa_net', 'btn_seo', 'btn_aso', 'btn_sms', 'btn_cpa', 'btn_push', 'btn_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'],
+        btn_cpa_net: { label: 'CPA-сеть', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_seo: { label: 'SEO', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_aso: { label: 'ASO', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_sms: { label: 'SMS', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_cpa: { label: 'CPA', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_push: { label: 'PUSH', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_inapp: { label: 'IN APP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_dsp: { label: 'DSP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_social: { label: 'SOCIAL', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_influence: { label: 'INFLUENCE', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_other_traffic: { label: 'OTHER', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+      },
+    },
+
+    // ── Ветка 2: Рекламодатель ──
+    anketa_adv_company: {
+      title: 'Название компании',
+      description: 'Ветка «Рекламодатель» — шаг 1',
+      scenario: 5,
+      stepType: 'text_input',
+      answerKey: 'company',
+      nextScreen: 'anketa_adv_position',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Название вашей компании</b>' },
+      },
+      buttons: { _order: [] },
+    },
+    anketa_adv_position: {
+      title: 'Должность',
+      description: 'Ветка «Рекламодатель» — шаг 2',
+      scenario: 5,
+      stepType: 'text_input',
+      answerKey: 'position',
+      nextScreen: 'anketa_sub_check',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Должность</b>' },
+      },
+      buttons: { _order: [] },
+    },
+
+    // ── Ветка 3: Другое ──
+    anketa_other_occupation: {
+      title: 'Чем занимаешься?',
+      description: 'Ветка «Другое»',
+      scenario: 5,
+      stepType: 'text_input',
+      answerKey: 'occupation',
+      nextScreen: 'anketa_sub_check',
+      messages: {
+        question_text: { label: 'Вопрос', text: '<b>Чем занимаешься?</b>' },
+      },
+      buttons: { _order: [] },
+    },
+
+    // ── Общий: Проверка подписки ──
+    anketa_sub_check: {
+      title: 'Проверка подписки',
+      description: 'Проверка подписки на канал @WinlinePartners',
+      scenario: 5,
+      stepType: 'subscription_check',
+      nextScreen: 'anketa_final',
+      messages: {
+        check_text: {
+          label: 'Текст перед проверкой',
+          text: 'Отлично! Осталось подписаться на канал @WinlinePartners и регистрация завершена.\nБудем ждать тебя на стенде Winline Partners, чтобы подарить мерч и обсудить сотрудничество!',
+        },
+        fail_text: {
+          label: 'Текст при неудаче',
+          text: 'Не получилось проверить подписку. Ты точно подписан(а) на канал @WinlinePartners?',
+        },
+        fail_alert: {
+          label: 'Всплывающее сообщение',
+          text: 'Всплывающее сообщение при отсутствии подписки нужно для визуального акцента',
+        },
+      },
+      buttons: {
+        _order: ['btn_check_sub'],
+        btn_check_sub: { label: 'Подписка есть!', action: 'callback:anketa_check_sub' },
+      },
+    },
+
+    // ── Общий: Финальный текст + QR ──
+    anketa_final: {
+      title: 'Финал + QR код',
+      description: 'Итоговое сообщение с условиями и QR-кодом',
+      scenario: 5,
+      stepType: 'finish',
+      messages: {
+        final_text: {
+          label: 'Итоговый текст',
+          text: 'Теперь можешь ознакомиться с <a href="https://winlinepartners.ru">условиями партнёрской программы</a> и получить мерч на стенде - держи для этого персональный QR код.\nПо вопросам сотрудничества пиши нашему Affiliate менеджеру @winline_affiliate',
+        },
+      },
+      buttons: { _order: [] },
     },
     /* logout_screen removed — button stays in main_menu but is locked */
     // ── Сценарий 4: Работа бота в чатах ──

@@ -62,6 +62,8 @@ function AnketaTypeDropdown({ value, onChange, options }) {
 const TYPE_OPTIONS = [
   { value: 'text', label: 'Текстовый ответ', icon: '✏️' },
   { value: 'choice', label: 'С вариантами (кнопки)', icon: '🔘' },
+  { value: 'subscription_check', label: 'Проверка подписки', icon: '🔔' },
+  { value: 'finish', label: 'Финал (QR код)', icon: '🏁' },
 ];
 const TYPE_OPTIONS_SHORT = [
   { value: 'text', label: 'Текстовый', icon: '✏️' },
@@ -402,9 +404,9 @@ export default function NodeEditorPanel({
               placeholder="role, traffic_type..."
             />
           </div>
-          {editData.stepType === 'text_input' && (
+          {(editData.stepType === 'text_input' || editData.stepType === 'subscription_check') && (
             <div className="anketa-field-row">
-              <label>Следующий экран (после ввода текста)</label>
+              <label>Следующий экран {editData.stepType === 'subscription_check' ? '(при успешной подписке)' : '(после ввода текста)'}</label>
               <select
                 className="node-editor-target-select"
                 value={editData.nextScreen || ''}

@@ -56,6 +56,16 @@ const DEFAULT_POSITIONS = {
   event_flow:        { x: 900, y: 350 },
   event_anketa:      { x: 1300, y: 60 },
 
+  // Сценарий 5: Анкета мероприятия
+  anketa_role:              { x: 1700, y: 60 },
+  anketa_traffic_company:   { x: 1400, y: 350 },
+  anketa_traffic_category:  { x: 1400, y: 650 },
+  anketa_adv_company:       { x: 1700, y: 350 },
+  anketa_adv_position:      { x: 1700, y: 650 },
+  anketa_other_occupation:  { x: 2000, y: 350 },
+  anketa_sub_check:         { x: 1700, y: 950 },
+  anketa_final:             { x: 1700, y: 1250 },
+
   // Выход
   logout_screen:     { x: 1300, y: 350 },
 

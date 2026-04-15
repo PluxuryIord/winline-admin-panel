@@ -100,7 +100,8 @@ export default function FlowNode({
   };
 
   const buttonOrder = screen.buttons?._order || [];
-  const icon = screen.scenario === 5 ? (screen.stepType === 'text_input' ? '✏️' : '🔘') : (SCREEN_ICONS[screenId] || '📄');
+  const anketaIcons = { text_input: '✏️', choice: '🔘', subscription_check: '🔔', finish: '🏁' };
+  const icon = screen.scenario === 5 ? (anketaIcons[screen.stepType] || '🔘') : (SCREEN_ICONS[screenId] || '📄');
   const isAnketa = screen.scenario === 5;
 
   // Get first message text for preview
@@ -166,6 +167,23 @@ export default function FlowNode({
             <div className="flow-node-btn flow-node-btn-text-input" data-btn-key="__next__">
               <span className="flow-node-btn-label">✏️ Ввод текста → далее</span>
               {screen.nextScreen && <div className="flow-node-anchor flow-node-anchor-btn" />}
+            </div>
+          </div>
+        )}
+        {/* Subscription check: show nextScreen arrow for success path */}
+        {isAnketa && screen.stepType === 'subscription_check' && screen.nextScreen && (
+          <div className="flow-node-buttons">
+            <div className="flow-node-btn flow-node-btn-text-input" data-btn-key="__next__">
+              <span className="flow-node-btn-label">✅ Подписка ОК → далее</span>
+              <div className="flow-node-anchor flow-node-anchor-btn" />
+            </div>
+          </div>
+        )}
+        {/* Finish step badge */}
+        {isAnketa && screen.stepType === 'finish' && (
+          <div className="flow-node-buttons">
+            <div className="flow-node-btn flow-node-btn-text-input">
+              <span className="flow-node-btn-label">🏁 Отправка QR кода</span>
             </div>
           </div>
         )}
