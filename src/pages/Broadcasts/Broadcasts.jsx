@@ -2106,6 +2106,7 @@ export default function Broadcasts() {
   const [search, setSearch] = useState('');
   const [deleteModal, setDeleteModal] = useState(null);
   const [deliveryModal, setDeliveryModal] = useState(null);
+  const [textModal, setTextModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
@@ -2406,7 +2407,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
+                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal((b.media ? `[${b.media.originalName}] ` : '') + (b.text || ''))} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
@@ -2460,6 +2461,15 @@ export default function Broadcasts() {
           onConfirm={handleDeleteBroadcast}
           onCancel={() => setDeleteModal(null)}
         />
+      )}
+
+      {textModal && (
+        <div className="bc-text-modal-overlay" onClick={() => setTextModal(null)}>
+          <div className="bc-text-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-text-modal-close"><button onClick={() => setTextModal(null)}><X size={18} /></button></div>
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal)) }} />
+          </div>
+        </div>
       )}
 
       {deliveryModal && (

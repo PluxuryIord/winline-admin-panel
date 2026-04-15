@@ -104,6 +104,10 @@
   white-space: nowrap;
 }
 
+.broadcasts-table th:first-child {
+  padding-left: 42px;
+}
+
 .broadcasts-row {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   transition: background 0.15s;
@@ -125,17 +129,77 @@
 /* Название */
 .bc-title-cell {
   display: flex !important;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   min-width: 200px;
   max-width: 320px;
 }
 
-.bc-title-cell span {
-  white-space: nowrap;
+.bc-title-cell .bc-type-badge {
+  margin-top: 2px;
+}
+
+.bc-title-cell .bc-hist-text-wrap {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
+  color: var(--color-white);
+  line-height: 1.4;
+  max-height: 2.8em;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.bc-title-cell .bc-hist-text-wrap:hover {
+  color: var(--color-orange);
+}
+
+/* Full text modal overlay */
+.bc-text-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.bc-text-modal {
+  background: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 560px;
+  width: 90%;
+  max-height: 70vh;
+  overflow-y: auto;
+  color: var(--color-white);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bc-text-modal-close {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.bc-text-modal-close button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.bc-text-modal-close button:hover {
   color: var(--color-white);
 }
 
@@ -2004,19 +2068,19 @@ input[type="checkbox"]:checked {
 .bc-ch-tag-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px 4px 10px;
-  border-radius: 12px;
+  gap: 5px;
+  padding: 6px 12px 6px 13px;
+  border-radius: 14px;
   background: rgba(255, 126, 0, 0.12);
   color: var(--color-orange);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.3;
 }
 
 .bc-ch-tag-chip .bc-chip-remove {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 .bc-ch-tag-add {
