@@ -19,7 +19,7 @@ const SCENARIO_CENTER = {
   'Сценарий 2': 'auth_flow',
   'Сценарий 3': 'event_flow',
   'Сценарий 4': 'group_menu',
-  'Анкета': 'event_anketa',
+  'Анкета': 'anketa_role',
 };
 
 export default function FlowCanvas({

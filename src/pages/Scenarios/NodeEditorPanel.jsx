@@ -381,7 +381,17 @@ export default function NodeEditorPanel({
       </div>
 
       {/* Anketa Questions — FIRST, only for event_anketa screen */}
-      {screenId === 'event_anketa' && <AnketaQuestionManager />}
+      {screenId === 'event_anketa' && (
+        <div className="sc-section anketa-redirect-hint">
+          <h3 className="sc-section-title"><ClipboardList size={16} /> Анкета мероприятия</h3>
+          <p style={{ color: '#aaa', fontSize: '0.85rem', margin: '8px 0 12px' }}>
+            Анкета настраивается через отдельные блоки в разделе <b>«Анкета»</b> на панели фильтров сверху.
+          </p>
+          <p style={{ color: '#888', fontSize: '0.8rem' }}>
+            Кнопка «Заполнить анкету» ведёт на блок <b>Ваша роль</b>, откуда начинается ветвление анкеты.
+          </p>
+        </div>
+      )}
 
       {/* Anketa flow fields — for scenario:5 screens */}
       {editData.scenario === 5 && (

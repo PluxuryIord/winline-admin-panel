@@ -97,6 +97,14 @@ function migrateData(data) {
     }
   }
 
+  // One-time cleanup: remove orphan blocks with title "test"
+  for (const [id, scr] of Object.entries(data.screens)) {
+    if (!SYSTEM_SCREENS.has(id) && !id.startsWith('anketa_') && scr.title?.toLowerCase() === 'test') {
+      delete data.screens[id];
+      changed = true;
+    }
+  }
+
   // One-time migration: move anketa blocks to the left if they're overlapping main blocks
   const ANKETA_IDS = new Set(['anketa_role','anketa_traffic_company','anketa_traffic_category',
     'anketa_adv_company','anketa_adv_position','anketa_other_occupation','anketa_sub_check','anketa_final']);

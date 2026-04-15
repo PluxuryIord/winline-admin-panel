@@ -65,6 +65,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
   }, [bendOffsets, onBendChange, zoom]);
 
   const arrows = [];
+  const drawnPairs = new Set(); // track srcId->targetScreen to deduplicate
 
   for (const [srcId, screen] of Object.entries(screens)) {
     const order = screen.buttons?._order || [];
@@ -79,6 +80,11 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
       if (btn.targetScreen === srcId) return;
 
       if (btn.label?.includes('Назад') || btn.label?.includes('Меню') && btnKey.includes('back')) return;
+
+      // Deduplicate: only draw one arrow per src→target pair
+      const pairKey = `${srcId}->${btn.targetScreen}`;
+      if (drawnPairs.has(pairKey)) return;
+      drawnPairs.add(pairKey);
 
       const target = screens[btn.targetScreen];
       const tgtX = target.x ?? 0;
