@@ -258,7 +258,7 @@ export default function Hostess() {
 
       {/* Logo */}
       <div className="hostess-logo-wrap">
-        <img src="/logo.svg" alt="Winline Partners" className="hostess-logo-img" />
+        <img src="/logo2.svg" alt="Winline Partners" className="hostess-logo-img" />
       </div>
 
       {/* Mini stats */}
