@@ -587,4 +587,14 @@ router.post('/seed', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /api/scenarios/new-anketa-sheet — create new Google Sheet tab for anketa answers
+router.post('/new-anketa-sheet', async (req, res, next) => {
+  try {
+    const { createAnketaSheet } = await import('../services/googleSheets.js');
+    const sheetTitle = await createAnketaSheet();
+    if (!sheetTitle) return res.status(500).json({ error: 'Google Sheets не настроен или ошибка' });
+    res.json({ ok: true, sheetTitle });
+  } catch (err) { next(err); }
+});
+
 export default router;

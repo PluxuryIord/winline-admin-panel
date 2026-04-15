@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Save, X, ChevronUp, ChevronDown, MessageSquare, MousePointer,
   Loader, Check, ExternalLink, Link, Plus, Trash2, GripVertical, Eye, ImageIcon,
-  ClipboardList, ToggleLeft, ToggleRight,
+  ClipboardList, ToggleLeft, ToggleRight, FilePlus,
 } from 'lucide-react';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import { api } from '../../utils/api';
@@ -69,6 +69,59 @@ const TYPE_OPTIONS_SHORT = [
   { value: 'text', label: 'Текстовый', icon: '✏️' },
   { value: 'choice', label: 'С вариантами', icon: '🔘' },
 ];
+
+// ─── Anketa Sheet Controls (for anketa_role) ────────────────────────────────
+function AnketaSheetControls() {
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState(FALLBACK_SHEET_URL);
+  const [creating, setCreating] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => { if (d.url) setSpreadsheetUrl(d.url); }).catch(() => {});
+  }, []);
+
+  const handleNewSheet = async () => {
+    if (!confirm('Создать новый лист? Текущий лист «Ответы анкеты» будет архивирован с сегодняшней датой.')) return;
+    setCreating(true);
+    setResult(null);
+    try {
+      const res = await api.post('/api/scenarios/new-anketa-sheet');
+      const data = await res.json();
+      if (data.ok) {
+        setResult({ ok: true, title: data.sheetTitle });
+      } else {
+        setResult({ ok: false, error: data.error || 'Ошибка' });
+      }
+    } catch (e) {
+      setResult({ ok: false, error: e.message });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="sc-section anketa-sheet-section">
+      <h3 className="sc-section-title"><ClipboardList size={16} /> Google Таблица</h3>
+      <p style={{ color: '#aaa', fontSize: '0.82rem', margin: '4px 0 12px' }}>
+        Ответы анкеты записываются на лист «Ответы анкеты»
+      </p>
+      <div className="anketa-sheet-actions">
+        <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
+          <ExternalLink size={14} /> Открыть таблицу
+        </a>
+        <button className="anketa-new-sheet-btn" onClick={handleNewSheet} disabled={creating}>
+          {creating ? <Loader size={14} className="sc-spinner" /> : <FilePlus size={14} />}
+          {creating ? 'Создаю...' : 'Новый лист'}
+        </button>
+      </div>
+      {result && (
+        <div className={`anketa-sheet-result ${result.ok ? 'success' : 'error'}`}>
+          {result.ok ? `✅ Создан новый лист «${result.title}»` : `❌ ${result.error}`}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Anketa Question Manager ─────────────────────────────────────────────────
 function AnketaQuestionManager() {
@@ -392,6 +445,9 @@ export default function NodeEditorPanel({
           </p>
         </div>
       )}
+
+      {/* Anketa sheet controls — only for anketa_role (entry point) */}
+      {screenId === 'anketa_role' && <AnketaSheetControls />}
 
       {/* Anketa flow fields — for scenario:5 screens */}
       {editData.scenario === 5 && (

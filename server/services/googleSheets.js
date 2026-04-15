@@ -102,6 +102,15 @@ export async function createSheetForQuestions(questions) {
   }
 }
 
+/**
+ * Create a new "Ответы анкеты" sheet with fixed anketa columns.
+ * Archives old sheet as "Ответы DD.MM.YYYY".
+ */
+export async function createAnketaSheet() {
+  const questionCols = ['Роль', 'Компания', 'Категория трафика', 'Должность', 'Род деятельности'];
+  return createSheetForQuestions(questionCols);
+}
+
 export function getSpreadsheetUrl() {
   if (!GOOGLE_SPREADSHEET_ID) return null;
   return `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}`;
