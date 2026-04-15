@@ -87,8 +87,9 @@
 .logo-area {
   display: flex;
   align-items: center;
-  margin-bottom: 40px;
-  padding: 0 16px;
+  justify-content: center;
+  margin-bottom: 32px;
+  padding: 12px 10px 0;
 }
 
 .logo-area h2 {
@@ -105,7 +106,6 @@
 
 .sidebar-logo {
   width: 100%;
-  max-width: 240px;
   height: auto;
   object-fit: contain;
 }
