@@ -81,6 +81,54 @@ export async function createAnketaSheet() {
   }
 }
 
+/**
+ * Legacy: create sheet for event questions (used by events.js).
+ * Renames existing "Ответы анкеты" → dated archive, creates fresh one.
+ */
+export async function createSheetForQuestions(questions) {
+  const sheets = getSheets();
+  if (!sheets) return null;
+
+  const now = new Date();
+  const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+  const SHEET_NAME = 'Ответы анкеты';
+
+  try {
+    const { data } = await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SPREADSHEET_ID });
+    const existing = data.sheets || [];
+    const titles = existing.map(s => s.properties.title);
+
+    const old = existing.find(s => s.properties.title === SHEET_NAME);
+    if (old) {
+      let archive = `Ответы ${dateStr}`;
+      let n = 1;
+      while (titles.includes(archive)) { n++; archive = `Ответы ${dateStr} (${n})`; }
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: GOOGLE_SPREADSHEET_ID,
+        requestBody: { requests: [{ updateSheetProperties: { properties: { sheetId: old.properties.sheetId, title: archive }, fields: 'title' } }] },
+      });
+    }
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: GOOGLE_SPREADSHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: SHEET_NAME } } }] },
+    });
+
+    const headers = ['Дата', 'User ID', 'ФИО', 'Username', ...questions];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SPREADSHEET_ID,
+      range: `'${SHEET_NAME}'!A1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [headers] },
+    });
+
+    return SHEET_NAME;
+  } catch (err) {
+    console.error('[googleSheets] Failed to create sheet:', err.message);
+    return null;
+  }
+}
+
 export function getSpreadsheetUrl() {
   if (!GOOGLE_SPREADSHEET_ID) return null;
   return `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}`;
