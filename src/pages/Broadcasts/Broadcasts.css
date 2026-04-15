@@ -161,46 +161,91 @@
 .bc-text-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  animation: bcModalFadeIn 0.2s ease;
+}
+
+@keyframes bcModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bcModalSlideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .bc-text-modal {
-  background: var(--color-panel);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 24px;
-  max-width: 560px;
+  background: linear-gradient(145deg, #1e1e36, #16162a);
+  border: 1px solid rgba(255, 126, 0, 0.15);
+  border-radius: 20px;
+  padding: 0;
+  max-width: 520px;
   width: 90%;
   max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: bcModalSlideUp 0.25s ease;
+}
+
+.bc-text-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bc-text-modal-header h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bc-text-modal-header button {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.bc-text-modal-header button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-white);
+}
+
+.bc-text-modal-body {
+  padding: 20px 24px 24px;
   overflow-y: auto;
   color: var(--color-white);
   font-size: 0.95rem;
-  line-height: 1.6;
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.bc-text-modal-close {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
-.bc-text-modal-close button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  padding: 4px;
-}
-
-.bc-text-modal-close button:hover {
-  color: var(--color-white);
+.bc-text-modal-body a { color: var(--color-orange); }
+.bc-text-modal-body code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
 }
 
 .bc-type-icon {

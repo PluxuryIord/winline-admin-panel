@@ -2466,8 +2466,11 @@ export default function Broadcasts() {
       {textModal && (
         <div className="bc-text-modal-overlay" onClick={() => setTextModal(null)}>
           <div className="bc-text-modal" onClick={e => e.stopPropagation()}>
-            <div className="bc-text-modal-close"><button onClick={() => setTextModal(null)}><X size={18} /></button></div>
-            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal)) }} />
+            <div className="bc-text-modal-header">
+              <h4>Текст рассылки</h4>
+              <button onClick={() => setTextModal(null)}><X size={16} /></button>
+            </div>
+            <div className="bc-text-modal-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal)) }} />
           </div>
         </div>
       )}
