@@ -104,8 +104,9 @@
 }
 
 .sidebar-logo {
-  height: 140px;
-  width: auto;
+  width: 100%;
+  max-width: 240px;
+  height: auto;
   object-fit: contain;
 }
 
