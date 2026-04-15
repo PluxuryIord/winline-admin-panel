@@ -23,7 +23,7 @@
 }
 
 .hostess-logo-img {
-  height: 150px;
+  height: 300px;
   width: auto;
   object-fit: contain;
 }
@@ -34,6 +34,7 @@
   align-items: center;
   gap: 0;
   background: rgba(0, 0, 0, 0.15);
+  border: 2px solid var(--color-orange, #FF7E00);
   border-radius: 12px;
   padding: 8px 16px;
   margin-top: 8px;
@@ -70,10 +71,12 @@
 .hostess-center {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: calc(50vh - 280px);
   width: 100%;
-  padding: 32px 24px;
+  padding-left: 24px;
+  padding-right: 24px;
   box-sizing: border-box;
 }
 
