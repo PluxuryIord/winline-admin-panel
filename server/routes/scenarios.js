@@ -590,8 +590,25 @@ router.post('/seed', async (req, res, next) => {
 // POST /api/scenarios/new-anketa-sheet — create new Google Sheet tab named with today's date
 router.post('/new-anketa-sheet', async (req, res, next) => {
   try {
+    // Collect answerKey columns from scenario:5 screens
+    const [scRows] = await dbPool.query("SELECT data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
+    const answerColumns = [];
+    if (scRows.length) {
+      const scData = typeof scRows[0].data === 'string' ? JSON.parse(scRows[0].data) : scRows[0].data;
+      const screens = scData.screens || {};
+      // Collect unique answerKeys in order of screen position
+      const anketaScreens = Object.values(screens).filter(s => s.scenario === 5 && s.answerKey);
+      const seen = new Set();
+      for (const s of anketaScreens) {
+        if (!seen.has(s.answerKey)) {
+          seen.add(s.answerKey);
+          answerColumns.push(s.answerKey);
+        }
+      }
+    }
+
     const { createAnketaSheet } = await import('../services/googleSheets.js');
-    const sheetTitle = await createAnketaSheet();
+    const sheetTitle = await createAnketaSheet(answerColumns);
     if (!sheetTitle) return res.status(500).json({ error: 'Google Sheets не настроен или ошибка' });
 
     // Save active sheet name to settings so the bot knows where to write

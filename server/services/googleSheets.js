@@ -21,13 +21,15 @@ function getSheets() {
   }
 }
 
-const ANKETA_HEADERS = ['Дата', 'User ID', 'ФИО', 'Username', 'Роль', 'Компания', 'Категория трафика', 'Должность', 'Род деятельности'];
+const ANKETA_BASE_HEADERS = ['Дата', 'User ID', 'ФИО', 'Username'];
 
 /**
  * Create a new sheet tab named with today's date (e.g. "15.04.2026").
+ * @param {string[]} answerColumns - column names from answerKey fields of anketa screens
  * Returns the sheet title. Panel saves it to DB, bot reads from DB.
  */
-export async function createAnketaSheet() {
+export async function createAnketaSheet(answerColumns = []) {
+  const ANKETA_HEADERS = [...ANKETA_BASE_HEADERS, ...answerColumns];
   const sheets = getSheets();
   if (!sheets) return null;
 

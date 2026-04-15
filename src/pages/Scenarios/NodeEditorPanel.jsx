@@ -472,18 +472,12 @@ export default function NodeEditorPanel({
           </div>
           <div className="anketa-field-row">
             <label>Колонка в таблице</label>
-            <select
-              className="node-editor-target-select"
+            <input
+              className="sc-modal-input"
               value={editData.answerKey || ''}
               onChange={e => onUpdateField?.('answerKey', e.target.value)}
-            >
-              <option value="">— Не сохранять —</option>
-              <option value="role">Роль</option>
-              <option value="company">Компания</option>
-              <option value="traffic_type">Категория трафика</option>
-              <option value="position">Должность</option>
-              <option value="occupation">Род деятельности</option>
-            </select>
+              placeholder="Название колонки в Google Таблице"
+            />
           </div>
           {(editData.stepType === 'text_input' || editData.stepType === 'subscription_check') && (
             <div className="anketa-field-row">
