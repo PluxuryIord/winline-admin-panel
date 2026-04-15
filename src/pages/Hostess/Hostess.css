@@ -2,7 +2,7 @@
 .hostess-page {
   min-height: 100vh;
   width: 100%;
-  background-color: #FF7E00;
+  background-color: #E56A00;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23,7 +23,7 @@
 }
 
 .hostess-logo-img {
-  height: 72px;
+  height: 110px;
   width: auto;
   object-fit: contain;
 }
