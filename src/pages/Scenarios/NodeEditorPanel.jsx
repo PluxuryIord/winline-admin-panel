@@ -471,13 +471,19 @@ export default function NodeEditorPanel({
             />
           </div>
           <div className="anketa-field-row">
-            <label>Ключ ответа <span className="sc-modal-optional">(для таблицы)</span></label>
-            <input
-              className="sc-modal-input"
+            <label>Колонка в таблице</label>
+            <select
+              className="node-editor-target-select"
               value={editData.answerKey || ''}
               onChange={e => onUpdateField?.('answerKey', e.target.value)}
-              placeholder="role, traffic_type..."
-            />
+            >
+              <option value="">— Не сохранять —</option>
+              <option value="role">Роль</option>
+              <option value="company">Компания</option>
+              <option value="traffic_type">Категория трафика</option>
+              <option value="position">Должность</option>
+              <option value="occupation">Род деятельности</option>
+            </select>
           </div>
           {(editData.stepType === 'text_input' || editData.stepType === 'subscription_check') && (
             <div className="anketa-field-row">
