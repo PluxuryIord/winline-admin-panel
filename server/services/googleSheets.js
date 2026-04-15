@@ -21,94 +21,64 @@ function getSheets() {
   }
 }
 
-const ANSWERS_SHEET_NAME = 'Ответы анкеты';
+const ANKETA_HEADERS = ['Дата', 'User ID', 'ФИО', 'Username', 'Роль', 'Компания', 'Категория трафика', 'Должность', 'Род деятельности'];
 
 /**
- * Create a new sheet (tab) for updated questions.
- * 1. Renames existing "Ответы анкеты" → "Ответы DD.MM.YYYY" (archive)
- * 2. Creates fresh "Ответы анкеты" with new question headers
- * Bot always writes to "Ответы анкеты" — no bot changes needed.
- * @param {string[]} questions - list of question texts
- * @returns {string|null} sheet title or null on failure
+ * Create a new sheet tab named with today's date (e.g. "15.04.2026").
+ * Returns the sheet title. Panel saves it to DB, bot reads from DB.
  */
-export async function createSheetForQuestions(questions) {
+export async function createAnketaSheet() {
   const sheets = getSheets();
-  if (!sheets) {
-    console.log('[googleSheets] Not configured, skipping sheet creation');
-    return null;
-  }
+  if (!sheets) return null;
 
   const now = new Date();
   const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
 
   try {
+    // Check for duplicate title
     const { data } = await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SPREADSHEET_ID });
-    const existingSheets = data.sheets || [];
-    const existingTitles = existingSheets.map(s => s.properties.title);
-
-    // Step 1: Rename existing "Ответы анкеты" → "Ответы DD.MM.YYYY"
-    const answersSheet = existingSheets.find(s => s.properties.title === ANSWERS_SHEET_NAME);
-    if (answersSheet) {
-      let archiveTitle = `Ответы ${dateStr}`;
-      let suffix = 1;
-      while (existingTitles.includes(archiveTitle)) {
-        suffix++;
-        archiveTitle = `Ответы ${dateStr} (${suffix})`;
-      }
-
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: GOOGLE_SPREADSHEET_ID,
-        requestBody: {
-          requests: [{
-            updateSheetProperties: {
-              properties: {
-                sheetId: answersSheet.properties.sheetId,
-                title: archiveTitle,
-              },
-              fields: 'title',
-            },
-          }],
-        },
-      });
-      console.log(`[googleSheets] Archived "${ANSWERS_SHEET_NAME}" → "${archiveTitle}"`);
+    const existingTitles = (data.sheets || []).map(s => s.properties.title);
+    let title = dateStr;
+    let suffix = 1;
+    while (existingTitles.includes(title)) {
+      suffix++;
+      title = `${dateStr} (${suffix})`;
     }
 
-    // Step 2: Create new "Ответы анкеты" with updated headers
+    // Create sheet
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: GOOGLE_SPREADSHEET_ID,
-      requestBody: {
-        requests: [{
-          addSheet: {
-            properties: { title: ANSWERS_SHEET_NAME },
-          },
-        }],
-      },
+      requestBody: { requests: [{ addSheet: { properties: { title } } }] },
     });
 
     // Write header row
-    const headers = ['Дата', 'User ID', 'ФИО', 'Username', ...questions];
     await sheets.spreadsheets.values.update({
       spreadsheetId: GOOGLE_SPREADSHEET_ID,
-      range: `'${ANSWERS_SHEET_NAME}'!A1`,
+      range: `'${title}'!A1`,
       valueInputOption: 'RAW',
-      requestBody: { values: [headers] },
+      requestBody: { values: [ANKETA_HEADERS] },
     });
 
-    console.log(`[googleSheets] Created new "${ANSWERS_SHEET_NAME}" with ${questions.length} questions`);
-    return ANSWERS_SHEET_NAME;
+    // Bold header
+    const newData = await sheets.spreadsheets.get({ spreadsheetId: GOOGLE_SPREADSHEET_ID });
+    const newSheet = newData.data.sheets.find(s => s.properties.title === title);
+    if (newSheet) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: GOOGLE_SPREADSHEET_ID,
+        requestBody: { requests: [{ repeatCell: {
+          range: { sheetId: newSheet.properties.sheetId, startRowIndex: 0, endRowIndex: 1 },
+          cell: { userEnteredFormat: { textFormat: { bold: true } } },
+          fields: 'userEnteredFormat.textFormat.bold',
+        } }] },
+      });
+    }
+
+    console.log(`[googleSheets] Created anketa sheet "${title}"`);
+    return title;
   } catch (err) {
-    console.error('[googleSheets] Failed to create sheet:', err.message);
+    console.error('[googleSheets] Failed to create anketa sheet:', err.message);
     return null;
   }
-}
-
-/**
- * Create a new "Ответы анкеты" sheet with fixed anketa columns.
- * Archives old sheet as "Ответы DD.MM.YYYY".
- */
-export async function createAnketaSheet() {
-  const questionCols = ['Роль', 'Компания', 'Категория трафика', 'Должность', 'Род деятельности'];
-  return createSheetForQuestions(questionCols);
 }
 
 export function getSpreadsheetUrl() {

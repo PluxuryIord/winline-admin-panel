@@ -73,21 +73,24 @@ const TYPE_OPTIONS_SHORT = [
 // ─── Anketa Sheet Controls (for anketa_role) ────────────────────────────────
 function AnketaSheetControls() {
   const [spreadsheetUrl, setSpreadsheetUrl] = useState(FALLBACK_SHEET_URL);
+  const [activeSheet, setActiveSheet] = useState(null);
   const [creating, setCreating] = useState(false);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
     api.get('/api/events/spreadsheet-url').then(r => r.json()).then(d => { if (d.url) setSpreadsheetUrl(d.url); }).catch(() => {});
+    api.get('/api/scenarios/anketa-active-sheet').then(r => r.json()).then(d => { if (d.sheet) setActiveSheet(d.sheet); }).catch(() => {});
   }, []);
 
   const handleNewSheet = async () => {
-    if (!confirm('Создать новый лист? Текущий лист «Ответы анкеты» будет архивирован с сегодняшней датой.')) return;
+    if (!confirm('Создать новый лист с сегодняшней датой? Все новые ответы будут записываться туда.')) return;
     setCreating(true);
     setResult(null);
     try {
       const res = await api.post('/api/scenarios/new-anketa-sheet');
       const data = await res.json();
       if (data.ok) {
+        setActiveSheet(data.sheetTitle);
         setResult({ ok: true, title: data.sheetTitle });
       } else {
         setResult({ ok: false, error: data.error || 'Ошибка' });
@@ -102,9 +105,15 @@ function AnketaSheetControls() {
   return (
     <div className="sc-section anketa-sheet-section">
       <h3 className="sc-section-title"><ClipboardList size={16} /> Google Таблица</h3>
-      <p style={{ color: '#aaa', fontSize: '0.82rem', margin: '4px 0 12px' }}>
-        Ответы анкеты записываются на лист «Ответы анкеты»
-      </p>
+      {activeSheet ? (
+        <p style={{ color: '#aaa', fontSize: '0.82rem', margin: '4px 0 12px' }}>
+          Активный лист: <b style={{ color: '#81c784' }}>{activeSheet}</b>
+        </p>
+      ) : (
+        <p style={{ color: '#ef5350', fontSize: '0.82rem', margin: '4px 0 12px' }}>
+          ⚠️ Лист не создан — нажмите «Новый лист» чтобы начать сбор ответов
+        </p>
+      )}
       <div className="anketa-sheet-actions">
         <a href={spreadsheetUrl} target="_blank" rel="noopener noreferrer" className="anketa-sheet-link-btn">
           <ExternalLink size={14} /> Открыть таблицу
@@ -116,7 +125,7 @@ function AnketaSheetControls() {
       </div>
       {result && (
         <div className={`anketa-sheet-result ${result.ok ? 'success' : 'error'}`}>
-          {result.ok ? `✅ Создан новый лист «${result.title}»` : `❌ ${result.error}`}
+          {result.ok ? `✅ Создан лист «${result.title}»` : `❌ ${result.error}`}
         </div>
       )}
     </div>

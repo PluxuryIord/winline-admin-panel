@@ -587,14 +587,37 @@ router.post('/seed', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/scenarios/new-anketa-sheet — create new Google Sheet tab for anketa answers
+// POST /api/scenarios/new-anketa-sheet — create new Google Sheet tab named with today's date
 router.post('/new-anketa-sheet', async (req, res, next) => {
   try {
     const { createAnketaSheet } = await import('../services/googleSheets.js');
     const sheetTitle = await createAnketaSheet();
     if (!sheetTitle) return res.status(500).json({ error: 'Google Sheets не настроен или ошибка' });
+
+    // Save active sheet name to settings so the bot knows where to write
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'event_settings' LIMIT 1");
+    if (rows.length) {
+      const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+      data.anketa_active_sheet = sheetTitle;
+      await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
+    } else {
+      await dbPool.query("INSERT INTO texts (category, data) VALUES ('event_settings', ?)", [JSON.stringify({ anketa_active_sheet: sheetTitle })]);
+    }
+
     res.json({ ok: true, sheetTitle });
   } catch (err) { next(err); }
+});
+
+// GET /api/scenarios/anketa-active-sheet — get current active sheet name
+router.get('/anketa-active-sheet', async (req, res) => {
+  try {
+    const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'event_settings' LIMIT 1");
+    if (rows.length) {
+      const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+      return res.json({ sheet: data.anketa_active_sheet || null });
+    }
+    res.json({ sheet: null });
+  } catch (e) { res.json({ sheet: null }); }
 });
 
 export default router;
