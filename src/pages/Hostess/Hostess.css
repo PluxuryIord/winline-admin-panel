@@ -2,7 +2,7 @@
 .hostess-page {
   min-height: 100vh;
   width: 100%;
-  background-color: #E56A00;
+  background-color: #111;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18,12 +18,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 56px;
+  margin-top: 40px;
   flex-shrink: 0;
 }
 
 .hostess-logo-img {
-  height: 110px;
+  height: 150px;
   width: auto;
   object-fit: contain;
 }
@@ -257,7 +257,7 @@
   }
 
   .hostess-logo-img {
-    height: 56px;
+    height: 80px;
   }
 
   /* Центральный блок — меньше отступы */
