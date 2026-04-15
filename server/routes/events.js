@@ -12,7 +12,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
 const QR_TEMPLATE_PATH = path.join(ASSETS_DIR, 'qr-template.jpg');
-const FONT_PATH = path.join(ASSETS_DIR, 'tt-bluescreens-bold.otf');
+const FONT_PATH = path.join(ASSETS_DIR, 'pfdintextcomppro-bold.ttf');
+
+// Preload font as base64 for SVG embedding
+const FONT_BASE64 = fs.existsSync(FONT_PATH) ? fs.readFileSync(FONT_PATH).toString('base64') : '';
 
 const router = Router();
 
@@ -156,7 +159,7 @@ export async function qrHandler(req, res, next) {
       type: 'png',
       width: 400,
       margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
+      color: { dark: '#FF6A13', light: '#FFFFFF' },
       errorCorrectionLevel: 'M',
     });
     res.set('Content-Type', 'image/png');
@@ -207,7 +210,7 @@ export async function qrCardHandler(req, res, next) {
       type: 'image/png',
       width: QR_SIZE,
       margin: 2,
-      color: { dark: '#E8640A', light: '#00000000' },
+      color: { dark: '#FF6A13', light: '#00000000' },
       errorCorrectionLevel: 'H',
     });
     const qrBase64 = qrDataUrl.split(',')[1];
@@ -250,7 +253,10 @@ export async function qrCardHandler(req, res, next) {
 
       const svgText = Buffer.from(`
         <svg width="${CARD_W}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">
-          <text x="50%" y="${fontSize + 4}" font-family="TTBluescreens-Bold, TTBluescreens, Arial, sans-serif" font-size="${fontSize}"
+          <defs><style>
+            @font-face { font-family: 'PFDinTextCompPro'; src: url('data:font/truetype;base64,${FONT_BASE64}') format('truetype'); font-weight: bold; }
+          </style></defs>
+          <text x="50%" y="${fontSize + 4}" font-family="PFDinTextCompPro, Arial, sans-serif" font-size="${fontSize}"
             font-weight="bold" fill="#FFFFFF" text-anchor="middle">${tspans}</text>
         </svg>
       `);
