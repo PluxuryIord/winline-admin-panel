@@ -56,15 +56,15 @@ const DEFAULT_POSITIONS = {
   event_flow:        { x: 900, y: 350 },
   event_anketa:      { x: 1300, y: 60 },
 
-  // Сценарий 5: Анкета мероприятия
-  anketa_role:              { x: 1700, y: 60 },
-  anketa_traffic_company:   { x: 1400, y: 350 },
-  anketa_traffic_category:  { x: 1400, y: 650 },
-  anketa_adv_company:       { x: 1700, y: 350 },
-  anketa_adv_position:      { x: 1700, y: 650 },
-  anketa_other_occupation:  { x: 2000, y: 350 },
-  anketa_sub_check:         { x: 1700, y: 950 },
-  anketa_final:             { x: 1700, y: 1250 },
+  // Сценарий 5: Анкета мероприятия (левее основных блоков)
+  anketa_role:              { x: -900, y: 60 },
+  anketa_traffic_company:   { x: -1200, y: 350 },
+  anketa_traffic_category:  { x: -1200, y: 650 },
+  anketa_adv_company:       { x: -900, y: 350 },
+  anketa_adv_position:      { x: -900, y: 650 },
+  anketa_other_occupation:  { x: -600, y: 350 },
+  anketa_sub_check:         { x: -900, y: 950 },
+  anketa_final:             { x: -900, y: 1250 },
 
   // Выход
   logout_screen:     { x: 1300, y: 350 },
@@ -93,6 +93,18 @@ function migrateData(data) {
         x: pos.x,
         y: pos.y,
       };
+      changed = true;
+    }
+  }
+
+  // One-time migration: move anketa blocks to the left if they're overlapping main blocks
+  const ANKETA_IDS = new Set(['anketa_role','anketa_traffic_company','anketa_traffic_category',
+    'anketa_adv_company','anketa_adv_position','anketa_other_occupation','anketa_sub_check','anketa_final']);
+  for (const aId of ANKETA_IDS) {
+    if (data.screens[aId] && data.screens[aId].x >= 1300) {
+      const pos = DEFAULT_POSITIONS[aId] || { x: -900, y: 60 };
+      data.screens[aId].x = pos.x;
+      data.screens[aId].y = pos.y;
       changed = true;
     }
   }
