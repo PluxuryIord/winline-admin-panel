@@ -14,6 +14,7 @@ export default function Raffle() {
   const [tagging, setTagging] = useState(false);
   const [tagResult, setTagResult] = useState(null);
   const [reelNames, setReelNames] = useState([]); // for animation
+  const [drawError, setDrawError] = useState(null);
   const animTimerRef = useRef(null);
 
   // Load eligible users
@@ -49,6 +50,7 @@ export default function Raffle() {
     setDrawing(true);
     setWinners([]);
     setTagResult(null);
+    setDrawError(null);
 
     // Start spinning animation with random names from eligible pool
     if (animTimerRef.current) clearInterval(animTimerRef.current);
@@ -63,25 +65,39 @@ export default function Raffle() {
 
     try {
       // Wait at least 2.2s for the animation effect
-      const [data] = await Promise.all([
+      const [res] = await Promise.all([
         api.post('/api/raffles/draw', {
           count: n,
           excludeUserIds: previousWinners.map(w => w.user_id),
-        }).then(r => r.json()),
+        }),
         new Promise(resolve => setTimeout(resolve, 2200)),
       ]);
 
       clearInterval(animTimerRef.current);
       animTimerRef.current = null;
 
-      const drawn = data.winners || [];
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDrawError(data.error || `HTTP ${res.status}`);
+        setReelNames([]);
+        return;
+      }
+
+      const drawn = Array.isArray(data.winners) ? data.winners : [];
+      if (drawn.length === 0) {
+        setDrawError('Сервер не вернул победителей. Возможно, пул пустой.');
+        setReelNames([]);
+        return;
+      }
+
       setWinners(drawn);
       setReelNames(drawn.map(userDisplayName));
       setPreviousWinners(prev => [...prev, ...drawn]);
     } catch (e) {
       clearInterval(animTimerRef.current);
       animTimerRef.current = null;
-      alert('Ошибка розыгрыша: ' + e.message);
+      setDrawError(e.message || 'Сетевая ошибка');
+      setReelNames([]);
     } finally {
       setDrawing(false);
     }
@@ -92,6 +108,7 @@ export default function Raffle() {
     setPreviousWinners([]);
     setReelNames([]);
     setTagResult(null);
+    setDrawError(null);
   };
 
   const handleAddTag = async () => {
@@ -186,6 +203,13 @@ export default function Raffle() {
           )}
         </div>
       </div>
+
+      {/* Error display */}
+      {drawError && !drawing && (
+        <div className="raffle-error">
+          <X size={18} /> {drawError}
+        </div>
+      )}
 
       {/* Reel display during animation */}
       {(drawing || reelNames.length > 0) && (
