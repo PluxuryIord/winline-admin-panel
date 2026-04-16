@@ -24,32 +24,39 @@ router.get('/eligible', async (req, res, next) => {
 // body: { count: number, excludeUserIds?: number[] }
 router.post('/draw', async (req, res, next) => {
   try {
-    const count = Math.max(1, parseInt(req.body?.count || 0, 10));
+    const count = Math.max(1, parseInt(req.body?.count, 10) || 1);
     const exclude = Array.isArray(req.body?.excludeUserIds)
       ? req.body.excludeUserIds.map(Number).filter(Boolean)
       : [];
 
-    let where = "c.code NOT LIKE 'TEST-%' AND c.user_id > 0";
+    // Subquery picks random user_ids first (compatible with ONLY_FULL_GROUP_BY).
+    let inner = `
+      SELECT user_id, MIN(code) AS code
+      FROM wl_event_codes
+      WHERE code NOT LIKE 'TEST-%' AND user_id > 0
+    `;
     const params = [];
     if (exclude.length) {
-      where += ' AND c.user_id NOT IN (?)';
+      inner += ' AND user_id NOT IN (?)';
       params.push(exclude);
     }
+    inner += ' GROUP BY user_id ORDER BY RAND() LIMIT ?';
+    params.push(count);
 
-    // Pick N random distinct users
-    const [rows] = await dbPool.query(
-      `SELECT c.user_id, c.code,
+    const sql = `
+      SELECT t.user_id, t.code,
         u.full_name, u.rl_full_name, u.username
-       FROM wl_event_codes c
-       LEFT JOIN users u ON u.user_id = c.user_id
-       WHERE ${where}
-       GROUP BY c.user_id
-       ORDER BY RAND()
-       LIMIT ?`,
-      [...params, count]
-    );
+      FROM (${inner}) t
+      LEFT JOIN users u ON u.user_id = t.user_id
+    `;
 
-    res.json({ winners: rows, requested: count, drawn: rows.length });
+    try {
+      const [rows] = await dbPool.query(sql, params);
+      return res.json({ winners: rows, requested: count, drawn: rows.length });
+    } catch (sqlErr) {
+      console.error('[raffles/draw] SQL error:', sqlErr.code, sqlErr.message);
+      return res.status(500).json({ error: `SQL: ${sqlErr.code || sqlErr.message}` });
+    }
   } catch (err) { next(err); }
 });
 
