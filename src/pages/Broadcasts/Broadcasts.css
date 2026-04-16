@@ -1030,7 +1030,18 @@ input[type="checkbox"]:checked {
 }
 
 .bc-poll-stats-modal {
-  max-width: 560px;
+  width: 720px;
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.bc-poll-stats-modal .bc-delivery-modal-header {
+  position: sticky;
+  top: 0;
+  background: var(--color-panel);
+  z-index: 2;
 }
 .bc-poll-stats-question {
   padding: 14px 18px 6px;
