@@ -3,39 +3,80 @@ import { Loader, Trophy, Users as UsersIcon, Tag, Sparkles, RefreshCw, Check, X 
 import { api } from '../../utils/api';
 import './Raffle.css';
 
-export default function Raffle() {
-  const [eligible, setEligible] = useState([]);
-  const [loadingEligible, setLoadingEligible] = useState(true);
-  const [winnerCount, setWinnerCount] = useState(1);
-  const [tagName, setTagName] = useState('Победитель');
+/**
+ * Raffle component — pick N random winners and bulk-tag them.
+ *
+ * Props (all optional):
+ *   users        — pre-loaded array of {user_id, full_name, username, ...}.
+ *                  When passed, no API fetch is performed.
+ *   loadUsers    — async () => Array of users. Used when `users` is not given
+ *                  to override the default `/api/raffles/eligible` fetch.
+ *   title        — header text (default: "Розыгрыш призов")
+ *   subtitle     — header subtitle
+ *   poolLabel    — label under the "total pool" stat card (default: "Получили QR код")
+ *   defaultTag   — initial value for the tag input (default: "Победитель")
+ *   compact      — when true, hides the page-style header (used when embedded in a modal)
+ */
+export default function Raffle({
+  users: usersProp,
+  loadUsers,
+  title = 'Розыгрыш призов',
+  subtitle = 'Выбор случайных победителей среди обладателей QR кодов',
+  poolLabel = 'Получили QR код',
+  defaultTag = 'Победитель',
+  compact = false,
+} = {}) {
+  const [eligible, setEligible] = useState(usersProp || []);
+  const [loadingEligible, setLoadingEligible] = useState(!usersProp);
+  const [winnerCount, setWinnerCount] = useState(Math.max(1, (usersProp || []).length));
+  const [tagName, setTagName] = useState(defaultTag);
   const [drawing, setDrawing] = useState(false);
   const [winners, setWinners] = useState([]);
-  const [previousWinners, setPreviousWinners] = useState([]); // exclude from re-draws in same session
+  const [previousWinners, setPreviousWinners] = useState([]);
   const [tagging, setTagging] = useState(false);
   const [tagResult, setTagResult] = useState(null);
-  const [reelNames, setReelNames] = useState([]); // for animation
+  const [reelNames, setReelNames] = useState([]);
   const [drawError, setDrawError] = useState(null);
   const animTimerRef = useRef(null);
 
-  // Load eligible users
-  const loadEligible = useCallback(async () => {
+  // When parent passes a new users array, replace the pool and reset transient state.
+  useEffect(() => {
+    if (usersProp) {
+      setEligible(usersProp);
+      setWinnerCount(Math.max(1, usersProp.length));
+      setLoadingEligible(false);
+      setWinners([]);
+      setPreviousWinners([]);
+      setReelNames([]);
+      setTagResult(null);
+      setDrawError(null);
+    }
+  }, [usersProp]);
+
+  // Load eligible users (only when no `users` prop is given)
+  const loadEligibleFn = useCallback(async () => {
+    if (usersProp) return;
     setLoadingEligible(true);
     try {
-      const res = await api.get('/api/raffles/eligible');
-      const data = await res.json();
-      const users = data.users || [];
-      setEligible(users);
-      setWinnerCount(Math.max(1, users.length));
+      let list;
+      if (loadUsers) {
+        list = await loadUsers();
+      } else {
+        const res = await api.get('/api/raffles/eligible');
+        const data = await res.json();
+        list = data.users || [];
+      }
+      setEligible(list);
+      setWinnerCount(Math.max(1, list.length));
     } catch (e) {
       console.error('Failed to load eligible users:', e);
     } finally {
       setLoadingEligible(false);
     }
-  }, []);
+  }, [usersProp, loadUsers]);
 
-  useEffect(() => { loadEligible(); }, [loadEligible]);
+  useEffect(() => { loadEligibleFn(); }, [loadEligibleFn]);
 
-  // Cleanup animation timer
   useEffect(() => {
     return () => { if (animTimerRef.current) clearInterval(animTimerRef.current); };
   }, []);
@@ -46,15 +87,16 @@ export default function Raffle() {
 
   const handleDraw = async () => {
     if (drawing) return;
-    const n = Math.max(1, Math.min(parseInt(winnerCount, 10) || 1, eligible.length));
-    if (eligible.length === 0) return;
+    const previousIds = new Set(previousWinners.map(w => w.user_id));
+    const pool = eligible.filter(u => !previousIds.has(u.user_id));
+    const n = Math.max(1, Math.min(parseInt(winnerCount, 10) || 1, pool.length));
+    if (pool.length === 0) return;
 
     setDrawing(true);
     setWinners([]);
     setTagResult(null);
     setDrawError(null);
 
-    // Start spinning animation with random names from eligible pool
     if (animTimerRef.current) clearInterval(animTimerRef.current);
     animTimerRef.current = setInterval(() => {
       const slots = [];
@@ -65,44 +107,23 @@ export default function Raffle() {
       setReelNames(slots);
     }, 80);
 
-    try {
-      // Wait at least 2.2s for the animation effect
-      const [res] = await Promise.all([
-        api.post('/api/raffles/draw', {
-          count: n,
-          excludeUserIds: previousWinners.map(w => w.user_id),
-        }),
-        new Promise(resolve => setTimeout(resolve, 2200)),
-      ]);
+    await new Promise(resolve => setTimeout(resolve, 2200));
 
-      clearInterval(animTimerRef.current);
-      animTimerRef.current = null;
+    clearInterval(animTimerRef.current);
+    animTimerRef.current = null;
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setDrawError(data.error || `HTTP ${res.status}`);
-        setReelNames([]);
-        return;
-      }
-
-      const drawn = Array.isArray(data.winners) ? data.winners : [];
-      if (drawn.length === 0) {
-        setDrawError('Сервер не вернул победителей. Возможно, пул пустой.');
-        setReelNames([]);
-        return;
-      }
-
-      setWinners(drawn);
-      setReelNames(drawn.map(userDisplayName));
-      setPreviousWinners(prev => [...prev, ...drawn]);
-    } catch (e) {
-      clearInterval(animTimerRef.current);
-      animTimerRef.current = null;
-      setDrawError(e.message || 'Сетевая ошибка');
-      setReelNames([]);
-    } finally {
-      setDrawing(false);
+    // Fisher-Yates shuffle, then take first N
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    const drawn = shuffled.slice(0, n);
+
+    setWinners(drawn);
+    setReelNames(drawn.map(userDisplayName));
+    setPreviousWinners(prev => [...prev, ...drawn]);
+    setDrawing(false);
   };
 
   const handleReset = () => {
@@ -143,19 +164,21 @@ export default function Raffle() {
 
   return (
     <div className="raffle-page">
-      <div className="raffle-header">
-        <div>
-          <h1><Trophy size={28} /> Розыгрыш призов</h1>
-          <p className="raffle-subtitle">Выбор случайных победителей среди обладателей QR кодов</p>
+      {!compact && (
+        <div className="raffle-header">
+          <div>
+            <h1><Trophy size={28} /> {title}</h1>
+            <p className="raffle-subtitle">{subtitle}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="raffle-stats">
         <div className="raffle-stat-card">
           <UsersIcon size={20} />
           <div>
             <div className="raffle-stat-value">{loadingEligible ? '—' : eligible.length}</div>
-            <div className="raffle-stat-label">Получили QR код</div>
+            <div className="raffle-stat-label">{poolLabel}</div>
           </div>
         </div>
         <div className="raffle-stat-card">
@@ -206,14 +229,12 @@ export default function Raffle() {
         </div>
       </div>
 
-      {/* Error display */}
       {drawError && !drawing && (
         <div className="raffle-error">
           <X size={18} /> {drawError}
         </div>
       )}
 
-      {/* Reel display during animation */}
       {(drawing || reelNames.length > 0) && (
         <div className="raffle-reel">
           <div className="raffle-reel-title">
@@ -230,7 +251,6 @@ export default function Raffle() {
         </div>
       )}
 
-      {/* Winner list with details */}
       {winners.length > 0 && !drawing && (
         <div className="raffle-winners">
           <div className="raffle-winners-header">
@@ -245,7 +265,7 @@ export default function Raffle() {
                   <div className="raffle-winner-meta">
                     {w.username && <span>@{w.username}</span>}
                     <span>ID: {w.user_id}</span>
-                    <span className="raffle-winner-code">{w.code}</span>
+                    {w.code && <span className="raffle-winner-code">{w.code}</span>}
                   </div>
                 </div>
                 <button className="raffle-winner-remove" onClick={() => removeWinner(w.user_id)} title="Убрать из списка">
@@ -287,7 +307,7 @@ export default function Raffle() {
       {!loadingEligible && eligible.length === 0 && (
         <div className="raffle-empty">
           <UsersIcon size={48} />
-          <p>Никто ещё не получил QR код мероприятия</p>
+          <p>Пул пустой — некого разыгрывать</p>
         </div>
       )}
     </div>

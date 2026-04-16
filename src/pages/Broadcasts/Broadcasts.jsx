@@ -10,6 +10,7 @@ import { sanitizeHtml } from '../../utils/sanitize.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import IosDatePicker from '../../components/UI/IosDatePicker';
+import Raffle from '../Raffle/Raffle.jsx';
 import './Broadcasts.css';
 
 /** Strip HTML for preview text */
@@ -2120,6 +2121,7 @@ export default function Broadcasts() {
   const [pollVotersLoading, setPollVotersLoading] = useState(false);
   const [randomWinner, setRandomWinner] = useState(null);
   const [spinning, setSpinning] = useState(false);
+  const [raffleOpen, setRaffleOpen] = useState(false);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -2146,6 +2148,7 @@ export default function Broadcasts() {
   const loadPollVoters = async (pollId, optionIndex, optionText) => {
     setPollVotersLoading(true);
     setRandomWinner(null);
+    setRaffleOpen(false);
     try {
       const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${optionIndex}`);
       if (!res.ok) throw new Error();
@@ -2158,6 +2161,7 @@ export default function Broadcasts() {
   const loadAllPollVoters = async (pollId, options) => {
     setPollVotersLoading(true);
     setRandomWinner(null);
+    setRaffleOpen(false);
     try {
       const all = [];
       for (let i = 0; i < options.length; i++) {
@@ -2505,11 +2509,11 @@ export default function Broadcasts() {
       )}
 
       {pollStatsModal && (
-        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); }}>
+        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); setRaffleOpen(false); }}>
           <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
             <div className="bc-delivery-modal-header">
               <h3>{pollStatsModal.type === 'quiz' ? 'Викторина' : 'Опрос'}</h3>
-              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); }}><X size={18} /></button>
+              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); setRaffleOpen(false); }}><X size={18} /></button>
             </div>
             <div className="bc-poll-stats-question">{pollStatsModal.question}</div>
             <div className="bc-poll-stats-total">
@@ -2570,11 +2574,35 @@ export default function Broadcasts() {
                         </div>
                       ))}
                     </div>
-                    <button className={`bc-poll-random-btn${spinning ? ' bc-poll-random-btn--spin' : ''}`} onClick={pickRandomVoter} disabled={spinning}>
-                      {spinning ? 'Выбираем...' : randomWinner && !spinning ? `Победитель: ${randomWinner.fullName || randomWinner.username || 'ID: ' + randomWinner.userId}` : 'Случайный победитель'}
-                    </button>
+                    <div className="bc-poll-actions-row">
+                      <button className={`bc-poll-random-btn${spinning ? ' bc-poll-random-btn--spin' : ''}`} onClick={pickRandomVoter} disabled={spinning}>
+                        {spinning ? 'Выбираем...' : randomWinner && !spinning ? `Победитель: ${randomWinner.fullName || randomWinner.username || 'ID: ' + randomWinner.userId}` : 'Случайный победитель'}
+                      </button>
+                      <button
+                        className={`bc-poll-raffle-btn${raffleOpen ? ' bc-poll-raffle-btn--active' : ''}`}
+                        onClick={() => setRaffleOpen(o => !o)}
+                      >
+                        <Tag size={14} /> {raffleOpen ? 'Скрыть розыгрыш' : 'Розыгрыш с тегом'}
+                      </button>
+                    </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Full raffle UI inside the modal */}
+            {raffleOpen && pollVoters && pollVoters.voters.length > 0 && (
+              <div className="bc-poll-raffle-wrap">
+                <Raffle
+                  compact
+                  poolLabel={pollVoters.optionIndex === 'all' ? 'Голосовавшие' : `Выбрали «${pollVoters.optionText}»`}
+                  defaultTag={pollStatsModal.type === 'quiz' ? 'Викторина-победитель' : 'Опрос-победитель'}
+                  users={pollVoters.voters.map(v => ({
+                    user_id: v.userId,
+                    full_name: v.fullName,
+                    username: v.username,
+                  }))}
+                />
               </div>
             )}
           </div>
