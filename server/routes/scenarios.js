@@ -590,7 +590,9 @@ router.post('/seed', async (req, res, next) => {
 // POST /api/scenarios/new-anketa-sheet — create new Google Sheet tab named with today's date
 router.post('/new-anketa-sheet', async (req, res, next) => {
   try {
-    // Collect answerKey columns from scenario:5 screens
+    // Collect anketa columns from scenario:5 screens.
+    // Google Sheet shows `title` (human-readable Russian), bot uses `answerKey` internally.
+    // Column order is deterministic so bot can map answerKey → column by index.
     const [scRows] = await dbPool.query("SELECT data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
     const answerColumns = [];
     if (scRows.length) {
@@ -602,7 +604,7 @@ router.post('/new-anketa-sheet', async (req, res, next) => {
       for (const s of anketaScreens) {
         if (!seen.has(s.answerKey)) {
           seen.add(s.answerKey);
-          answerColumns.push(s.answerKey);
+          answerColumns.push({ key: s.answerKey, label: s.title || s.answerKey });
         }
       }
     }

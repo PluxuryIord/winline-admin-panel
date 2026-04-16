@@ -25,11 +25,17 @@ const ANKETA_BASE_HEADERS = ['Дата', 'User ID', 'ФИО', 'Username'];
 
 /**
  * Create a new sheet tab named with today's date (e.g. "15.04.2026").
- * @param {string[]} answerColumns - column names from answerKey fields of anketa screens
+ * @param {Array<{key:string,label:string}>|string[]} answerColumns
+ *   - Preferred: array of {key, label} — header row shows `label` (Russian title),
+ *     bot maps answerKey → column by ORDER, reading same scenario:5 list from DB.
+ *   - Legacy: plain string[] — used directly as headers (backward compat).
  * Returns the sheet title. Panel saves it to DB, bot reads from DB.
  */
 export async function createAnketaSheet(answerColumns = []) {
-  const ANKETA_HEADERS = [...ANKETA_BASE_HEADERS, ...answerColumns];
+  const headerLabels = answerColumns.map(c =>
+    typeof c === 'string' ? c : (c?.label || c?.key || '')
+  );
+  const ANKETA_HEADERS = [...ANKETA_BASE_HEADERS, ...headerLabels];
   const sheets = getSheets();
   if (!sheets) return null;
 
