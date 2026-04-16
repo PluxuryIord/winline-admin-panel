@@ -6,6 +6,7 @@ import {
   ToggleLeft, ToggleRight, Upload, ImageIcon,
 } from 'lucide-react';
 import { api } from '../../utils/api';
+import Raffle from '../Raffle/Raffle.jsx';
 import './EventWork.css';
 
 const PAGE_SIZE = 30;
@@ -582,6 +583,8 @@ export default function EventWork() {
 
       <StatsBar />
       <CodesSection />
+
+      <Raffle />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
