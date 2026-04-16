@@ -143,6 +143,8 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/bot/status', statusRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/events', eventsRouter);
+import rafflesRouter from './routes/raffles.js';
+app.use('/api/raffles', rafflesRouter);
 import scenariosRouter from './routes/scenarios.js';
 app.use('/api/scenarios', scenariosRouter);
 import emojisRouter from './routes/emojis.js';
