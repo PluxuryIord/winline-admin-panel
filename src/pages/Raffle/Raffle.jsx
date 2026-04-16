@@ -6,7 +6,7 @@ import './Raffle.css';
 export default function Raffle() {
   const [eligible, setEligible] = useState([]);
   const [loadingEligible, setLoadingEligible] = useState(true);
-  const [winnerCount, setWinnerCount] = useState(10);
+  const [winnerCount, setWinnerCount] = useState(1);
   const [tagName, setTagName] = useState('Победитель');
   const [drawing, setDrawing] = useState(false);
   const [winners, setWinners] = useState([]);
@@ -23,7 +23,9 @@ export default function Raffle() {
     try {
       const res = await api.get('/api/raffles/eligible');
       const data = await res.json();
-      setEligible(data.users || []);
+      const users = data.users || [];
+      setEligible(users);
+      setWinnerCount(Math.max(1, users.length));
     } catch (e) {
       console.error('Failed to load eligible users:', e);
     } finally {
