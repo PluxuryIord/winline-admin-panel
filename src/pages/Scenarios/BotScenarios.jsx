@@ -8,7 +8,7 @@ import './BotScenarios.css';
 // System screens that cannot be deleted
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
-  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'event_anketa', 'logout_screen',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
 ]);
 
 // ─── Callback → Screen mapping (for auto-migration) ────────────────────────
@@ -21,7 +21,7 @@ const CALLBACK_TO_SCREEN = {
   client_promo: 'promo_page',
   client_socials: 'socials_page',
   client_at_event: 'event_flow',
-  client_event_anketa: 'event_anketa',
+  client_event_anketa: 'anketa_role',
   client_logout: 'logout_screen',
 };
 
@@ -35,7 +35,6 @@ const SCREEN_TO_CALLBACK = {
   promo_page: 'client_promo',
   socials_page: 'client_socials',
   event_flow: 'client_at_event',
-  event_anketa: 'client_event_anketa',
   logout_screen: 'client_logout',
 };
 
@@ -54,7 +53,6 @@ const DEFAULT_POSITIONS = {
 
   // Сценарий 3: Мероприятие
   event_flow:        { x: 900, y: 350 },
-  event_anketa:      { x: 1300, y: 60 },
 
   // Сценарий 5: Анкета мероприятия (левее основных блоков)
   anketa_role:              { x: -900, y: 60 },
@@ -102,6 +100,22 @@ function migrateData(data) {
     if (!SYSTEM_SCREENS.has(id) && !id.startsWith('anketa_') && scr.title?.toLowerCase() === 'test') {
       delete data.screens[id];
       changed = true;
+    }
+  }
+
+  // One-time cleanup: remove deprecated event_anketa block and rewire pointers to anketa_role
+  if (data.screens.event_anketa) {
+    delete data.screens.event_anketa;
+    changed = true;
+  }
+  for (const scr of Object.values(data.screens)) {
+    const order = scr.buttons?._order || [];
+    for (const btnKey of order) {
+      const btn = scr.buttons[btnKey];
+      if (btn?.targetScreen === 'event_anketa') {
+        btn.targetScreen = 'anketa_role';
+        changed = true;
+      }
     }
   }
 

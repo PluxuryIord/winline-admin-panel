@@ -5,7 +5,7 @@ import { sanitizeHtml } from '../../utils/sanitize.js';
 const SCREEN_ICONS = {
   start_menu: '👋', registration_flow: '📝', auth_flow: '🔐',
   main_menu: '🏠', offer_page: '📋', promo_page: '🎨',
-  socials_page: '📱', event_flow: '🎪', event_anketa: '📋', logout_screen: '🚪',
+  socials_page: '📱', event_flow: '🎪', logout_screen: '🚪',
   group_menu: '💬', group_promo: '📢', group_calendar: '📅',
   group_landings: '🌐', group_kb: '📚',
 };
@@ -13,7 +13,7 @@ const SCREEN_ICONS = {
 // System screens that cannot be deleted
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
-  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'event_anketa', 'logout_screen',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
 ]);
 
 // Convert Telegram HTML to safe preview HTML
