@@ -990,11 +990,15 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   // Channel tags
   const [allChannelTags, setAllChannelTags] = useState([]);
   const [filterChannelTags, setFilterChannelTags] = useState([]);
+  const [excludeChannelTags, setExcludeChannelTags] = useState([]);
   const [channelTagsMap, setChannelTagsMap] = useState({});
   const [showChTagDD, setShowChTagDD] = useState(false);
+  const [showChExcludeDD, setShowChExcludeDD] = useState(false);
   const [chTagSearch, setChTagSearch] = useState('');
+  const [chExcludeSearch, setChExcludeSearch] = useState('');
   const [chListSearch, setChListSearch] = useState('');
   const chTagRef = useRef(null);
+  const chExcludeRef = useRef(null);
 
   const loadAllChannelTags = useCallback(() => {
     api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllChannelTags).catch(() => {});
@@ -1025,7 +1029,10 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => { loadChannels(); loadAllChannelTags(); }, [loadChannels, loadAllChannelTags]);
 
   useEffect(() => {
-    const handler = (e) => { if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false); };
+    const handler = (e) => {
+      if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false);
+      if (chExcludeRef.current && !chExcludeRef.current.contains(e.target)) setShowChExcludeDD(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -1072,11 +1079,18 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   const toggleChFilterTag = (tag) => {
     setFilterChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludeChannelTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const toggleChExcludeTag = (tag) => {
+    setExcludeChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setFilterChannelTags(prev => prev.filter(t => t !== tag));
   };
 
   const filteredChannels = channels.filter(ch => {
     if (activeFolderId !== null && (folderMap[ch.chatId] || null) !== activeFolderId) return false;
     if (filterChannelTags.length > 0 && !(channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t))) return false;
+    if (excludeChannelTags.length > 0 && (channelTagsMap[ch.chatId] || []).some(t => excludeChannelTags.includes(t))) return false;
     if (chListSearch.trim()) {
       const q = chListSearch.trim().toLowerCase();
       const titleMatch = ch.title?.toLowerCase().includes(q);
@@ -1127,41 +1141,78 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <h3 className="bc-section-title">Каналы</h3>
           <div className="bc-header-actions">
             {allChannelTags.length > 0 && (
-              <div className="bc-tag-filter" ref={chTagRef}>
-                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
-                  <Tag size={13} />
-                  <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
-                  <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
-                </button>
-                {showChTagDD && (
-                  <div className="bc-tag-dropdown">
-                    <div className="bc-tag-search-wrap">
-                      <Search size={12} className="bc-tag-search-icon" />
-                      <input
-                        className="bc-tag-search-input"
-                        type="text"
-                        placeholder="Поиск..."
-                        value={chTagSearch}
-                        onChange={e => setChTagSearch(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-                    <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
-                        Все теги
+              <>
+                <div className="bc-tag-filter" ref={chTagRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
+                    <Tag size={13} />
+                    <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
+                  </button>
+                  {showChTagDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={chTagSearch}
+                          onChange={e => setChTagSearch(e.target.value)}
+                          autoFocus
+                        />
                       </div>
-                      {allChannelTags
-                        .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
-                        .map(t => (
-                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleChFilterTag(t); }}>
-                            <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                            <span>{t}</span>
-                          </label>
-                        ))}
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
+                          Все теги
+                        </div>
+                        {allChannelTags
+                          .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''} ${excludeChannelTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludeChannelTags.includes(t)) toggleChFilterTag(t); }}>
+                              <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{excludeChannelTags.includes(t) ? ' (исключён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+                <div className="bc-tag-filter bc-tag-filter--exclude" ref={chExcludeRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small bc-tag-filter-btn--exclude" onClick={() => setShowChExcludeDD(!showChExcludeDD)}>
+                    <X size={13} />
+                    <span>{excludeChannelTags.length === 0 ? 'Исключить' : `Исключено: ${excludeChannelTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showChExcludeDD ? 'open' : ''}`} />
+                  </button>
+                  {showChExcludeDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={chExcludeSearch}
+                          onChange={e => setChExcludeSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${excludeChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setExcludeChannelTags([]); setChExcludeSearch(''); }}>
+                          Сбросить
+                        </div>
+                        {allChannelTags
+                          .filter(t => !chExcludeSearch.trim() || t.toLowerCase().includes(chExcludeSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludeChannelTags.includes(t) ? 'active' : ''} ${filterChannelTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!filterChannelTags.includes(t)) toggleChExcludeTag(t); }}>
+                              <input type="checkbox" checked={excludeChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{filterChannelTags.includes(t) ? ' (включён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
@@ -1170,15 +1221,21 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         </div>
 
-        {filterChannelTags.length > 0 && (
+        {(filterChannelTags.length > 0 || excludeChannelTags.length > 0) && (
           <div className="bc-selected-tags">
             {filterChannelTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => setFilterChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setFilterChannelTags([])}>Сбросить</button>
+            {excludeChannelTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => setExcludeChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setFilterChannelTags([]); setExcludeChannelTags([]); }}>Сбросить</button>
           </div>
         )}
 
@@ -1221,7 +1278,7 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
-              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : activeFolderId !== null ? `Каналы в папке (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
+              <span>{(filterChannelTags.length > 0 || excludeChannelTags.length > 0) ? `Каналы по тегам (${filteredChannels.length})` : activeFolderId !== null ? `Каналы в папке (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
             {filteredChannels.map(ch => (
               <div key={ch.id} className="bc-list-item bc-list-item--with-menu">
@@ -1313,6 +1370,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   // Фильтры
   const [tags, setTags] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [excludedTags, setExcludedTags] = useState([]);
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
@@ -1321,29 +1379,40 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
   }, []);
 
-  // Подсчёт по фильтрам — только когда выбраны теги
+  // Подсчёт по фильтрам — когда выбраны теги (включая или исключая)
   useEffect(() => {
-    if (selectedTags.length === 0) {
+    if (selectedTags.length === 0 && excludedTags.length === 0) {
       setUserCount(0);
       return;
     }
     setCountLoading(true);
     const params = new URLSearchParams();
-    params.set('tags', selectedTags.join(','));
+    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
 
     api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [selectedTags]);
+  }, [selectedTags, excludedTags]);
 
   const toggleTag = (tag) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const toggleExcludeTag = (tag) => {
+    setExcludedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setSelectedTags(prev => prev.filter(t => t !== tag));
   };
 
   const removeTag = (tag) => {
     setSelectedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const removeExcludedTag = (tag) => {
+    setExcludedTags(prev => prev.filter(t => t !== tag));
   };
 
   const handleSend = async (composeBody, resetCompose) => {
@@ -1352,6 +1421,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     try {
       const filters = {};
       if (selectedTags.length > 0) filters.tags = selectedTags;
+      if (excludedTags.length > 0) filters.excludeTags = excludedTags;
 
       const body = { filters, ...composeBody };
 
@@ -1374,6 +1444,9 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [tagSearch, setTagSearch] = useState('');
   const tagRef = useRef(null);
   const tagSearchRef = useRef(null);
+  const [showExcludeDD, setShowExcludeDD] = useState(false);
+  const [excludeSearch, setExcludeSearch] = useState('');
+  const excludeRef = useRef(null);
 
   // Recipients list
   const [showRecipients, setShowRecipients] = useState(false);
@@ -1388,6 +1461,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const fetchRecipients = async (offset = 0) => {
     const params = new URLSearchParams();
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
     params.set('limit', RECIPIENTS_PAGE);
     params.set('offset', offset);
     const res = await api.get(`/api/broadcasts/users/list?${params}`);
@@ -1428,6 +1502,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => {
     const handler = (e) => {
       if (tagRef.current && !tagRef.current.contains(e.target)) setShowTagDD(false);
+      if (excludeRef.current && !excludeRef.current.contains(e.target)) setShowExcludeDD(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1439,7 +1514,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         <div className="bc-tag-filter" ref={tagRef}>
           <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
             <Tag size={14} />
-            <span>{selectedTags.length === 0 ? 'Выберите теги' : `Тегов: ${selectedTags.length}`}</span>
+            <span>{selectedTags.length === 0 ? 'Включить теги' : `Включено: ${selectedTags.length}`}</span>
             <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
           </button>
           {showTagDD && (
@@ -1467,9 +1542,9 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 {tags
                   .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
                   .map(t => (
-                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleTag(t); }}>
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''} ${excludedTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludedTags.includes(t)) toggleTag(t); }}>
                       <input type="checkbox" checked={selectedTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                      <span>{t}</span>
+                      <span>{t}{excludedTags.includes(t) ? ' (исключён)' : ''}</span>
                     </label>
                   ))}
                 {tagSearch.trim() && tags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).length === 0 && (
@@ -1480,15 +1555,64 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           )}
         </div>
 
-        {selectedTags.length > 0 && (
+        <div className="bc-tag-filter bc-tag-filter--exclude" ref={excludeRef}>
+          <button className="bc-tag-filter-btn bc-tag-filter-btn--exclude" onClick={() => setShowExcludeDD(!showExcludeDD)}>
+            <X size={14} />
+            <span>{excludedTags.length === 0 ? 'Исключить теги' : `Исключено: ${excludedTags.length}`}</span>
+            <ChevronDown size={14} className={`bc-tag-chevron ${showExcludeDD ? 'open' : ''}`} />
+          </button>
+          {showExcludeDD && (
+            <div className="bc-tag-dropdown">
+              {tags.length > 5 && (
+                <div className="bc-tag-search-wrap">
+                  <Search size={13} className="bc-tag-search-icon" />
+                  <input
+                    className="bc-tag-search-input"
+                    type="text"
+                    placeholder="Поиск тега..."
+                    value={excludeSearch}
+                    onChange={e => setExcludeSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div className="bc-tag-options-list">
+                {(!excludeSearch.trim()) && (
+                  <div className="bc-tag-option" onClick={() => { setExcludedTags([]); setExcludeSearch(''); }}>
+                    Сбросить все
+                  </div>
+                )}
+                {tags
+                  .filter(t => !excludeSearch.trim() || t.toLowerCase().includes(excludeSearch.trim().toLowerCase()))
+                  .map(t => (
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludedTags.includes(t) ? 'active' : ''} ${selectedTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!selectedTags.includes(t)) toggleExcludeTag(t); }}>
+                      <input type="checkbox" checked={excludedTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                      <span>{t}{selectedTags.includes(t) ? ' (включён)' : ''}</span>
+                    </label>
+                  ))}
+                {excludeSearch.trim() && tags.filter(t => t.toLowerCase().includes(excludeSearch.trim().toLowerCase())).length === 0 && (
+                  <div className="bc-tag-option bc-tag-option--empty">Ничего не найдено</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {(selectedTags.length > 0 || excludedTags.length > 0) && (
           <div className="bc-selected-tags">
             {selectedTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => removeTag(t)}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setSelectedTags([])}>Сбросить</button>
+            {excludedTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => removeExcludedTag(t)}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setSelectedTags([]); setExcludedTags([]); }}>Сбросить</button>
           </div>
         )}
 
@@ -1533,13 +1657,24 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
       <ComposeBlock
         title="Рассылка пользователям бота"
-        hintText={selectedTags.length === 0 ? 'Выберите хотя бы один тег' : userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
-        canSend={userCount > 0 && selectedTags.length > 0}
+        hintText={
+          selectedTags.length === 0 && excludedTags.length === 0
+            ? 'Выберите хотя бы один тег для включения или исключения'
+            : userCount != null && userCount > 0
+              ? `Будет отправлено ${userCount} пользователям`
+              : 'Нет пользователей по фильтрам'
+        }
+        canSend={userCount > 0 && (selectedTags.length > 0 || excludedTags.length > 0)}
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
         targetType="users"
-        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters: selectedTags.length > 0 ? { tags: selectedTags } : {} } }, resetCb)}
+        onSaveDraft={(body, resetCb) => {
+          const filters = {};
+          if (selectedTags.length > 0) filters.tags = selectedTags;
+          if (excludedTags.length > 0) filters.excludeTags = excludedTags;
+          onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters } }, resetCb);
+        }}
         savingDraft={savingDraft}
         initialDraft={initialDraft}
       />
@@ -1606,11 +1741,15 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   // Group tags (separate table from channels)
   const [allGroupTags, setAllGroupTags] = useState([]);
   const [filterGroupTags, setFilterGroupTags] = useState([]);
+  const [excludeGroupTags, setExcludeGroupTags] = useState([]);
   const [groupTagsMap, setGroupTagsMap] = useState({});
   const [showGrTagDD, setShowGrTagDD] = useState(false);
+  const [showGrExcludeDD, setShowGrExcludeDD] = useState(false);
   const [grTagSearch, setGrTagSearch] = useState('');
+  const [grExcludeSearch, setGrExcludeSearch] = useState('');
   const [grListSearch, setGrListSearch] = useState('');
   const grTagRef = useRef(null);
+  const grExcludeRef = useRef(null);
 
   const loadAllGroupTags = useCallback(() => {
     api.get('/api/broadcasts/group-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
@@ -1641,7 +1780,10 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => { loadGroups(); loadAllGroupTags(); }, [loadGroups, loadAllGroupTags]);
 
   useEffect(() => {
-    const handler = (e) => { if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false); };
+    const handler = (e) => {
+      if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false);
+      if (grExcludeRef.current && !grExcludeRef.current.contains(e.target)) setShowGrExcludeDD(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -1695,11 +1837,18 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   const toggleGrFilterTag = (tag) => {
     setFilterGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludeGroupTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const toggleGrExcludeTag = (tag) => {
+    setExcludeGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setFilterGroupTags(prev => prev.filter(t => t !== tag));
   };
 
   const filteredGroups = groups.filter(g => {
     if (grActiveFolderId !== null && (grFolderMap[g.chatId] || null) !== grActiveFolderId) return false;
     if (filterGroupTags.length > 0 && !(groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t))) return false;
+    if (excludeGroupTags.length > 0 && (groupTagsMap[g.chatId] || []).some(t => excludeGroupTags.includes(t))) return false;
     if (grListSearch.trim()) {
       const q = grListSearch.trim().toLowerCase();
       const titleMatch = g.title?.toLowerCase().includes(q);
@@ -1750,41 +1899,78 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <h3 className="bc-section-title">Группы / чаты</h3>
           <div className="bc-header-actions">
             {allGroupTags.length > 0 && (
-              <div className="bc-tag-filter" ref={grTagRef}>
-                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
-                  <Tag size={13} />
-                  <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
-                  <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
-                </button>
-                {showGrTagDD && (
-                  <div className="bc-tag-dropdown">
-                    <div className="bc-tag-search-wrap">
-                      <Search size={12} className="bc-tag-search-icon" />
-                      <input
-                        className="bc-tag-search-input"
-                        type="text"
-                        placeholder="Поиск..."
-                        value={grTagSearch}
-                        onChange={e => setGrTagSearch(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-                    <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
-                        Все теги
+              <>
+                <div className="bc-tag-filter" ref={grTagRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
+                    <Tag size={13} />
+                    <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
+                  </button>
+                  {showGrTagDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={grTagSearch}
+                          onChange={e => setGrTagSearch(e.target.value)}
+                          autoFocus
+                        />
                       </div>
-                      {allGroupTags
-                        .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
-                        .map(t => (
-                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleGrFilterTag(t); }}>
-                            <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                            <span>{t}</span>
-                          </label>
-                        ))}
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
+                          Все теги
+                        </div>
+                        {allGroupTags
+                          .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''} ${excludeGroupTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludeGroupTags.includes(t)) toggleGrFilterTag(t); }}>
+                              <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{excludeGroupTags.includes(t) ? ' (исключён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+                <div className="bc-tag-filter bc-tag-filter--exclude" ref={grExcludeRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small bc-tag-filter-btn--exclude" onClick={() => setShowGrExcludeDD(!showGrExcludeDD)}>
+                    <X size={13} />
+                    <span>{excludeGroupTags.length === 0 ? 'Исключить' : `Исключено: ${excludeGroupTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showGrExcludeDD ? 'open' : ''}`} />
+                  </button>
+                  {showGrExcludeDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={grExcludeSearch}
+                          onChange={e => setGrExcludeSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${excludeGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setExcludeGroupTags([]); setGrExcludeSearch(''); }}>
+                          Сбросить
+                        </div>
+                        {allGroupTags
+                          .filter(t => !grExcludeSearch.trim() || t.toLowerCase().includes(grExcludeSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludeGroupTags.includes(t) ? 'active' : ''} ${filterGroupTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!filterGroupTags.includes(t)) toggleGrExcludeTag(t); }}>
+                              <input type="checkbox" checked={excludeGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{filterGroupTags.includes(t) ? ' (включён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
@@ -1793,15 +1979,21 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           </div>
         </div>
 
-        {filterGroupTags.length > 0 && (
+        {(filterGroupTags.length > 0 || excludeGroupTags.length > 0) && (
           <div className="bc-selected-tags">
             {filterGroupTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => setFilterGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setFilterGroupTags([])}>Сбросить</button>
+            {excludeGroupTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => setExcludeGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setFilterGroupTags([]); setExcludeGroupTags([]); }}>Сбросить</button>
           </div>
         )}
 
@@ -1843,7 +2035,7 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
             )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
-              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : grActiveFolderId !== null ? `Группы в папке (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
+              <span>{(filterGroupTags.length > 0 || excludeGroupTags.length > 0) ? `Группы по тегам (${filteredGroups.length})` : grActiveFolderId !== null ? `Группы в папке (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
             {filteredGroups.map(g => (
               <div key={g.id} className="bc-list-item bc-list-item--with-menu">

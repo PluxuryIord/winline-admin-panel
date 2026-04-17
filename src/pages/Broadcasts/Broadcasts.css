@@ -2099,6 +2099,22 @@ input[type="checkbox"]:checked {
   line-height: 1.3;
 }
 
+.bc-selected-tag-chip--exclude {
+  background: rgba(229, 72, 77, 0.15);
+  color: #ff7b7b;
+}
+
+.bc-tag-filter-btn--exclude {
+  border-color: rgba(229, 72, 77, 0.35);
+  color: #ff9d9d;
+}
+
+.bc-tag-option--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .bc-chip-remove {
   display: inline-flex;
   align-items: center;
