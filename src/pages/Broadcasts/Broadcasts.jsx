@@ -3,11 +3,14 @@ import {
   Plus, Send, Trash2, Search, Hash, AlertCircle, CheckCircle, XCircle,
   Loader, Users, MessageCircle, Filter, Paperclip, X, Image, FileText, Film,
   BarChart2, HelpCircle, Check, Archive, RotateCcw, ChevronDown, ChevronRight, Tag, Eye,
-  Save, Clock, Calendar, Play, Edit3, FileBox
+  Save, Clock, Calendar, Play, Edit3, FileBox, MoreVertical, Pencil
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
+import { sanitizeHtml } from '../../utils/sanitize.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
+import IosDatePicker from '../../components/UI/IosDatePicker';
+import Raffle from '../Raffle/Raffle.jsx';
 import './Broadcasts.css';
 
 /** Strip HTML for preview text */
@@ -60,7 +63,7 @@ function formatSize(bytes) {
 }
 
 /* ═══ iOS-style Time Picker ═══ */
-function IosTimePicker({ value, onChange }) {
+function IosTimePicker({ value, onChange, minTime = null }) {
   const [hours, minutes] = (value || '12:00').split(':').map(Number);
   const hoursRef = useRef(null);
   const minsRef = useRef(null);
@@ -68,41 +71,73 @@ function IosTimePicker({ value, onChange }) {
   const ITEM_H = 36;
   const VISIBLE = 5;
 
+  const minH = minTime ? parseInt(minTime.split(':')[0], 10) : null;
+  const minM = minTime ? parseInt(minTime.split(':')[1], 10) : null;
+
   const scrollToValue = (ref, val) => {
     if (ref.current) {
       ref.current.scrollTop = val * ITEM_H;
     }
   };
 
-  useEffect(() => {
-    scrollToValue(hoursRef, hours);
-    scrollToValue(minsRef, minutes);
-  }, []); // eslint-disable-line
+  const isHourDisabled = (h) => minH != null && h < minH;
+  const isMinDisabled = (m) => minH != null && hours === minH && minM != null && m < minM;
 
-  const handleScroll = (ref, max, isHours) => {
-    const idx = Math.round(ref.current.scrollTop / ITEM_H);
-    const clamped = Math.max(0, Math.min(max, idx));
-    const h = isHours ? clamped : hours;
-    const m = isHours ? minutes : clamped;
-    onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  const clampTime = (h, m) => {
+    if (minH != null) {
+      if (h < minH) { h = minH; m = minM || 0; }
+      else if (h === minH && minM != null && m < minM) { m = minM; }
+    }
+    return [h, m];
   };
 
-  const renderColumn = (ref, count, val, isHours) => (
-    <div className="ios-tp-col" ref={ref}
-      onScroll={() => handleScroll(ref, count - 1, isHours)}
-      style={{ height: ITEM_H * VISIBLE }}
-    >
-      <div style={{ height: ITEM_H * 2 }} />
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className={`ios-tp-item ${i === val ? 'ios-tp-item--active' : ''}`} style={{ height: ITEM_H }}
-          onClick={() => { scrollToValue(ref, i); }}
-        >
-          {String(i).padStart(2, '0')}
-        </div>
-      ))}
-      <div style={{ height: ITEM_H * 2 }} />
-    </div>
-  );
+  // Build filtered item lists for scroll offset calculation
+  const hourItems = [];
+  for (let i = 0; i < 24; i++) { if (!isHourDisabled(i)) hourItems.push(i); }
+  const minItems = [];
+  for (let i = 0; i < 60; i++) { if (!isMinDisabled(i)) minItems.push(i); }
+
+  useEffect(() => {
+    const hIdx = hourItems.indexOf(hours);
+    const mIdx = minItems.indexOf(minutes);
+    scrollToValue(hoursRef, hIdx >= 0 ? hIdx : 0);
+    scrollToValue(minsRef, mIdx >= 0 ? mIdx : 0);
+  }, []); // eslint-disable-line
+
+  const renderColumn = (ref, count, val, isHours) => {
+    const items = [];
+    for (let i = 0; i < count; i++) {
+      const disabled = isHours ? isHourDisabled(i) : isMinDisabled(i);
+      if (!disabled) items.push(i);
+    }
+    const activeIdx = items.indexOf(val);
+    return (
+      <div className="ios-tp-col" ref={ref}
+        onScroll={() => {
+          const idx = Math.round(ref.current.scrollTop / ITEM_H);
+          const clamped = Math.max(0, Math.min(items.length - 1, idx));
+          const realVal = items[clamped];
+          let h = isHours ? realVal : hours;
+          let m = isHours ? minutes : realVal;
+          [h, m] = clampTime(h, m);
+          onChange(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+        }}
+        style={{ height: ITEM_H * VISIBLE }}
+      >
+        <div style={{ height: ITEM_H * 2 }} />
+        {items.map((realI, idx) => (
+          <div key={realI}
+            className={`ios-tp-item ${realI === val ? 'ios-tp-item--active' : ''}`}
+            style={{ height: ITEM_H }}
+            onClick={() => scrollToValue(ref, idx)}
+          >
+            {String(realI).padStart(2, '0')}
+          </div>
+        ))}
+        <div style={{ height: ITEM_H * 2 }} />
+      </div>
+    );
+  };
 
   return (
     <div className="ios-tp">
@@ -128,10 +163,9 @@ function MediaAttach({ media, onChange }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const token = localStorage.getItem('wl_admin_token');
       const res = await fetch('/api/broadcasts/upload', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'same-origin',
         body: formData,
       });
       const data = await res.json();
@@ -205,7 +239,9 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
   const [text, setText] = useState('');
   const [media, setMedia] = useState(null);
   const [scheduleMode, setScheduleMode] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [confirmSend, setConfirmSend] = useState(false);
 
   // Poll state
   const [question, setQuestion] = useState('');
@@ -234,6 +270,17 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
         setMode('text');
         setText(initialDraft.text || '');
         setMedia(initialDraft.media || null);
+      }
+      // Restore schedule state if draft was scheduled
+      if (initialDraft.scheduledAt && initialDraft.scheduleStatus === 'pending') {
+        setScheduleMode(true);
+        // Convert to local datetime for inputs (YYYY-MM-DDTHH:MM)
+        const d = new Date(initialDraft.scheduledAt);
+        const local = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        setScheduledAt(local);
+      } else {
+        setScheduleMode(false);
+        setScheduledAt('');
       }
     }
   }, [initialDraft]);
@@ -421,42 +468,70 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
       <div className="bc-schedule-toggle">
         <button
           className={`bc-schedule-btn ${!scheduleMode ? 'bc-schedule-btn--active' : ''}`}
-          onClick={() => setScheduleMode(false)}
+          onClick={() => { setScheduleMode(false); setShowScheduleModal(false); setScheduledAt(null); }}
         >
           <Send size={13} /> Отправить сейчас
         </button>
         <button
           className={`bc-schedule-btn ${scheduleMode ? 'bc-schedule-btn--active' : ''}`}
-          onClick={() => setScheduleMode(true)}
+          onClick={() => { setScheduleMode(true); setShowScheduleModal(true); }}
         >
-          <Clock size={13} /> Запланировать
+          <Clock size={13} /> {scheduledAt ? `${scheduledAt.slice(8,10)}.${scheduledAt.slice(5,7)} в ${scheduledAt.slice(11,16)}` : 'Запланировать'}
         </button>
       </div>
 
-      {scheduleMode && (
-        <div className="bc-schedule-picker-styled">
-          <div className="bc-schedule-date-section">
-            <Calendar size={14} />
-            <input
-              type="date"
-              className="bc-schedule-date-input"
-              value={scheduledAt ? scheduledAt.slice(0, 10) : ''}
-              onChange={e => {
-                const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
-                setScheduledAt(e.target.value + 'T' + time);
-              }}
-              min={new Date().toISOString().slice(0, 10)}
-            />
+      {showScheduleModal && (() => {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const selDate = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+        const selTime = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+        const isToday = selDate === todayStr;
+        let minTimeStr = null;
+        if (isToday) {
+          const min = new Date(now.getTime() + 2 * 60 * 1000);
+          minTimeStr = `${String(min.getHours()).padStart(2, '0')}:${String(min.getMinutes()).padStart(2, '0')}`;
+        }
+        return (
+          <div className="bc-schedule-overlay" onClick={() => setShowScheduleModal(false)}>
+            <div className="bc-schedule-modal" onClick={e => e.stopPropagation()}>
+              <div className="bc-schedule-modal-header">
+                <span>Запланировать отправку</span>
+                <button className="bc-schedule-modal-close" onClick={() => setShowScheduleModal(false)}><X size={16} /></button>
+              </div>
+              <div className="bc-schedule-modal-body">
+                <div className="bc-schedule-section">
+                  <div className="bc-schedule-section-label">Дата</div>
+                  <IosDatePicker
+                    value={selDate}
+                    minDate={todayStr}
+                    onChange={(date) => {
+                      const time = scheduledAt ? scheduledAt.slice(11, 16) : '12:00';
+                      setScheduledAt(date + 'T' + time);
+                    }}
+                  />
+                </div>
+                <div className="bc-schedule-section">
+                  <div className="bc-schedule-section-label">Время</div>
+                  <IosTimePicker
+                    value={selTime}
+                    minTime={minTimeStr}
+                    onChange={(time) => {
+                      const date = scheduledAt ? scheduledAt.slice(0, 10) : todayStr;
+                      setScheduledAt(date + 'T' + time);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="bc-schedule-modal-footer">
+                <span className="bc-schedule-modal-preview">
+                  {selDate.split('-').reverse().join('.')} в {selTime}
+                </span>
+                <button className="bc-schedule-modal-ok" onClick={() => setShowScheduleModal(false)}>Готово</button>
+              </div>
+            </div>
           </div>
-          <IosTimePicker
-            value={scheduledAt ? scheduledAt.slice(11, 16) : '12:00'}
-            onChange={(time) => {
-              const date = scheduledAt ? scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-              setScheduledAt(date + 'T' + time);
-            }}
-          />
-        </div>
-      )}
+        );
+      })()}
 
       <div className="bc-compose-footer">
         <span className="bc-compose-hint">{hintText}</span>
@@ -479,9 +554,21 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
               className="broadcasts-create-btn bc-schedule-send-btn"
               disabled={sending || !(canSend && isValid()) || !scheduledAt}
               onClick={() => {
+                // Auto-correct: if scheduled time < now+2min, bump it
+                let finalSchedule = scheduledAt;
+                const minAllowed = new Date(Date.now() + 2 * 60 * 1000);
+                if (new Date(scheduledAt) < minAllowed) {
+                  const y = minAllowed.getFullYear();
+                  const mo = String(minAllowed.getMonth() + 1).padStart(2, '0');
+                  const d = String(minAllowed.getDate()).padStart(2, '0');
+                  const h = String(minAllowed.getHours()).padStart(2, '0');
+                  const mi = String(minAllowed.getMinutes()).padStart(2, '0');
+                  finalSchedule = `${y}-${mo}-${d}T${h}:${mi}`;
+                  setScheduledAt(finalSchedule);
+                }
                 const body = getComposeBody();
                 if (body && onSaveDraft) {
-                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: scheduledAt }, () => {
+                  onSaveDraft({ ...body, _schedule: true, _scheduledAt: finalSchedule }, () => {
                     setText(''); setMedia(null); setQuestion(''); setPollOptions(['', '']); setQuizQuestion(''); setQuizOptions(['', '']); setCorrectIndex(0); setScheduleMode(false); setScheduledAt('');
                   });
                 }
@@ -490,7 +577,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
               <Clock size={16} /> Запланировать
             </button>
           ) : (
-            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={handleSend}>
+            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={() => setConfirmSend(true)}>
               {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
               {sending ? 'Отправка...' : 'Отправить'}
             </button>
@@ -502,11 +589,83 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
           {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
         </div>
       )}
+
+      {confirmSend && (
+        <div className="bc-confirm-overlay" onClick={() => setConfirmSend(false)}>
+          <div className="bc-confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-confirm-modal-title">Подтверждение</div>
+            <div className="bc-confirm-modal-text">Отправить рассылку сейчас?</div>
+            <div className="bc-confirm-modal-actions">
+              <button className="bc-confirm-modal-cancel" onClick={() => setConfirmSend(false)}>Отмена</button>
+              <button className="bc-confirm-modal-ok" onClick={() => { setConfirmSend(false); handleSend(); }}>Отправить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ═══ Вкладка «Каналы» ═══ */
+function CommentEditor({ chatId, entityType = 'channels' }) {
+  const [comment, setComment] = useState('');
+  const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`)
+      .then(r => r.json())
+      .then(data => { setComment(data.comment || ''); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [chatId, entityType]);
+
+  const save = async () => {
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`, { comment: draft });
+      setComment(draft);
+      setEditing(false);
+    } catch { /* ignore */ }
+  };
+
+  const startEdit = (e) => {
+    e.stopPropagation();
+    setDraft(comment);
+    setEditing(true);
+  };
+
+  if (loading) return null;
+
+  if (editing) {
+    return (
+      <div className="bc-comment-edit" onClick={e => e.stopPropagation()}>
+        <input
+          className="bc-comment-input"
+          type="text"
+          value={draft}
+          autoFocus
+          placeholder="Комментарий..."
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+        />
+        <button className="bc-comment-save" onClick={save} title="Сохранить">✓</button>
+        <button className="bc-comment-cancel" onClick={() => setEditing(false)} title="Отмена"><X size={12} /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bc-comment-view" onClick={startEdit} title={comment ? 'Изменить комментарий' : 'Добавить комментарий'}>
+      {comment
+        ? <span className="bc-comment-text">{comment}</span>
+        : <span className="bc-comment-placeholder">+ комментарий</span>}
+    </div>
+  );
+}
+
 function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 'channels' }) {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -605,6 +764,174 @@ function ChannelTagsEditor({ chatId, allChannelTags, onTagsChange, entityType = 
   );
 }
 
+function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive, folders, currentFolderId, onAssignFolder }) {
+  const [open, setOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState(null); // 'comment' | 'tags' | 'folder'
+  const menuRef = useRef(null);
+
+  // Comment state
+  const [comment, setComment] = useState('');
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentLoading, setCommentLoading] = useState(true);
+
+  // Tags state
+  const [tags, setTags] = useState([]);
+  const [tagsLoading, setTagsLoading] = useState(true);
+  const [tagSearch, setTagSearch] = useState('');
+
+  useEffect(() => {
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`)
+      .then(r => r.json())
+      .then(data => { setComment(data.comment || ''); setCommentLoading(false); })
+      .catch(() => setCommentLoading(false));
+    api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`)
+      .then(r => r.json())
+      .then(data => { setTags(data); setTagsLoading(false); })
+      .catch(() => setTagsLoading(false));
+  }, [chatId, entityType]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) { setOpen(false); setActivePanel(null); } };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const saveComment = async () => {
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`, { comment: commentDraft });
+      setComment(commentDraft);
+      setActivePanel(null);
+    } catch { /* ignore */ }
+  };
+
+  const saveTags = async (newTags) => {
+    setTags(newTags);
+    try {
+      await api.put(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/tags`, { tags: newTags });
+      onTagsChange?.();
+    } catch { /* ignore */ }
+  };
+
+  const toggleTag = (tag) => saveTags(tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag]);
+  const addNewTag = () => { const t = tagSearch.trim(); if (t && !tags.includes(t)) saveTags([...tags, t]); setTagSearch(''); };
+
+  const filteredSuggestions = (allTags || []).filter(t => !tags.includes(t)).filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()));
+
+  return (
+    <div className="bc-item-menu" ref={menuRef}>
+      <button className="bc-item-menu-btn" onClick={(e) => { e.stopPropagation(); setOpen(!open); setActivePanel(null); }} title="Действия">
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="bc-item-menu-dropdown" onClick={e => e.stopPropagation()}>
+          {!activePanel && (
+            <>
+              <button className="bc-item-menu-option" onClick={() => { setCommentDraft(comment); setActivePanel('comment'); }}>
+                <Edit3 size={13} /> {comment ? 'Комментарий' : 'Добавить комментарий'}
+                {comment && <span className="bc-item-menu-hint">{comment.length > 20 ? comment.slice(0, 20) + '…' : comment}</span>}
+              </button>
+              <button className="bc-item-menu-option" onClick={() => { setTagSearch(''); setActivePanel('tags'); }}>
+                <Tag size={13} /> Теги
+                {tags.length > 0 && <span className="bc-item-menu-hint">{tags.length}</span>}
+              </button>
+              {folders && folders.length > 0 && (
+                <button className="bc-item-menu-option" onClick={() => setActivePanel('folder')}>
+                  <Filter size={13} /> Папка
+                  {currentFolderId && <span className="bc-item-menu-hint">{folders.find(f => f.id === currentFolderId)?.name || ''}</span>}
+                </button>
+              )}
+              <button className="bc-item-menu-option bc-item-menu-option--archive" onClick={() => { setOpen(false); onArchive(); }}>
+                <Archive size={13} /> В архив
+              </button>
+            </>
+          )}
+          {activePanel === 'folder' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>←</button>
+                <span>Папка</span>
+              </div>
+              <div className="bc-item-menu-folder-list">
+                <button className={`bc-item-menu-folder-option${!currentFolderId ? ' active' : ''}`} onClick={() => { onAssignFolder?.(chatId, null); setOpen(false); setActivePanel(null); }}>
+                  — Без папки
+                </button>
+                {folders.map(f => (
+                  <button key={f.id} className={`bc-item-menu-folder-option${currentFolderId === f.id ? ' active' : ''}`} onClick={() => { onAssignFolder?.(chatId, f.id); setOpen(false); setActivePanel(null); }}>
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {activePanel === 'comment' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>
+                  <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                </button>
+                <span>Комментарий</span>
+              </div>
+              <input
+                className="bc-item-menu-input"
+                type="text"
+                placeholder="Комментарий..."
+                value={commentDraft}
+                onChange={e => setCommentDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveComment(); }}
+                autoFocus
+              />
+              <button className="bc-item-menu-save" onClick={saveComment}>Сохранить</button>
+            </div>
+          )}
+          {activePanel === 'tags' && (
+            <div className="bc-item-menu-panel">
+              <div className="bc-item-menu-panel-header">
+                <button className="bc-item-menu-back" onClick={() => setActivePanel(null)}>
+                  <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                </button>
+                <span>Теги</span>
+              </div>
+              {tags.length > 0 && (
+                <div className="bc-item-menu-tags-list">
+                  {tags.map(t => (
+                    <span key={t} className="bc-ch-tag-chip">
+                      {t}
+                      <button className="bc-chip-remove" onClick={() => saveTags(tags.filter(x => x !== t))}><X size={10} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="bc-tag-search-wrap">
+                <Search size={12} className="bc-tag-search-icon" />
+                <input
+                  className="bc-tag-search-input"
+                  type="text"
+                  placeholder="Поиск или новый тег..."
+                  value={tagSearch}
+                  onChange={e => setTagSearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addNewTag(); }}
+                  autoFocus
+                />
+              </div>
+              <div className="bc-tag-options-list">
+                {filteredSuggestions.map(t => (
+                  <div key={t} className="bc-tag-option" onClick={() => toggleTag(t)}>{t}</div>
+                ))}
+                {tagSearch.trim() && !(allTags || []).includes(tagSearch.trim()) && !tags.includes(tagSearch.trim()) && (
+                  <div className="bc-tag-option bc-tag-option--create" onClick={addNewTag}>
+                    <Plus size={12} /> Создать «{tagSearch.trim()}»
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [channels, setChannels] = useState([]);
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -614,13 +941,64 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Rename
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const handleRenameChannel = async (id) => {
+    if (!renameValue.trim()) { setRenamingId(null); return; }
+    try {
+      await api.put(`/api/broadcasts/channels/${id}/rename`, { title: renameValue.trim() });
+      setChannels(prev => prev.map(ch => ch.id === id ? { ...ch, title: renameValue.trim() } : ch));
+    } catch {}
+    setRenamingId(null);
+  };
+
+  // Folders
+  const [folders, setFolders] = useState([]);
+  const [activeFolderId, setActiveFolderId] = useState(null);
+  const [folderMap, setFolderMap] = useState({});
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+
+  const loadFolders = useCallback(() => {
+    api.get('/api/broadcast-folders?type=channels').then(r => r.json()).then(setFolders).catch(() => {});
+    api.get('/api/broadcast-folders/map?type=channels').then(r => r.json()).then(setFolderMap).catch(() => {});
+  }, []);
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  const createFolder = async () => {
+    const res = await api.post('/api/broadcast-folders', { name: 'Новая папка', type: 'channels' });
+    if (res.ok) loadFolders();
+  };
+  const renameFolder = async (id, name) => {
+    if (!name.trim()) return;
+    await api.put(`/api/broadcast-folders/${id}`, { name: name.trim() });
+    setEditingFolderId(null);
+    loadFolders();
+  };
+  const deleteFolder = async (id) => {
+    await api.delete(`/api/broadcast-folders/${id}`);
+    if (activeFolderId === id) setActiveFolderId(null);
+    loadFolders();
+  };
+  const assignFolder = async (chatId, folderId) => {
+    await api.put('/api/broadcast-folders/assign', { chatId, entityType: 'channels', folderId });
+    loadFolders();
+  };
+
   // Channel tags
   const [allChannelTags, setAllChannelTags] = useState([]);
   const [filterChannelTags, setFilterChannelTags] = useState([]);
+  const [excludeChannelTags, setExcludeChannelTags] = useState([]);
   const [channelTagsMap, setChannelTagsMap] = useState({});
   const [showChTagDD, setShowChTagDD] = useState(false);
+  const [showChExcludeDD, setShowChExcludeDD] = useState(false);
   const [chTagSearch, setChTagSearch] = useState('');
+  const [chExcludeSearch, setChExcludeSearch] = useState('');
+  const [chListSearch, setChListSearch] = useState('');
   const chTagRef = useRef(null);
+  const chExcludeRef = useRef(null);
 
   const loadAllChannelTags = useCallback(() => {
     api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllChannelTags).catch(() => {});
@@ -651,7 +1029,10 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => { loadChannels(); loadAllChannelTags(); }, [loadChannels, loadAllChannelTags]);
 
   useEffect(() => {
-    const handler = (e) => { if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false); };
+    const handler = (e) => {
+      if (chTagRef.current && !chTagRef.current.contains(e.target)) setShowChTagDD(false);
+      if (chExcludeRef.current && !chExcludeRef.current.contains(e.target)) setShowChExcludeDD(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -698,11 +1079,26 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   const toggleChFilterTag = (tag) => {
     setFilterChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludeChannelTags(prev => prev.filter(t => t !== tag));
   };
 
-  const filteredChannels = filterChannelTags.length > 0
-    ? channels.filter(ch => (channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t)))
-    : channels;
+  const toggleChExcludeTag = (tag) => {
+    setExcludeChannelTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setFilterChannelTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const filteredChannels = channels.filter(ch => {
+    if (activeFolderId !== null && (folderMap[ch.chatId] || null) !== activeFolderId) return false;
+    if (filterChannelTags.length > 0 && !(channelTagsMap[ch.chatId] || []).some(t => filterChannelTags.includes(t))) return false;
+    if (excludeChannelTags.length > 0 && (channelTagsMap[ch.chatId] || []).some(t => excludeChannelTags.includes(t))) return false;
+    if (chListSearch.trim()) {
+      const q = chListSearch.trim().toLowerCase();
+      const titleMatch = ch.title?.toLowerCase().includes(q);
+      const tagMatch = (channelTagsMap[ch.chatId] || []).some(t => t.toLowerCase().includes(q));
+      if (!titleMatch && !tagMatch) return false;
+    }
+    return true;
+  });
 
   const toggleChannel = (chatId) => {
     setSelectedChannels(prev =>
@@ -745,15 +1141,15 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <h3 className="bc-section-title">Каналы</h3>
           <div className="bc-header-actions">
             {allChannelTags.length > 0 && (
-              <div className="bc-tag-filter" ref={chTagRef}>
-                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
-                  <Tag size={13} />
-                  <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
-                  <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
-                </button>
-                {showChTagDD && (
-                  <div className="bc-tag-dropdown">
-                    {allChannelTags.length > 5 && (
+              <>
+                <div className="bc-tag-filter" ref={chTagRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowChTagDD(!showChTagDD)}>
+                    <Tag size={13} />
+                    <span>{filterChannelTags.length === 0 ? 'Все теги' : `Тегов: ${filterChannelTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showChTagDD ? 'open' : ''}`} />
+                  </button>
+                  {showChTagDD && (
+                    <div className="bc-tag-dropdown">
                       <div className="bc-tag-search-wrap">
                         <Search size={12} className="bc-tag-search-icon" />
                         <input
@@ -765,69 +1161,152 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                           autoFocus
                         />
                       </div>
-                    )}
-                    <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
-                        Все теги
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${filterChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterChannelTags([]); setChTagSearch(''); }}>
+                          Все теги
+                        </div>
+                        {allChannelTags
+                          .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''} ${excludeChannelTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludeChannelTags.includes(t)) toggleChFilterTag(t); }}>
+                              <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{excludeChannelTags.includes(t) ? ' (исключён)' : ''}</span>
+                            </label>
+                          ))}
                       </div>
-                      {allChannelTags
-                        .filter(t => !chTagSearch.trim() || t.toLowerCase().includes(chTagSearch.trim().toLowerCase()))
-                        .map(t => (
-                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterChannelTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleChFilterTag(t); }}>
-                            <input type="checkbox" checked={filterChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                            <span>{t}</span>
-                          </label>
-                        ))}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+
+                <div className="bc-tag-filter bc-tag-filter--exclude" ref={chExcludeRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small bc-tag-filter-btn--exclude" onClick={() => setShowChExcludeDD(!showChExcludeDD)}>
+                    <X size={13} />
+                    <span>{excludeChannelTags.length === 0 ? 'Исключить' : `Исключено: ${excludeChannelTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showChExcludeDD ? 'open' : ''}`} />
+                  </button>
+                  {showChExcludeDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={chExcludeSearch}
+                          onChange={e => setChExcludeSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${excludeChannelTags.length === 0 ? 'active' : ''}`} onClick={() => { setExcludeChannelTags([]); setChExcludeSearch(''); }}>
+                          Сбросить все
+                        </div>
+                        {allChannelTags
+                          .filter(t => !chExcludeSearch.trim() || t.toLowerCase().includes(chExcludeSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludeChannelTags.includes(t) ? 'active' : ''} ${filterChannelTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!filterChannelTags.includes(t)) toggleChExcludeTag(t); }}>
+                              <input type="checkbox" checked={excludeChannelTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{filterChannelTags.includes(t) ? ' (включён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
             </button>
-            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-              <Plus size={16} /> Добавить
-            </button>
           </div>
         </div>
 
-        {filterChannelTags.length > 0 && (
+        {(filterChannelTags.length > 0 || excludeChannelTags.length > 0) && (
           <div className="bc-selected-tags">
             {filterChannelTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => setFilterChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setFilterChannelTags([])}>Сбросить</button>
+            {excludeChannelTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => setExcludeChannelTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setFilterChannelTags([]); setExcludeChannelTags([]); }}>Сбросить</button>
+          </div>
+        )}
+
+        {/* Folder tabs */}
+        {channels.length > 0 && (
+          <div className="bc-folder-tabs">
+            <button className={`bc-folder-tab${activeFolderId === null ? ' active' : ''}`} onClick={() => setActiveFolderId(null)}>Все</button>
+            {folders.map(f => (
+              <div key={f.id} className={`bc-folder-tab${activeFolderId === f.id ? ' active' : ''}`}
+                onClick={() => setActiveFolderId(f.id)}
+                onDoubleClick={() => { setEditingFolderId(f.id); setEditingFolderName(f.name); }}
+              >
+                {editingFolderId === f.id ? (
+                  <input className="bc-folder-rename-input" value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)}
+                    onBlur={() => renameFolder(f.id, editingFolderName)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameFolder(f.id, editingFolderName); if (e.key === 'Escape') setEditingFolderId(null); }}
+                    autoFocus onClick={e => e.stopPropagation()} />
+                ) : f.name}
+                {editingFolderId === f.id && (
+                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                )}
+              </div>
+            ))}
+            <button className="bc-folder-tab bc-folder-tab--add" onClick={createFolder} title="Новая папка"><Plus size={13} /></button>
           </div>
         )}
 
         {/* Active channels list */}
         {channels.length === 0 ? (
           <div className="bc-channels-empty">
-            Каналы не добавлены. Нажмите «Добавить» и введите @username или chat_id канала.
+            Каналы не добавлены.
           </div>
         ) : (
           <div className="bc-list-view">
+            {channels.length > 3 && (
+              <div className="bc-list-search-wrap">
+                <Search size={13} />
+                <input type="text" placeholder="Поиск по каналам и тегам..." value={chListSearch} onChange={e => setChListSearch(e.target.value)} />
+              </div>
+            )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedChannels.length === filteredChannels.length && filteredChannels.length > 0} onChange={selectAll} />
-              <span>{filterChannelTags.length > 0 ? `Каналы по тегам (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
+              <span>{(filterChannelTags.length > 0 || excludeChannelTags.length > 0) ? `Каналы по тегам (${filteredChannels.length})` : activeFolderId !== null ? `Каналы в папке (${filteredChannels.length})` : `Все каналы (${channels.length})`}</span>
             </label>
             {filteredChannels.map(ch => (
-              <div key={ch.id} className="bc-list-item bc-list-item--with-tags">
+              <div key={ch.id} className="bc-list-item bc-list-item--with-menu">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedChannels.includes(ch.chatId)} onChange={() => toggleChannel(ch.chatId)} />
                   <Hash size={14} className="bc-list-icon" />
-                  <span className="bc-list-title">{ch.title}</span>
-                  <span className="bc-list-id">{ch.chatId}</span>
+                  {renamingId === ch.id ? (
+                    <input className="bc-rename-input" value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                      onBlur={() => handleRenameChannel(ch.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameChannel(ch.id); if (e.key === 'Escape') setRenamingId(null); }}
+                      autoFocus onClick={e => e.preventDefault()} />
+                  ) : (
+                    <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }}>{ch.title}</span>
+                  )}
+                  <span className="bc-list-chatid">ID: {ch.chatId}</span>
+                  {renamingId !== ch.id && (
+                    <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setRenamingId(ch.id); setRenameValue(ch.title); }} title="Переименовать">
+                      <Pencil size={11} />
+                    </button>
+                  )}
+                  {(channelTagsMap[ch.chatId] || []).length > 0 && (
+                    <span className="bc-list-inline-tags">
+                      {(channelTagsMap[ch.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}
+                    </span>
+                  )}
                 </label>
-                <ChannelTagsEditor chatId={ch.chatId} allChannelTags={allChannelTags} onTagsChange={handleTagsChange} />
-                <button className="bc-list-archive-btn" onClick={() => handleArchive(ch.id)} title="В архив">
-                  <Archive size={14} />
-                </button>
+                <ItemActionsMenu chatId={ch.chatId} entityType="channels" allTags={allChannelTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(ch.id)} folders={folders} currentFolderId={folderMap[ch.chatId] || null} onAssignFolder={assignFolder} />
               </div>
             ))}
           </div>
@@ -846,8 +1325,8 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <Hash size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{ch.title}</span>
-                      <span className="bc-list-id">{ch.chatId}</span>
-                    </div>
+                      <span className="bc-list-chatid">ID: {ch.chatId}</span>
+                        </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(ch.id)} title="Восстановить">
                       <RotateCcw size={14} />
                     </button>
@@ -892,6 +1371,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   // Фильтры
   const [tags, setTags] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [excludedTags, setExcludedTags] = useState([]);
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
@@ -900,25 +1380,40 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
   }, []);
 
-  // Подсчёт по фильтрам
+  // Подсчёт по фильтрам — когда выбраны теги (включая или исключая)
   useEffect(() => {
+    if (selectedTags.length === 0 && excludedTags.length === 0) {
+      setUserCount(0);
+      return;
+    }
     setCountLoading(true);
     const params = new URLSearchParams();
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
 
     api.get(`/api/broadcasts/users/count?${params}`)
       .then(r => r.json())
       .then(data => setUserCount(data.count))
       .catch(() => setUserCount(null))
       .finally(() => setCountLoading(false));
-  }, [selectedTags]);
+  }, [selectedTags, excludedTags]);
 
   const toggleTag = (tag) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const toggleExcludeTag = (tag) => {
+    setExcludedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setSelectedTags(prev => prev.filter(t => t !== tag));
   };
 
   const removeTag = (tag) => {
     setSelectedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const removeExcludedTag = (tag) => {
+    setExcludedTags(prev => prev.filter(t => t !== tag));
   };
 
   const handleSend = async (composeBody, resetCompose) => {
@@ -927,6 +1422,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     try {
       const filters = {};
       if (selectedTags.length > 0) filters.tags = selectedTags;
+      if (excludedTags.length > 0) filters.excludeTags = excludedTags;
 
       const body = { filters, ...composeBody };
 
@@ -949,6 +1445,9 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [tagSearch, setTagSearch] = useState('');
   const tagRef = useRef(null);
   const tagSearchRef = useRef(null);
+  const [showExcludeDD, setShowExcludeDD] = useState(false);
+  const [excludeSearch, setExcludeSearch] = useState('');
+  const excludeRef = useRef(null);
 
   // Recipients list
   const [showRecipients, setShowRecipients] = useState(false);
@@ -963,6 +1462,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const fetchRecipients = async (offset = 0) => {
     const params = new URLSearchParams();
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
     params.set('limit', RECIPIENTS_PAGE);
     params.set('offset', offset);
     const res = await api.get(`/api/broadcasts/users/list?${params}`);
@@ -1003,6 +1503,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => {
     const handler = (e) => {
       if (tagRef.current && !tagRef.current.contains(e.target)) setShowTagDD(false);
+      if (excludeRef.current && !excludeRef.current.contains(e.target)) setShowExcludeDD(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -1014,7 +1515,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         <div className="bc-tag-filter" ref={tagRef}>
           <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
             <Tag size={14} />
-            <span>{selectedTags.length === 0 ? 'Все теги' : `Тегов: ${selectedTags.length}`}</span>
+            <span>{selectedTags.length === 0 ? 'Включить теги' : `Включено: ${selectedTags.length}`}</span>
             <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
           </button>
           {showTagDD && (
@@ -1035,16 +1536,16 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               )}
               <div className="bc-tag-options-list">
                 {(!tagSearch.trim()) && (
-                  <div className={`bc-tag-option ${selectedTags.length === 0 ? 'active' : ''}`} onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
-                    Все теги
+                  <div className="bc-tag-option" onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
+                    Сбросить все
                   </div>
                 )}
                 {tags
                   .filter(t => !tagSearch.trim() || t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
                   .map(t => (
-                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleTag(t); }}>
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${selectedTags.includes(t) ? 'active' : ''} ${excludedTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludedTags.includes(t)) toggleTag(t); }}>
                       <input type="checkbox" checked={selectedTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                      <span>{t}</span>
+                      <span>{t}{excludedTags.includes(t) ? ' (исключён)' : ''}</span>
                     </label>
                   ))}
                 {tagSearch.trim() && tags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).length === 0 && (
@@ -1055,15 +1556,64 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           )}
         </div>
 
-        {selectedTags.length > 0 && (
+        <div className="bc-tag-filter bc-tag-filter--exclude" ref={excludeRef}>
+          <button className="bc-tag-filter-btn bc-tag-filter-btn--exclude" onClick={() => setShowExcludeDD(!showExcludeDD)}>
+            <X size={14} />
+            <span>{excludedTags.length === 0 ? 'Исключить теги' : `Исключено: ${excludedTags.length}`}</span>
+            <ChevronDown size={14} className={`bc-tag-chevron ${showExcludeDD ? 'open' : ''}`} />
+          </button>
+          {showExcludeDD && (
+            <div className="bc-tag-dropdown">
+              {tags.length > 5 && (
+                <div className="bc-tag-search-wrap">
+                  <Search size={13} className="bc-tag-search-icon" />
+                  <input
+                    className="bc-tag-search-input"
+                    type="text"
+                    placeholder="Поиск тега..."
+                    value={excludeSearch}
+                    onChange={e => setExcludeSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div className="bc-tag-options-list">
+                {(!excludeSearch.trim()) && (
+                  <div className="bc-tag-option" onClick={() => { setExcludedTags([]); setExcludeSearch(''); }}>
+                    Сбросить все
+                  </div>
+                )}
+                {tags
+                  .filter(t => !excludeSearch.trim() || t.toLowerCase().includes(excludeSearch.trim().toLowerCase()))
+                  .map(t => (
+                    <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludedTags.includes(t) ? 'active' : ''} ${selectedTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!selectedTags.includes(t)) toggleExcludeTag(t); }}>
+                      <input type="checkbox" checked={excludedTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                      <span>{t}{selectedTags.includes(t) ? ' (включён)' : ''}</span>
+                    </label>
+                  ))}
+                {excludeSearch.trim() && tags.filter(t => t.toLowerCase().includes(excludeSearch.trim().toLowerCase())).length === 0 && (
+                  <div className="bc-tag-option bc-tag-option--empty">Ничего не найдено</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {(selectedTags.length > 0 || excludedTags.length > 0) && (
           <div className="bc-selected-tags">
             {selectedTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => removeTag(t)}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setSelectedTags([])}>Сбросить</button>
+            {excludedTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => removeExcludedTag(t)}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setSelectedTags([]); setExcludedTags([]); }}>Сбросить</button>
           </div>
         )}
 
@@ -1108,13 +1658,24 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
       <ComposeBlock
         title="Рассылка пользователям бота"
-        hintText={userCount != null && userCount > 0 ? `Будет отправлено ${userCount} пользователям` : 'Нет пользователей по фильтрам'}
-        canSend={userCount > 0}
+        hintText={
+          selectedTags.length === 0 && excludedTags.length === 0
+            ? 'Выберите хотя бы один тег для включения или исключения'
+            : userCount != null && userCount > 0
+              ? `Будет отправлено ${userCount} пользователям`
+              : 'Нет пользователей по фильтрам'
+        }
+        canSend={userCount > 0 && (selectedTags.length > 0 || excludedTags.length > 0)}
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
         targetType="users"
-        onSaveDraft={(body, resetCb) => onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters: selectedTags.length > 0 ? { tags: selectedTags } : {} } }, resetCb)}
+        onSaveDraft={(body, resetCb) => {
+          const filters = {};
+          if (selectedTags.length > 0) filters.tags = selectedTags;
+          if (excludedTags.length > 0) filters.excludeTags = excludedTags;
+          onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters } }, resetCb);
+        }}
         savingDraft={savingDraft}
         initialDraft={initialDraft}
       />
@@ -1132,13 +1693,64 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [showArchive, setShowArchive] = useState(false);
   const [archived, setArchived] = useState([]);
 
+  // Rename
+  const [grRenamingId, setGrRenamingId] = useState(null);
+  const [grRenameValue, setGrRenameValue] = useState('');
+
+  const handleRenameGroup = async (id) => {
+    if (!grRenameValue.trim()) { setGrRenamingId(null); return; }
+    try {
+      await api.put(`/api/broadcasts/groups/${id}/rename`, { title: grRenameValue.trim() });
+      setGroups(prev => prev.map(g => g.id === id ? { ...g, title: grRenameValue.trim() } : g));
+    } catch {}
+    setGrRenamingId(null);
+  };
+
+  // Folders
+  const [grFolders, setGrFolders] = useState([]);
+  const [grActiveFolderId, setGrActiveFolderId] = useState(null);
+  const [grFolderMap, setGrFolderMap] = useState({});
+  const [grEditingFolderId, setGrEditingFolderId] = useState(null);
+  const [grEditingFolderName, setGrEditingFolderName] = useState('');
+
+  const loadGrFolders = useCallback(() => {
+    api.get('/api/broadcast-folders?type=groups').then(r => r.json()).then(setGrFolders).catch(() => {});
+    api.get('/api/broadcast-folders/map?type=groups').then(r => r.json()).then(setGrFolderMap).catch(() => {});
+  }, []);
+  useEffect(() => { loadGrFolders(); }, [loadGrFolders]);
+
+  const createGrFolder = async () => {
+    const res = await api.post('/api/broadcast-folders', { name: 'Новая папка', type: 'groups' });
+    if (res.ok) loadGrFolders();
+  };
+  const renameGrFolder = async (id, name) => {
+    if (!name.trim()) return;
+    await api.put(`/api/broadcast-folders/${id}`, { name: name.trim() });
+    setGrEditingFolderId(null);
+    loadGrFolders();
+  };
+  const deleteGrFolder = async (id) => {
+    await api.delete(`/api/broadcast-folders/${id}`);
+    if (grActiveFolderId === id) setGrActiveFolderId(null);
+    loadGrFolders();
+  };
+  const assignGrFolder = async (chatId, folderId) => {
+    await api.put('/api/broadcast-folders/assign', { chatId, entityType: 'groups', folderId });
+    loadGrFolders();
+  };
+
   // Group tags (separate table from channels)
   const [allGroupTags, setAllGroupTags] = useState([]);
   const [filterGroupTags, setFilterGroupTags] = useState([]);
   const [groupTagsMap, setGroupTagsMap] = useState({});
   const [showGrTagDD, setShowGrTagDD] = useState(false);
+  const [showGrExcludeDD, setShowGrExcludeDD] = useState(false);
   const [grTagSearch, setGrTagSearch] = useState('');
+  const [grExcludeSearch, setGrExcludeSearch] = useState('');
+  const [grListSearch, setGrListSearch] = useState('');
   const grTagRef = useRef(null);
+  const grExcludeRef = useRef(null);
+  const [excludeGroupTags, setExcludeGroupTags] = useState([]);
 
   const loadAllGroupTags = useCallback(() => {
     api.get('/api/broadcasts/group-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
@@ -1169,7 +1781,10 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   useEffect(() => { loadGroups(); loadAllGroupTags(); }, [loadGroups, loadAllGroupTags]);
 
   useEffect(() => {
-    const handler = (e) => { if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false); };
+    const handler = (e) => {
+      if (grTagRef.current && !grTagRef.current.contains(e.target)) setShowGrTagDD(false);
+      if (grExcludeRef.current && !grExcludeRef.current.contains(e.target)) setShowGrExcludeDD(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -1177,6 +1792,13 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const handleTagsChange = () => {
     loadAllGroupTags();
     loadGroups();
+  };
+
+  const handleApprove = async (id) => {
+    try {
+      await api.put(`/api/broadcasts/groups/${id}/approve`);
+      setGroups(prev => prev.map(g => g.id === id ? { ...g, approved: 1 } : g));
+    } catch (e) { alert('Ошибка: ' + e.message); }
   };
 
   const handleArchive = async (id) => {
@@ -1216,11 +1838,26 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   const toggleGrFilterTag = (tag) => {
     setFilterGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setExcludeGroupTags(prev => prev.filter(t => t !== tag));
   };
 
-  const filteredGroups = filterGroupTags.length > 0
-    ? groups.filter(g => (groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t)))
-    : groups;
+  const toggleGrExcludeTag = (tag) => {
+    setExcludeGroupTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setFilterGroupTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const filteredGroups = groups.filter(g => {
+    if (grActiveFolderId !== null && (grFolderMap[g.chatId] || null) !== grActiveFolderId) return false;
+    if (filterGroupTags.length > 0 && !(groupTagsMap[g.chatId] || []).some(t => filterGroupTags.includes(t))) return false;
+    if (excludeGroupTags.length > 0 && (groupTagsMap[g.chatId] || []).some(t => excludeGroupTags.includes(t))) return false;
+    if (grListSearch.trim()) {
+      const q = grListSearch.trim().toLowerCase();
+      const titleMatch = g.title?.toLowerCase().includes(q);
+      const tagMatch = (groupTagsMap[g.chatId] || []).some(t => t.toLowerCase().includes(q));
+      if (!titleMatch && !tagMatch) return false;
+    }
+    return true;
+  });
 
   const toggleGroup = (chatId) => {
     setSelectedGroups(prev =>
@@ -1263,15 +1900,15 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           <h3 className="bc-section-title">Группы / чаты</h3>
           <div className="bc-header-actions">
             {allGroupTags.length > 0 && (
-              <div className="bc-tag-filter" ref={grTagRef}>
-                <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
-                  <Tag size={13} />
-                  <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
-                  <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
-                </button>
-                {showGrTagDD && (
-                  <div className="bc-tag-dropdown">
-                    {allGroupTags.length > 5 && (
+              <>
+                <div className="bc-tag-filter" ref={grTagRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small" onClick={() => setShowGrTagDD(!showGrTagDD)}>
+                    <Tag size={13} />
+                    <span>{filterGroupTags.length === 0 ? 'Все теги' : `Тегов: ${filterGroupTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showGrTagDD ? 'open' : ''}`} />
+                  </button>
+                  {showGrTagDD && (
+                    <div className="bc-tag-dropdown">
                       <div className="bc-tag-search-wrap">
                         <Search size={12} className="bc-tag-search-icon" />
                         <input
@@ -1283,68 +1920,161 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                           autoFocus
                         />
                       </div>
-                    )}
-                    <div className="bc-tag-options-list">
-                      <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
-                        Все теги
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${filterGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setFilterGroupTags([]); setGrTagSearch(''); }}>
+                          Все теги
+                        </div>
+                        {allGroupTags
+                          .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''} ${excludeGroupTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!excludeGroupTags.includes(t)) toggleGrFilterTag(t); }}>
+                              <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{excludeGroupTags.includes(t) ? ' (исключён)' : ''}</span>
+                            </label>
+                          ))}
                       </div>
-                      {allGroupTags
-                        .filter(t => !grTagSearch.trim() || t.toLowerCase().includes(grTagSearch.trim().toLowerCase()))
-                        .map(t => (
-                          <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${filterGroupTags.includes(t) ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); toggleGrFilterTag(t); }}>
-                            <input type="checkbox" checked={filterGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
-                            <span>{t}</span>
-                          </label>
-                        ))}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+
+                <div className="bc-tag-filter bc-tag-filter--exclude" ref={grExcludeRef}>
+                  <button className="bc-tag-filter-btn bc-tag-filter-btn--small bc-tag-filter-btn--exclude" onClick={() => setShowGrExcludeDD(!showGrExcludeDD)}>
+                    <X size={13} />
+                    <span>{excludeGroupTags.length === 0 ? 'Исключить' : `Исключено: ${excludeGroupTags.length}`}</span>
+                    <ChevronDown size={13} className={`bc-tag-chevron ${showGrExcludeDD ? 'open' : ''}`} />
+                  </button>
+                  {showGrExcludeDD && (
+                    <div className="bc-tag-dropdown">
+                      <div className="bc-tag-search-wrap">
+                        <Search size={12} className="bc-tag-search-icon" />
+                        <input
+                          className="bc-tag-search-input"
+                          type="text"
+                          placeholder="Поиск..."
+                          value={grExcludeSearch}
+                          onChange={e => setGrExcludeSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <div className="bc-tag-options-list">
+                        <div className={`bc-tag-option ${excludeGroupTags.length === 0 ? 'active' : ''}`} onClick={() => { setExcludeGroupTags([]); setGrExcludeSearch(''); }}>
+                          Сбросить все
+                        </div>
+                        {allGroupTags
+                          .filter(t => !grExcludeSearch.trim() || t.toLowerCase().includes(grExcludeSearch.trim().toLowerCase()))
+                          .map(t => (
+                            <label key={t} className={`bc-tag-option bc-tag-option--checkbox ${excludeGroupTags.includes(t) ? 'active' : ''} ${filterGroupTags.includes(t) ? 'bc-tag-option--disabled' : ''}`} onClick={(e) => { e.preventDefault(); if (!filterGroupTags.includes(t)) toggleGrExcludeTag(t); }}>
+                              <input type="checkbox" checked={excludeGroupTags.includes(t)} readOnly className="bc-tag-checkbox" />
+                              <span>{t}{filterGroupTags.includes(t) ? ' (включён)' : ''}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <button className="bc-archive-toggle" onClick={() => { setShowArchive(!showArchive); if (!showArchive) loadArchive(); }}>
               <Archive size={14} /> {showArchive ? 'Скрыть архив' : 'Архив'}
               {archived.length > 0 && !showArchive && <span className="bc-archive-count">{archived.length}</span>}
             </button>
-            <button className="bc-add-channel-btn" onClick={() => setAddModal(true)}>
-              <Plus size={16} /> Добавить
-            </button>
           </div>
         </div>
 
-        {filterGroupTags.length > 0 && (
+        {(filterGroupTags.length > 0 || excludeGroupTags.length > 0) && (
           <div className="bc-selected-tags">
             {filterGroupTags.map(t => (
-              <span key={t} className="bc-selected-tag-chip">
+              <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
                 <button className="bc-chip-remove" onClick={() => setFilterGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => setFilterGroupTags([])}>Сбросить</button>
+            {excludeGroupTags.map(t => (
+              <span key={`exc-${t}`} className="bc-selected-tag-chip bc-selected-tag-chip--exclude">
+                − {t}
+                <button className="bc-chip-remove" onClick={() => setExcludeGroupTags(prev => prev.filter(x => x !== t))}><X size={11} /></button>
+              </span>
+            ))}
+            <button className="bc-clear-tags-btn" onClick={() => { setFilterGroupTags([]); setExcludeGroupTags([]); }}>Сбросить</button>
+          </div>
+        )}
+
+        {/* Group folder tabs */}
+        {groups.length > 0 && (
+          <div className="bc-folder-tabs">
+            <button className={`bc-folder-tab${grActiveFolderId === null ? ' active' : ''}`} onClick={() => setGrActiveFolderId(null)}>Все</button>
+            {grFolders.map(f => (
+              <div key={f.id} className={`bc-folder-tab${grActiveFolderId === f.id ? ' active' : ''}`}
+                onClick={() => setGrActiveFolderId(f.id)}
+                onDoubleClick={() => { setGrEditingFolderId(f.id); setGrEditingFolderName(f.name); }}
+              >
+                {grEditingFolderId === f.id ? (
+                  <input className="bc-folder-rename-input" value={grEditingFolderName} onChange={e => setGrEditingFolderName(e.target.value)}
+                    onBlur={() => renameGrFolder(f.id, grEditingFolderName)}
+                    onKeyDown={e => { if (e.key === 'Enter') renameGrFolder(f.id, grEditingFolderName); if (e.key === 'Escape') setGrEditingFolderId(null); }}
+                    autoFocus onClick={e => e.stopPropagation()} />
+                ) : f.name}
+                {grEditingFolderId === f.id && (
+                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteGrFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                )}
+              </div>
+            ))}
+            <button className="bc-folder-tab bc-folder-tab--add" onClick={createGrFolder} title="Новая папка"><Plus size={13} /></button>
           </div>
         )}
 
         {groups.length === 0 ? (
           <div className="bc-channels-empty">
-            Группы не добавлены. Нажмите «Добавить» и введите chat_id группы где есть бот.
+            Группы не добавлены.
           </div>
         ) : (
           <div className="bc-list-view">
+            {groups.length > 3 && (
+              <div className="bc-list-search-wrap">
+                <Search size={13} />
+                <input type="text" placeholder="Поиск по группам и тегам..." value={grListSearch} onChange={e => setGrListSearch(e.target.value)} />
+              </div>
+            )}
             <label className="bc-list-item bc-list-item--all">
               <input type="checkbox" checked={selectedGroups.length === filteredGroups.length && filteredGroups.length > 0} onChange={selectAll} />
-              <span>{filterGroupTags.length > 0 ? `Группы по тегам (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
+              <span>{(filterGroupTags.length > 0 || excludeGroupTags.length > 0) ? `Группы по тегам (${filteredGroups.length})` : grActiveFolderId !== null ? `Группы в папке (${filteredGroups.length})` : `Все группы (${groups.length})`}</span>
             </label>
             {filteredGroups.map(g => (
-              <div key={g.id} className="bc-list-item bc-list-item--with-tags">
+              <div key={g.id} className="bc-list-item bc-list-item--with-menu">
                 <label className="bc-list-item-main">
                   <input type="checkbox" checked={selectedGroups.includes(g.chatId)} onChange={() => toggleGroup(g.chatId)} />
                   <MessageCircle size={14} className="bc-list-icon" />
-                  <span className="bc-list-title">{g.title}</span>
-                  <span className="bc-list-id">{g.chatId}</span>
+                  {grRenamingId === g.id ? (
+                    <input className="bc-rename-input" value={grRenameValue} onChange={e => setGrRenameValue(e.target.value)}
+                      onBlur={() => handleRenameGroup(g.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameGroup(g.id); if (e.key === 'Escape') setGrRenamingId(null); }}
+                      autoFocus onClick={e => e.preventDefault()} />
+                  ) : (
+                    <span className="bc-list-title" onDoubleClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }}>{g.title}</span>
+                  )}
+                  <span className="bc-list-chatid">ID: {g.chatId}</span>
+                  {!g.approved && (
+                    <span className="bc-pending-badge" title="Ожидает подтверждения">
+                      <Clock size={12} /> Ожидает
+                    </span>
+                  )}
+                  {!g.approved && (
+                    <button className="bc-approve-btn" onClick={(e) => { e.preventDefault(); handleApprove(g.id); }} title="Подтвердить">
+                      <Check size={12} /> Принять
+                    </button>
+                  )}
+                  {grRenamingId !== g.id && (
+                    <button className="bc-rename-btn" onClick={(e) => { e.preventDefault(); setGrRenamingId(g.id); setGrRenameValue(g.title); }} title="Переименовать">
+                      <Pencil size={11} />
+                    </button>
+                  )}
+                  {(groupTagsMap[g.chatId] || []).length > 0 && (
+                    <span className="bc-list-inline-tags">
+                      {(groupTagsMap[g.chatId] || []).map(t => <span key={t} className="bc-inline-tag">{t}</span>)}
+                    </span>
+                  )}
                 </label>
-                <ChannelTagsEditor chatId={g.chatId} allChannelTags={allGroupTags} onTagsChange={handleTagsChange} entityType="groups" />
-                <button className="bc-list-archive-btn" onClick={() => handleArchive(g.id)} title="В архив">
-                  <Archive size={14} />
-                </button>
+                <ItemActionsMenu chatId={g.chatId} entityType="groups" allTags={allGroupTags} onTagsChange={handleTagsChange} onArchive={() => handleArchive(g.id)} folders={grFolders} currentFolderId={grFolderMap[g.chatId] || null} onAssignFolder={assignGrFolder} />
               </div>
             ))}
           </div>
@@ -1362,8 +2092,8 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     <div className="bc-list-item-main">
                       <MessageCircle size={14} className="bc-list-icon" />
                       <span className="bc-list-title">{g.title}</span>
-                      <span className="bc-list-id">{g.chatId}</span>
-                    </div>
+                      <span className="bc-list-chatid">ID: {g.chatId}</span>
+                        </div>
                     <button className="bc-list-restore-btn" onClick={() => handleRestore(g.id)} title="Восстановить">
                       <RotateCcw size={14} />
                     </button>
@@ -1413,7 +2143,8 @@ function DraftsTab({ onSendResult, onEditDraft }) {
     try {
       const res = await api.get('/api/broadcasts/drafts');
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-      setDrafts(await res.json());
+      const all = await res.json();
+      setDrafts(all.filter(d => !(d.scheduleId && d.scheduleStatus === 'pending')));
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
@@ -1485,7 +2216,7 @@ function DraftsTab({ onSendResult, onEditDraft }) {
                 {d.poll ? (
                   <span>[{d.poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] {d.poll.question}</span>
                 ) : (
-                  <span dangerouslySetInnerHTML={{ __html: renderTgHtml((d.text || '').substring(0, 120)) }} />
+                  <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml((d.text || '').substring(0, 120))) }} />
                 )}
               </div>
               <div className="bc-draft-footer">
@@ -1511,15 +2242,6 @@ function DraftsTab({ onSendResult, onEditDraft }) {
                     title="Редактировать"
                   >
                     <Edit3 size={13} /> Редактировать
-                  </button>
-                  <button
-                    className="bc-draft-action-btn bc-draft-send-btn"
-                    onClick={() => setConfirmSend(d)}
-                    disabled={sendingId === d.id}
-                    title="Отправить сейчас"
-                  >
-                    {sendingId === d.id ? <Loader size={13} className="spin" /> : <Play size={13} />}
-                    Отправить
                   </button>
                   <button
                     className="bc-draft-action-btn bc-draft-delete-btn"
@@ -1579,14 +2301,21 @@ export default function Broadcasts() {
   const [search, setSearch] = useState('');
   const [deleteModal, setDeleteModal] = useState(null);
   const [deliveryModal, setDeliveryModal] = useState(null);
+  const [textModal, setTextModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
   const [filterType, setFilterType] = useState(''); // channels|users|groups
   const [filterStatus, setFilterStatus] = useState(''); // published|partial|failed|scheduled
-  const [pollStatsModal, setPollStatsModal] = useState(null); // { question, stats, totalVotes, ... }
+  const [filterContent, setFilterContent] = useState(''); // text|poll|quiz
+  const [pollStatsModal, setPollStatsModal] = useState(null);
   const [pollStatsLoading, setPollStatsLoading] = useState(false);
+  const [pollVoters, setPollVoters] = useState(null); // { optionIndex, optionText, voters: [] }  optionIndex='all' for all
+  const [pollVotersLoading, setPollVotersLoading] = useState(false);
+  const [randomWinner, setRandomWinner] = useState(null);
+  const [spinning, setSpinning] = useState(false);
+  const [raffleOpen, setRaffleOpen] = useState(false);
 
   const fetchBroadcasts = useCallback(async () => {
     try {
@@ -1608,6 +2337,56 @@ export default function Broadcasts() {
       setPollStatsModal(data);
     } catch { setPollStatsModal(null); }
     setPollStatsLoading(false);
+  };
+
+  const loadPollVoters = async (pollId, optionIndex, optionText) => {
+    setPollVotersLoading(true);
+    setRandomWinner(null);
+    setRaffleOpen(false);
+    try {
+      const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${optionIndex}`);
+      if (!res.ok) throw new Error();
+      const voters = await res.json();
+      setPollVoters({ optionIndex, optionText, voters });
+    } catch { setPollVoters(null); }
+    setPollVotersLoading(false);
+  };
+
+  const loadAllPollVoters = async (pollId, options) => {
+    setPollVotersLoading(true);
+    setRandomWinner(null);
+    setRaffleOpen(false);
+    try {
+      const all = [];
+      for (let i = 0; i < options.length; i++) {
+        const res = await api.get(`/api/broadcasts/poll/${pollId}/voters/${i}`);
+        if (res.ok) {
+          const list = await res.json();
+          list.forEach(v => all.push({ ...v, optionIndex: i, optionText: options[i] }));
+        }
+      }
+      setPollVoters({ optionIndex: 'all', optionText: 'Все', voters: all });
+    } catch { setPollVoters(null); }
+    setPollVotersLoading(false);
+  };
+
+  const pickRandomVoter = () => {
+    if (!pollVoters || pollVoters.voters.length === 0) return;
+    setSpinning(true);
+    setRandomWinner(null);
+    let count = 0;
+    const total = 12 + Math.floor(Math.random() * 6);
+    const iv = setInterval(() => {
+      const idx = Math.floor(Math.random() * pollVoters.voters.length);
+      setRandomWinner(pollVoters.voters[idx]);
+      count++;
+      if (count >= total) {
+        clearInterval(iv);
+        const finalIdx = Math.floor(Math.random() * pollVoters.voters.length);
+        setRandomWinner(pollVoters.voters[finalIdx]);
+        setSpinning(false);
+      }
+    }, 80 + count * 8);
   };
 
   const handleSendResult = (data) => {
@@ -1672,12 +2451,38 @@ export default function Broadcasts() {
     const targetSection = draft.targetType || 'channels';
     setOpenSection(targetSection);
     setMounted(prev => ({ ...prev, [targetSection]: true }));
+    // Scroll to top so compose area is visible
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+  };
+
+  const handleEditScheduled = (b) => {
+    // Convert scheduled broadcast from history into a draft-like object for editing
+    const draftLike = {
+      id: b.draftId,
+      text: b.text || '',
+      media: b.media || null,
+      poll: b.poll || null,
+      targetType: b.type || 'channels',
+      targetFilter: b.targetFilter || null,
+      scheduledAt: b.date,
+      scheduleStatus: 'pending',
+      scheduleId: b.scheduleId,
+    };
+    handleEditDraft(draftLike);
   };
 
   const filtered = broadcasts.filter(b => {
     if (search && !(b.text || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (filterType && b.type !== filterType) return false;
     if (filterStatus && b.status !== filterStatus) return false;
+    if (filterContent) {
+      const t = (b.text || '');
+      const isQuiz = t.startsWith('[Викторина]');
+      const isPoll = t.startsWith('[Опрос]');
+      if (filterContent === 'quiz' && !isQuiz) return false;
+      if (filterContent === 'poll' && !isPoll) return false;
+      if (filterContent === 'text' && (isQuiz || isPoll)) return false;
+    }
     return true;
   });
 
@@ -1687,9 +2492,16 @@ export default function Broadcasts() {
   const TYPE_ICONS = { channels: '📢', users: '👤', groups: '💬', poll: '📊', quiz: '🧠' };
 
   const [mounted, setMounted] = useState({ channels: true }); // track which sections have been opened
+  const sectionRefs = useRef({});
   const toggleSection = (id) => {
+    const wasOpen = openSection === id;
     setOpenSection(prev => prev === id ? null : id);
     setMounted(prev => ({ ...prev, [id]: true }));
+    if (!wasOpen) {
+      setTimeout(() => {
+        sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
 
   if (loading) {
@@ -1715,7 +2527,7 @@ export default function Broadcasts() {
         const Icon = s.icon;
         const isOpen = openSection === s.id;
         return (
-          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`}>
+          <div key={s.id} className={`bc-accordion ${isOpen ? 'open' : ''}`} ref={el => sectionRefs.current[s.id] = el}>
             <button className="bc-accordion-header" onClick={() => toggleSection(s.id)}>
               <Icon size={18} />
               <span className="bc-accordion-label">{s.label}</span>
@@ -1767,6 +2579,12 @@ export default function Broadcasts() {
               <button key={v} className={`bc-filter-chip ${filterStatus === v ? 'active' : ''}`} onClick={() => { setFilterStatus(v); setVisibleCount(20); }}>{l}</button>
             ))}
           </div>
+          <div className="bc-filter-group">
+            <span className="bc-filter-label">Контент:</span>
+            {[['', 'Все'], ['text', '📝 Текст'], ['poll', '📊 Опрос'], ['quiz', '🧠 Викторина']].map(([v, l]) => (
+              <button key={v} className={`bc-filter-chip ${filterContent === v ? 'active' : ''}`} onClick={() => { setFilterContent(v); setVisibleCount(20); }}>{l}</button>
+            ))}
+          </div>
         </div>
 
         <div className="broadcasts-table-wrap">
@@ -1787,7 +2605,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span dangerouslySetInnerHTML={{ __html: (b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '') }} />
+                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal((b.media ? `[${b.media.originalName}] ` : '') + (b.text || ''))} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
@@ -1811,6 +2629,11 @@ export default function Broadcasts() {
                     {new Date(b.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="bc-actions">
+                    {b.status === 'scheduled' && b.draftId && (
+                      <button className="bc-action-btn bc-action-edit" title="Редактировать" onClick={() => handleEditScheduled(b)}>
+                        <Edit3 size={14} />
+                      </button>
+                    )}
                     {b.pollId && (
                       <button className="bc-action-btn bc-action-stats" title="Статистика опроса" onClick={() => loadPollStats(b.pollId)}>
                         <BarChart2 size={14} />
@@ -1836,6 +2659,18 @@ export default function Broadcasts() {
           onConfirm={handleDeleteBroadcast}
           onCancel={() => setDeleteModal(null)}
         />
+      )}
+
+      {textModal && (
+        <div className="bc-text-modal-overlay" onClick={() => setTextModal(null)}>
+          <div className="bc-text-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-text-modal-header">
+              <h4>Текст рассылки</h4>
+              <button onClick={() => setTextModal(null)}><X size={16} /></button>
+            </div>
+            <div className="bc-text-modal-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal)) }} />
+          </div>
+        </div>
       )}
 
       {deliveryModal && (
@@ -1868,17 +2703,31 @@ export default function Broadcasts() {
       )}
 
       {pollStatsModal && (
-        <div className="bc-delivery-overlay" onClick={() => setPollStatsModal(null)}>
+        <div className="bc-delivery-overlay" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); setRaffleOpen(false); }}>
           <div className="bc-delivery-modal bc-poll-stats-modal" onClick={e => e.stopPropagation()}>
             <div className="bc-delivery-modal-header">
-              <h3>{pollStatsModal.type === 'quiz' ? '🧠 Викторина' : '📊 Опрос'}</h3>
-              <button className="bc-delivery-close" onClick={() => setPollStatsModal(null)}><X size={18} /></button>
+              <h3>{pollStatsModal.type === 'quiz' ? 'Викторина' : 'Опрос'}</h3>
+              <button className="bc-delivery-close" onClick={() => { setPollStatsModal(null); setPollVoters(null); setRandomWinner(null); setRaffleOpen(false); }}><X size={18} /></button>
             </div>
-            <div className="bc-poll-question">{pollStatsModal.question}</div>
-            <div className="bc-poll-total">Всего голосов: <b>{pollStatsModal.totalVotes}</b></div>
+            <div className="bc-poll-stats-question">{pollStatsModal.question}</div>
+            <div className="bc-poll-stats-total">
+              <span>Всего голосов: <b>{pollStatsModal.totalVotes}</b></span>
+              {pollStatsModal.totalVotes > 0 && (
+                <button
+                  className={`bc-poll-all-voters-btn ${pollVoters?.optionIndex === 'all' ? 'active' : ''}`}
+                  onClick={() => loadAllPollVoters(pollStatsModal.id, (pollStatsModal.stats || []).map(s => s.option))}
+                >
+                  <Users size={13} /> Все проголосовавшие
+                </button>
+              )}
+            </div>
             <div className="bc-poll-options">
               {(pollStatsModal.stats || []).map((s, i) => (
-                <div key={i} className={`bc-poll-option ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''}`}>
+                <div
+                  key={i}
+                  className={`bc-poll-option bc-poll-option--clickable ${pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i ? 'bc-poll-option--correct' : ''} ${pollVoters?.optionIndex === i ? 'bc-poll-option--selected' : ''}`}
+                  onClick={() => s.count > 0 && loadPollVoters(pollStatsModal.id, i, s.option)}
+                >
                   <div className="bc-poll-option-header">
                     <span className="bc-poll-option-text">
                       {pollStatsModal.type === 'quiz' && pollStatsModal.correctIndex === i && <Check size={14} className="bc-poll-correct-icon" />}
@@ -1892,6 +2741,64 @@ export default function Broadcasts() {
                 </div>
               ))}
             </div>
+
+            {/* Voters panel */}
+            {pollVotersLoading && <div className="bc-poll-voters-loading"><Loader size={16} className="spin" /> Загрузка...</div>}
+            {pollVoters && !pollVotersLoading && (
+              <div className="bc-poll-voters">
+                <div className="bc-poll-voters-header">
+                  <span>{pollVoters.optionIndex === 'all' ? 'Все проголосовавшие' : `Вариант: «${pollVoters.optionText}»`}</span>
+                  <span className="bc-poll-voters-count">{pollVoters.voters.length}</span>
+                </div>
+                {pollVoters.voters.length === 0 ? (
+                  <div className="bc-poll-voters-empty">Нет голосов</div>
+                ) : (
+                  <>
+                    <div className="bc-poll-voters-list">
+                      {pollVoters.voters.map((v, vi) => (
+                        <div key={vi} className={`bc-poll-voter${randomWinner?.userId === v.userId && !spinning ? ' bc-poll-voter--winner' : ''}`}>
+                          <div className="bc-poll-voter-avatar">{(v.fullName || v.username || '?').charAt(0).toUpperCase()}</div>
+                          <div className="bc-poll-voter-info">
+                            <span className="bc-poll-voter-name">{v.fullName || 'Без имени'}</span>
+                            {v.username && <span className="bc-poll-voter-username">@{v.username}</span>}
+                          </div>
+                          {pollVoters.optionIndex === 'all' && v.optionText && (
+                            <span className="bc-poll-voter-opt">{v.optionText}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bc-poll-actions-row">
+                      <button className={`bc-poll-random-btn${spinning ? ' bc-poll-random-btn--spin' : ''}`} onClick={pickRandomVoter} disabled={spinning}>
+                        {spinning ? 'Выбираем...' : randomWinner && !spinning ? `Победитель: ${randomWinner.fullName || randomWinner.username || 'ID: ' + randomWinner.userId}` : 'Случайный победитель'}
+                      </button>
+                      <button
+                        className={`bc-poll-raffle-btn${raffleOpen ? ' bc-poll-raffle-btn--active' : ''}`}
+                        onClick={() => setRaffleOpen(o => !o)}
+                      >
+                        <Tag size={14} /> {raffleOpen ? 'Скрыть розыгрыш' : 'Розыгрыш с тегом'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Full raffle UI inside the modal */}
+            {raffleOpen && pollVoters && pollVoters.voters.length > 0 && (
+              <div className="bc-poll-raffle-wrap">
+                <Raffle
+                  compact
+                  poolLabel={pollVoters.optionIndex === 'all' ? 'Голосовавшие' : `Выбрали «${pollVoters.optionText}»`}
+                  defaultTag={pollStatsModal.type === 'quiz' ? 'Викторина-победитель' : 'Опрос-победитель'}
+                  users={pollVoters.voters.map(v => ({
+                    user_id: v.userId,
+                    full_name: v.fullName,
+                    username: v.username,
+                  }))}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

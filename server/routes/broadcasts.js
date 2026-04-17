@@ -557,6 +557,11 @@ router.post('/users', async (req, res, next) => {
         joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
         params.push(...tagsArr);
       }
+      const excludeTagsArr = Array.isArray(filters.excludeTags) ? filters.excludeTags.filter(Boolean) : [];
+      if (excludeTagsArr.length > 0) {
+        where.push(`u.user_id NOT IN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (${excludeTagsArr.map(() => '?').join(',')}))`);
+        params.push(...excludeTagsArr);
+      }
     }
 
     const [rows] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name, u.username FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
@@ -660,6 +665,14 @@ router.get('/users/count', async (req, res, next) => {
         params.push(...tagsArr);
       }
     }
+    const excludeParam = req.query.excludeTags?.trim();
+    if (excludeParam) {
+      const excArr = excludeParam.split(',').map(t => t.trim()).filter(Boolean);
+      if (excArr.length > 0) {
+        where.push(`u.user_id NOT IN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (${excArr.map(() => '?').join(',')}))`);
+        params.push(...excArr);
+      }
+    }
     const [[{ count }]] = await dbPool.query(`SELECT COUNT(DISTINCT u.user_id) as count FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
     res.json({ count });
   } catch (err) { next(err); }
@@ -677,6 +690,14 @@ router.get('/users/list', async (req, res, next) => {
       if (tagsArr.length > 0) {
         joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
         params.push(...tagsArr);
+      }
+    }
+    const excludeParam = req.query.excludeTags?.trim();
+    if (excludeParam) {
+      const excArr = excludeParam.split(',').map(t => t.trim()).filter(Boolean);
+      if (excArr.length > 0) {
+        where.push(`u.user_id NOT IN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (${excArr.map(() => '?').join(',')}))`);
+        params.push(...excArr);
       }
     }
     const offset = Math.max(0, parseInt(req.query.offset) || 0);
@@ -982,6 +1003,11 @@ router.post('/drafts/:id/send', async (req, res, next) => {
         joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
         params.push(...tagsArr);
       }
+      const excTagsArr = Array.isArray(filters.excludeTags) ? filters.excludeTags.filter(Boolean) : [];
+      if (excTagsArr.length > 0) {
+        where.push(`u.user_id NOT IN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (${excTagsArr.map(() => '?').join(',')}))`);
+        params.push(...excTagsArr);
+      }
       const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
       let draftPollId = null;
       if (poll) draftPollId = await createPoll(poll);
@@ -1134,6 +1160,11 @@ setInterval(async () => {
           if (tagsArr.length > 0) {
             joins += ` INNER JOIN wl_admin_user_tags t ON t.user_id = u.user_id AND t.tag IN (${tagsArr.map(() => '?').join(',')})`;
             params.push(...tagsArr);
+          }
+          const excTagsArr = Array.isArray(filters.excludeTags) ? filters.excludeTags.filter(Boolean) : [];
+          if (excTagsArr.length > 0) {
+            where.push(`u.user_id NOT IN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (${excTagsArr.map(() => '?').join(',')}))`);
+            params.push(...excTagsArr);
           }
           const [users] = await dbPool.query(`SELECT DISTINCT u.user_id, u.full_name FROM users u${joins} WHERE ${where.join(' AND ')}`, params);
           let schedPollId = null;
