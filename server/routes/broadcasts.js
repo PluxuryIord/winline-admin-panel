@@ -124,6 +124,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
       approved TINYINT(1) DEFAULT 0,
       approved_at DATETIME DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // Full broadcast texts (sidecar — wl_admin_broadcasts.text is VARCHAR(500) and cannot be altered).
+    // Stores the untruncated text so history/preview can show the whole message.
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_broadcast_texts (
+      broadcast_id INT PRIMARY KEY,
+      full_text MEDIUMTEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   } catch (err) {
     console.error('[broadcasts] Failed to create archive tables:', err.message);
   }
@@ -490,9 +497,13 @@ router.post('/groups/send', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const withMedia = await checkMediaColumn();
-    const cols = 'id, text, type, channels_json, channel_ids_json, total, success, failed, results_json, ' +
-      (withMedia ? 'media_json, ' : '') + 'status, created_at AS date';
-    const [rows] = await dbPool.query(`SELECT ${cols} FROM wl_admin_broadcasts ORDER BY created_at DESC LIMIT 200`);
+    const cols = 'b.id, b.text, b.type, b.channels_json, b.channel_ids_json, b.total, b.success, b.failed, b.results_json, ' +
+      (withMedia ? 'b.media_json, ' : '') + 'b.status, b.created_at AS date, t.full_text';
+    const [rows] = await dbPool.query(
+      `SELECT ${cols} FROM wl_admin_broadcasts b
+       LEFT JOIN wl_admin_broadcast_texts t ON t.broadcast_id = b.id
+       ORDER BY b.created_at DESC LIMIT 200`
+    );
 
     // Get poll ids linked to broadcasts (for inline polls stats)
     const broadcastIds = rows.map(r => r.id);
@@ -509,7 +520,7 @@ router.get('/', async (req, res, next) => {
 
     const history = rows.map(r => ({
       id: r.id,
-      text: r.text,
+      text: r.full_text || r.text,
       type: r.type || 'channels',
       channels: safeJsonArray(r.channels_json),
       channelIds: safeJsonArray(r.channel_ids_json),
@@ -598,8 +609,10 @@ router.post('/', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const [result] = await dbPool.query('DELETE FROM wl_admin_broadcasts WHERE id = ?', [Number(req.params.id)]);
+    const bid = Number(req.params.id);
+    const [result] = await dbPool.query('DELETE FROM wl_admin_broadcasts WHERE id = ?', [bid]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    try { await dbPool.query('DELETE FROM wl_admin_broadcast_texts WHERE broadcast_id = ?', [bid]); } catch {}
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -1377,13 +1390,28 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
   const sql = `INSERT INTO wl_admin_broadcasts (${cols}) VALUES (${placeholders})`;
   const [result] = await db.query(sql, vals);
 
+  // Persist full (untruncated) text in sidecar table so history can render the whole message.
+  // wl_admin_broadcasts.text is VARCHAR(500) and we cannot ALTER it.
+  const fullText = text || '';
+  if (fullText.length > 0) {
+    try {
+      await db.query(
+        `INSERT INTO wl_admin_broadcast_texts (broadcast_id, full_text) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE full_text = VALUES(full_text)`,
+        [result.insertId, fullText]
+      );
+    } catch (err) {
+      console.error('[broadcasts] save full text failed:', err.message);
+    }
+  }
+
   // Link poll to broadcast
   if (pollId) {
     try { await db.query('UPDATE wl_admin_polls SET broadcast_id = ? WHERE id = ?', [result.insertId, pollId]); } catch {}
   }
 
   return {
-    id: result.insertId, text: (text || '').substring(0, 200), type, channels, channelIds,
+    id: result.insertId, text: fullText, type, channels, channelIds,
     total, success, failed, results, media: media || null, date: new Date().toISOString(), status, pollId,
   };
 }
