@@ -2603,7 +2603,7 @@ export default function Broadcasts() {
                 <tr key={b.id} className="broadcasts-row">
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal((b.media ? `[${b.media.originalName}] ` : '') + (b.text || ''))} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
+                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal({ text: b.text || '', media: b.media || null })} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
@@ -2666,7 +2666,39 @@ export default function Broadcasts() {
               <h4>Текст рассылки</h4>
               <button onClick={() => setTextModal(null)}><X size={16} /></button>
             </div>
-            <div className="bc-text-modal-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal)) }} />
+            <div className="bc-text-modal-body">
+              {textModal.media && (() => {
+                const m = textModal.media;
+                const mime = m.mimeType || '';
+                if (mime.startsWith('image/')) {
+                  return (
+                    <a href={m.url} target="_blank" rel="noopener noreferrer" className="bc-text-modal-media">
+                      <img src={m.url} alt={m.originalName || ''} className="bc-text-modal-image" />
+                    </a>
+                  );
+                }
+                if (mime.startsWith('video/')) {
+                  return (
+                    <video src={m.url} controls className="bc-text-modal-video" preload="metadata" />
+                  );
+                }
+                return (
+                  <a href={m.url} target="_blank" rel="noopener noreferrer" className="bc-text-modal-file">
+                    <Paperclip size={14} />
+                    <span className="bc-text-modal-file-name">{m.originalName || 'Файл'}</span>
+                    {typeof m.size === 'number' && (
+                      <span className="bc-text-modal-file-size">{formatSize(m.size)}</span>
+                    )}
+                  </a>
+                );
+              })()}
+              {textModal.text && (
+                <div
+                  className="bc-text-modal-text"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderTgHtml(textModal.text)) }}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
