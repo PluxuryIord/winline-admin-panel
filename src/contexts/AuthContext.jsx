@@ -27,11 +27,27 @@ export function AuthProvider({ children }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
-      credentials: 'same-origin', // Important: receive the cookie
+      credentials: 'same-origin',
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Ошибка авторизации');
-    removeToken(); // Clean up old localStorage token
+    // Если нужен второй шаг — не ставим user, просто возвращаем данные шага.
+    if (data.needsOtp) return data;
+    removeToken();
+    setUser(data.user);
+    return data;
+  }, []);
+
+  const verifyOtp = useCallback(async (otpSession, code, trustDevice) => {
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otpSession, code, trustDevice }),
+      credentials: 'same-origin',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Неверный код');
+    removeToken();
     setUser(data.user);
     return data;
   }, []);
@@ -45,7 +61,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyOtp, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

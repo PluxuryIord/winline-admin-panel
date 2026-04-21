@@ -79,6 +79,7 @@ const uploadLimiter = rateLimit({
 });
 
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/verify-otp', loginLimiter);
 app.use('/api/broadcasts/groups/send', broadcastLimiter);
 app.use('/api/broadcasts/users', broadcastLimiter);
 app.use('/api/broadcasts/drafts/:id/send', broadcastLimiter);

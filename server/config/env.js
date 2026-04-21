@@ -43,3 +43,15 @@ export const BOT_API_URL = process.env.BOT_API_URL || projectEnv.BOT_API_URL || 
 // Google Sheets (service account credentials JSON string)
 export const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || projectEnv.GOOGLE_SERVICE_ACCOUNT || '';
 export const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || projectEnv.GOOGLE_SPREADSHEET_ID || '';
+
+// --- SMTP (2FA OTP emails) ---
+export const SMTP_HOST = process.env.SMTP_HOST || projectEnv.SMTP_HOST || '';
+export const SMTP_PORT = Number(process.env.SMTP_PORT || projectEnv.SMTP_PORT || 465);
+export const SMTP_SECURE = String(process.env.SMTP_SECURE || projectEnv.SMTP_SECURE || 'true') === 'true';
+export const SMTP_USER = process.env.SMTP_USER || projectEnv.SMTP_USER || '';
+export const SMTP_PASS = process.env.SMTP_PASS || projectEnv.SMTP_PASS || '';
+export const SMTP_FROM = process.env.SMTP_FROM || projectEnv.SMTP_FROM || '';
+export const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || projectEnv.SMTP_FROM_NAME || 'Winline Admin';
+
+// Set OTP_2FA=0 в .env чтобы выключить 2FA (нужно при первой раскатке, пока у админов нет email)
+export const OTP_2FA_ENABLED = String(process.env.OTP_2FA || projectEnv.OTP_2FA || '1') !== '0';

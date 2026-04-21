@@ -3,6 +3,7 @@ import dbPool from '../config/db.js';
 import createTables from './001_create_tables.js';
 import seedAdmin from './002_seed_admin.js';
 import multiuserAudit from './005_multiuser_audit.js';
+import admin2fa from './006_admin_2fa.js';
 
 async function run() {
   if (!dbPool) {
@@ -14,6 +15,7 @@ async function run() {
     await createTables(dbPool);
     await seedAdmin(dbPool);
     await multiuserAudit(dbPool);
+    await admin2fa(dbPool);
     console.log('\n[migrate] ✓ Все миграции выполнены.');
   } catch (err) {
     console.error('[migrate] Ошибка:', err.message);
