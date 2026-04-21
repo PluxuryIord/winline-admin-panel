@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { LogIn, Loader } from 'lucide-react';
+import logoSvg from '../../assets/logo.svg';
 import './Login.css';
 
 export default function Login() {
@@ -32,7 +33,7 @@ export default function Login() {
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-logo">
-          <img src="/logo.svg" alt="Winline Partners" className="login-logo-img" />
+          <img src={logoSvg} alt="Winline Partners" className="login-logo-img" />
         </div>
         <p className="login-subtitle">Войдите в панель управления</p>
 

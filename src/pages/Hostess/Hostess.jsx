@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import jsQR from 'jsqr';
+import logo2Svg from '../../assets/logo2.svg';
 import './Hostess.css';
 
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -258,7 +259,7 @@ export default function Hostess() {
 
       {/* Logo */}
       <div className="hostess-logo-wrap">
-        <img src="/logo2.svg" alt="Winline Partners" className="hostess-logo-img" />
+        <img src={logo2Svg} alt="Winline Partners" className="hostess-logo-img" />
       </div>
 
       {/* Mini stats */}

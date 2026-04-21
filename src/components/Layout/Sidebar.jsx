@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
+import logoSvg from '../../assets/logo.svg';
 
 export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, onToggleCollapse }) {
   const { user, logout } = useAuth();
@@ -13,7 +14,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
   return (
     <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="logo-area">
-        {!collapsed && <img src="/logo.svg" alt="Winline Partners" className="sidebar-logo" />}
+        {!collapsed && <img src={logoSvg} alt="Winline Partners" className="sidebar-logo" />}
         <button className="sidebar-collapse-btn" onClick={onToggleCollapse} title={collapsed ? 'Развернуть' : 'Свернуть'}>
           {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
         </button>
