@@ -45,12 +45,14 @@ function issueSessionCookie(res, { id, username, role, displayName }) {
 
 async function loadUserFull(whereCol, whereVal) {
   const [rows] = await dbPool.query(
-    `SELECT u.id, u.username, u.email, u.password_hash, u.display_name,
+    `SELECT u.id, u.username, u.password_hash, u.display_name,
+            e.email AS email,
             COALESCE(p.role, 'editor') AS role,
             COALESCE(p.is_active, 1) AS is_active,
             p.display_name AS profile_display_name
        FROM wl_admin_users u
        LEFT JOIN wl_admin_user_profiles p ON p.user_id = u.id
+       LEFT JOIN wl_admin_user_emails   e ON e.user_id = u.id
       WHERE u.${whereCol} = ?
       LIMIT 1`,
     [whereVal]

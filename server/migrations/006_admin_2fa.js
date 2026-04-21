@@ -10,23 +10,17 @@
  * только если её ещё нет).
  */
 export default async function admin2fa(pool) {
-  // --- 1) Добавить email в wl_admin_users, если колонки ещё нет ---
-  const [cols] = await pool.query(
-    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE()
-         AND TABLE_NAME = 'wl_admin_users'
-         AND COLUMN_NAME = 'email'`
-  );
-  if (!cols.length) {
-    await pool.query(
-      `ALTER TABLE wl_admin_users
-         ADD COLUMN email VARCHAR(255) DEFAULT NULL AFTER username,
-         ADD INDEX idx_email (email)`
-    );
-    console.log('[migrate] ✓ wl_admin_users.email');
-  } else {
-    console.log('[migrate] · wl_admin_users.email (already exists)');
-  }
+  // --- 1) Email хранится в отдельной таблице (ALTER на prod запрещён) ---
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wl_admin_user_emails (
+      user_id INT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_email (email)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  console.log('[migrate] ✓ wl_admin_user_emails');
 
   // --- 2) Одноразовые коды ---
   await pool.query(`

@@ -15,14 +15,19 @@ async function run() {
     console.error('Некорректный email');
     process.exit(1);
   }
-  const [result] = await dbPool.query(
-    'UPDATE wl_admin_users SET email = ? WHERE username = ?',
-    [email, username]
+  const [users] = await dbPool.query(
+    'SELECT id FROM wl_admin_users WHERE username = ?',
+    [username]
   );
-  if (result.affectedRows === 0) {
+  if (!users.length) {
     console.error(`Пользователь "${username}" не найден.`);
     process.exit(1);
   }
+  await dbPool.query(
+    `INSERT INTO wl_admin_user_emails (user_id, email) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE email = VALUES(email)`,
+    [users[0].id, email]
+  );
   console.log(`✓ ${username} → ${email}`);
   await dbPool.end();
 }
