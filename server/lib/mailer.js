@@ -18,10 +18,13 @@ function getTransporter() {
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // Жёсткие таймауты чтобы login не висел, если порт закрыт / креды битые
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
+    // Таймауты: короткие, но дают серверу дохнуть
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 30_000,
+    tls: { rejectUnauthorized: false },
+    logger: false,
+    debug: false,
   });
   return _transporter;
 }
