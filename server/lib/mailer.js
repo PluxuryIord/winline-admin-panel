@@ -5,6 +5,7 @@
 import nodemailer from 'nodemailer';
 import {
   SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_FROM_NAME,
+  MAIL_PROVIDER, RESEND_API_KEY, RESEND_FROM,
 } from '../config/env.js';
 
 let _transporter = null;
@@ -27,16 +28,49 @@ function getTransporter() {
 
 // Диагностический метод — проверить соединение и креды одной командой
 export async function verifyMailer() {
+  if (isResend()) return verifyResend();
   const t = getTransporter();
   if (!t) throw new Error('SMTP не настроен (SMTP_HOST/USER/PASS пустые)');
   return t.verify();
 }
 
+function isResend() { return MAIL_PROVIDER === 'resend'; }
+
 export function isMailerConfigured() {
+  if (isResend()) return !!(RESEND_API_KEY && RESEND_FROM);
   return !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 }
 
+async function sendViaResend({ to, subject, text, html }) {
+  const fromAddr = RESEND_FROM;
+  const from = SMTP_FROM_NAME ? `${SMTP_FROM_NAME} <${fromAddr}>` : fromAddr;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to, subject, text, html }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.message || data?.error || `HTTP ${res.status}`;
+    const err = new Error(`Resend: ${msg}`);
+    err.code = data?.name || 'RESEND_ERR';
+    throw err;
+  }
+  return { messageId: data.id || '(unknown)', response: 'resend ok' };
+}
+
+async function verifyResend() {
+  // У Resend нет verify-ручки; считаем сконфигурированный ключ валидным.
+  if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY пуст');
+  if (!RESEND_FROM) throw new Error('RESEND_FROM пуст');
+  return true;
+}
+
 export async function sendMail({ to, subject, text, html }) {
+  if (isResend()) return sendViaResend({ to, subject, text, html });
   const t = getTransporter();
   if (!t) throw new Error('SMTP не настроен');
   const fromAddr = SMTP_FROM || SMTP_USER;

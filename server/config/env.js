@@ -55,3 +55,11 @@ export const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || projectEnv.SMTP_FROM
 
 // Set OTP_2FA=0 в .env чтобы выключить 2FA (нужно при первой раскатке, пока у админов нет email)
 export const OTP_2FA_ENABLED = String(process.env.OTP_2FA || projectEnv.OTP_2FA || '1') !== '0';
+
+// --- Resend (HTTPS-альтернатива SMTP, если хостинг режет 465/587) ---
+// MAIL_PROVIDER=resend — использовать Resend вместо SMTP.
+export const MAIL_PROVIDER = (process.env.MAIL_PROVIDER || projectEnv.MAIL_PROVIDER || 'smtp').toLowerCase();
+export const RESEND_API_KEY = process.env.RESEND_API_KEY || projectEnv.RESEND_API_KEY || '';
+// RESEND_FROM должен быть адресом на подтверждённом домене в Resend,
+// или `onboarding@resend.dev` (для теста — можно отправлять только на свой аккаунтный ящик).
+export const RESEND_FROM = process.env.RESEND_FROM || projectEnv.RESEND_FROM || '';
