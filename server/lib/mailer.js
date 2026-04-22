@@ -17,8 +17,19 @@ function getTransporter() {
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Жёсткие таймауты чтобы login не висел, если порт закрыт / креды битые
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   return _transporter;
+}
+
+// Диагностический метод — проверить соединение и креды одной командой
+export async function verifyMailer() {
+  const t = getTransporter();
+  if (!t) throw new Error('SMTP не настроен (SMTP_HOST/USER/PASS пустые)');
+  return t.verify();
 }
 
 export function isMailerConfigured() {

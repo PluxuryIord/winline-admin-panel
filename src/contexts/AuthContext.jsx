@@ -22,6 +22,11 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const parseJsonSafe = async (res) => {
+    try { return await res.json(); }
+    catch { return { error: `Сервер вернул ответ не в формате JSON (HTTP ${res.status}).` }; }
+  };
+
   const login = useCallback(async (username, password) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -29,9 +34,8 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ username, password }),
       credentials: 'same-origin',
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.error || 'Ошибка авторизации');
-    // Если нужен второй шаг — не ставим user, просто возвращаем данные шага.
     if (data.needsOtp) return data;
     removeToken();
     setUser(data.user);
@@ -45,7 +49,7 @@ export function AuthProvider({ children }) {
       body: JSON.stringify({ otpSession, code, trustDevice }),
       credentials: 'same-origin',
     });
-    const data = await res.json();
+    const data = await parseJsonSafe(res);
     if (!res.ok) throw new Error(data.error || 'Неверный код');
     removeToken();
     setUser(data.user);
