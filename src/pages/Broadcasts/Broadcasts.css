@@ -2173,6 +2173,13 @@ input[type="checkbox"]:checked {
   color: #ff9d9d;
 }
 
+/* Дропдаун у кнопки "Исключить" раскрывается ВЛЕВО от кнопки,
+   чтобы не съезжал за правый край и не ломал раскладку */
+.bc-tag-filter--exclude .bc-tag-dropdown {
+  left: auto;
+  right: 0;
+}
+
 .bc-tag-option--disabled {
   opacity: 0.45;
   cursor: not-allowed;

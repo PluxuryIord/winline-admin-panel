@@ -1255,7 +1255,13 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     autoFocus onClick={e => e.stopPropagation()} />
                 ) : f.name}
                 {editingFolderId === f.id && (
-                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                  <button
+                    className="bc-folder-delete"
+                    /* onMouseDown + preventDefault — чтобы инпут не потерял фокус
+                       и не успел сработать его onBlur → renameFolder, который убирает кнопку */
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); deleteFolder(f.id); setEditingFolderId(null); }}
+                    title="Удалить"
+                  ><X size={11} /></button>
                 )}
               </div>
             ))}
@@ -2013,7 +2019,11 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                     autoFocus onClick={e => e.stopPropagation()} />
                 ) : f.name}
                 {grEditingFolderId === f.id && (
-                  <button className="bc-folder-delete" onClick={(e) => { e.stopPropagation(); deleteGrFolder(f.id); }} title="Удалить"><X size={11} /></button>
+                  <button
+                    className="bc-folder-delete"
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); deleteGrFolder(f.id); setGrEditingFolderId(null); }}
+                    title="Удалить"
+                  ><X size={11} /></button>
                 )}
               </div>
             ))}

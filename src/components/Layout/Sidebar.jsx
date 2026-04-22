@@ -23,6 +23,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
         </button>
       </div>
 
+      <div className="sidebar-scroll">
       <nav className="menu">
         {[
           { name: 'Пользователи', path: '/users', icon: <Users size={18} /> },
@@ -72,6 +73,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
           </NavLink>
         ))}
       </nav>
+      </div>
 
       <div className="admin-profile">
         <div className="admin-avatar">{(user?.username || 'AD').slice(0, 2).toUpperCase()}</div>

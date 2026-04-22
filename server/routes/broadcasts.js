@@ -134,6 +134,16 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
   } catch (err) {
     console.error('[broadcasts] Failed to create archive tables:', err.message);
   }
+  // Автомиграция: добавить media_json, если его нет (без DROP TABLE — чтобы не терять историю).
+  try {
+    const [cols] = await dbPool.query("SHOW COLUMNS FROM wl_admin_broadcasts LIKE 'media_json'");
+    if (!cols.length) {
+      await dbPool.query("ALTER TABLE wl_admin_broadcasts ADD COLUMN media_json TEXT DEFAULT NULL");
+      console.log('[broadcasts] media_json column added to wl_admin_broadcasts');
+    }
+  } catch (err) {
+    console.error('[broadcasts] Failed to ensure media_json column:', err.message);
+  }
 })();
 
 let hasMediaColumn = null; // кэш

@@ -23,6 +23,22 @@
   padding: 24px 8px 0 8px;
 }
 
+/* Скроллящаяся средняя часть: меню не выталкивает admin-profile за viewport */
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Тонкий скроллбар, чтобы не съедал место */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+
 /* --- КНОПКА СВОРАЧИВАНИЯ --- */
 .sidebar-collapse-btn {
   display: flex;
@@ -213,9 +229,10 @@
 
 /* --- ПРОФИЛЬ АДМИНА --- */
 .admin-profile {
-  /* margin-top: auto — это магия Flexbox. Она заставляет этот блок 
-     сдвинуться в самый низ родительского контейнера (.sidebar) */
-  margin-top: auto; 
+  /* Раньше было margin-top:auto для прижатия вниз, но при нехватке высоты
+     это толкало блок за viewport. Теперь меню в .sidebar-scroll скроллится,
+     а admin-profile всегда видно снизу. */
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
