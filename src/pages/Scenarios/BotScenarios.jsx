@@ -9,6 +9,10 @@ import './BotScenarios.css';
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
   'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+  // Сценарий 3 — расширенный поток мероприятия
+  'event_partner_check', 'event_verify_promo', 'event_email_prompt',
+  'event_email_confirmed', 'event_site_status', 'event_site_wait',
+  'event_congrats', 'event_registration_promo', 'event_registration_instructions',
 ]);
 
 // ─── Callback → Screen mapping (for auto-migration) ────────────────────────
@@ -53,6 +57,17 @@ const DEFAULT_POSITIONS = {
 
   // Сценарий 3: Мероприятие
   event_flow:        { x: 900, y: 350 },
+
+  // Сценарий 3: Расширенный поток мероприятия (колонка правее анкеты)
+  event_partner_check:           { x: 2000, y: 60 },
+  event_verify_promo:            { x: 1700, y: 350 },
+  event_email_prompt:            { x: 1700, y: 700 },
+  event_email_confirmed:         { x: 1700, y: 1000 },
+  event_site_status:             { x: 1700, y: 1300 },
+  event_site_wait:               { x: 2050, y: 1300 },
+  event_congrats:                { x: 1700, y: 1650 },
+  event_registration_promo:      { x: 2300, y: 350 },
+  event_registration_instructions: { x: 2300, y: 700 },
 
   // Сценарий 5: Анкета мероприятия (левее основных блоков)
   anketa_role:              { x: -900, y: 60 },

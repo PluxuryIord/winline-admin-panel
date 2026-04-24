@@ -20,10 +20,22 @@ const ENTRY_POINTS = new Set(['start_menu', 'event_flow', 'group_menu']);
 
 const FALLBACK_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1wfqrdL30DicmCikX_PBaYHTxbEoJwA8wQgF2jQowA4A/edit';
 
-// Блоки с заблокированными связями — нельзя менять targetScreen кнопок
-const LOCKED_CONNECTIONS = new Set([
-  'start_menu', 'registration_flow', 'auth_flow',
+// Системные блоки — структуру менять нельзя (только текст и фото).
+// Нельзя: добавлять/удалять кнопки, менять targetScreen, менять тип (URL/блок),
+// переупорядочивать, удалять сам блок.
+const LOCKED_STRUCTURE = new Set([
+  'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
+  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+  'anketa_role', 'anketa_traffic_company', 'anketa_traffic_category',
+  'anketa_adv_company', 'anketa_adv_position', 'anketa_other_occupation',
+  'anketa_sub_check', 'anketa_final',
+  'group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb',
+  'event_partner_check', 'event_verify_promo', 'event_email_prompt',
+  'event_email_confirmed', 'event_site_status', 'event_site_wait',
+  'event_congrats', 'event_registration_promo', 'event_registration_instructions',
 ]);
+// Обратная совместимость
+const LOCKED_CONNECTIONS = LOCKED_STRUCTURE;
 
 // ─── Custom Type Dropdown ────────────────────────────────────────────────────
 function AnketaTypeDropdown({ value, onChange, options }) {
@@ -344,6 +356,7 @@ export default function NodeEditorPanel({
     }));
 
   const isConnectionsLocked = LOCKED_CONNECTIONS.has(screenId);
+  const isStructureLocked = LOCKED_STRUCTURE.has(screenId);
 
   // ─── Drag & drop state ─────────────────────────────────────────────────────
   const [dragIdx, setDragIdx] = useState(null);
@@ -554,10 +567,15 @@ export default function NodeEditorPanel({
       {/* Buttons */}
       <div className="sc-section">
         <div className="sc-section-header">
-          <h3 className="sc-section-title"><MousePointer size={16} /> Кнопки</h3>
-          <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
-            <Plus size={14} /> Добавить
-          </button>
+          <h3 className="sc-section-title">
+            <MousePointer size={16} /> Кнопки
+            {isStructureLocked && <span className="node-editor-locked-hint" title="Структура заблокирована — можно менять только текст">🔒</span>}
+          </h3>
+          {!isStructureLocked && (
+            <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
+              <Plus size={14} /> Добавить
+            </button>
+          )}
         </div>
         {buttonOrder.length > 0 && (
           <div className="sc-buttons-list">
@@ -590,62 +608,70 @@ export default function NodeEditorPanel({
                   className={`node-editor-btn-block ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
                 >
                   <div className="sc-button-row">
-                    {/* Drag handle */}
-                    <div
-                      className="sc-drag-handle"
-                      onMouseDown={(e) => handleDragStart(e, idx)}
-                      title="Перетащите для перемещения"
-                    >
-                      <GripVertical size={16} />
-                    </div>
-                    <div className="sc-button-arrows">
-                      <button className="sc-arrow-btn" onClick={() => onMoveButton(key, -1)} disabled={idx === 0}>
-                        <ChevronUp size={14} />
-                      </button>
-                      <button className="sc-arrow-btn" onClick={() => onMoveButton(key, 1)} disabled={idx === buttonOrder.length - 1}>
-                        <ChevronDown size={14} />
-                      </button>
-                    </div>
+                    {!isStructureLocked && (
+                      <>
+                        {/* Drag handle */}
+                        <div
+                          className="sc-drag-handle"
+                          onMouseDown={(e) => handleDragStart(e, idx)}
+                          title="Перетащите для перемещения"
+                        >
+                          <GripVertical size={16} />
+                        </div>
+                        <div className="sc-button-arrows">
+                          <button className="sc-arrow-btn" onClick={() => onMoveButton(key, -1)} disabled={idx === 0}>
+                            <ChevronUp size={14} />
+                          </button>
+                          <button className="sc-arrow-btn" onClick={() => onMoveButton(key, 1)} disabled={idx === buttonOrder.length - 1}>
+                            <ChevronDown size={14} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                     <input
                       className="sc-button-input"
                       value={btn.label}
                       onChange={e => onUpdateButtonLabel(key, e.target.value)}
                       placeholder="Текст кнопки"
                     />
-                    <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
-                      <X size={14} />
-                    </button>
+                    {!isStructureLocked && (
+                      <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
 
                   {/* Action: URL or Target Screen */}
                   <div className="node-editor-btn-action">
-                    <div className="node-editor-mode-toggle">
-                      <button
-                        className={`node-editor-mode-btn ${!isUrl ? 'active' : ''}`}
-                        onClick={() => {
-                          if (isUrl) {
-                            onUpdateButtonAction(key, 'callback:noop');
-                          }
-                        }}
-                        title="Ссылка на блок"
-                        type="button"
-                      >
-                        <Link size={12} /> Блок
-                      </button>
-                      <button
-                        className={`node-editor-mode-btn ${isUrl ? 'active' : ''}`}
-                        onClick={() => {
-                          if (!isUrl) {
-                            onUpdateButtonAction(key, 'url:');
-                            onUpdateButtonTarget(key, '');
-                          }
-                        }}
-                        title="URL ссылка"
-                        type="button"
-                      >
-                        <ExternalLink size={12} /> URL
-                      </button>
-                    </div>
+                    {!isStructureLocked && (
+                      <div className="node-editor-mode-toggle">
+                        <button
+                          className={`node-editor-mode-btn ${!isUrl ? 'active' : ''}`}
+                          onClick={() => {
+                            if (isUrl) {
+                              onUpdateButtonAction(key, 'callback:noop');
+                            }
+                          }}
+                          title="Ссылка на блок"
+                          type="button"
+                        >
+                          <Link size={12} /> Блок
+                        </button>
+                        <button
+                          className={`node-editor-mode-btn ${isUrl ? 'active' : ''}`}
+                          onClick={() => {
+                            if (!isUrl) {
+                              onUpdateButtonAction(key, 'url:');
+                              onUpdateButtonTarget(key, '');
+                            }
+                          }}
+                          title="URL ссылка"
+                          type="button"
+                        >
+                          <ExternalLink size={12} /> URL
+                        </button>
+                      </div>
+                    )}
                     {isUrl ? (
                       <div className="node-editor-url-row">
                         <ExternalLink size={14} className="node-editor-url-icon" />
@@ -654,6 +680,7 @@ export default function NodeEditorPanel({
                           value={urlValue}
                           onChange={e => onUpdateButtonAction(key, `url:${e.target.value}`)}
                           placeholder="https://..."
+                          disabled={isStructureLocked}
                         />
                       </div>
                     ) : (

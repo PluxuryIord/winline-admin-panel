@@ -169,6 +169,123 @@ const SEED_DATA = {
         btn_back: { label: '🔙 Меню', action: 'callback:client_back_menu' },
       },
     },
+    // ── Сценарий 3: Мероприятие — визуальные блоки потока ──
+    event_partner_check: {
+      title: 'Вы работаете с WINLINE PARTNERS?',
+      description: 'Выбор: действующий партнёр / новый',
+      scenario: 3,
+      messages: {
+        prompt: { label: 'Вопрос', text: '<b>Вы уже работаете с WINLINE PARTNERS?</b>' },
+      },
+      buttons: {
+        _order: ['btn_yes', 'btn_no'],
+        btn_yes: { label: 'Работаю с WINLINE PARTNERS', action: 'callback:noop', locked: true },
+        btn_no: { label: 'Не работаю с WINLINE PARTNERS', action: 'callback:noop', locked: true },
+      },
+    },
+    event_verify_promo: {
+      title: 'Верификация — промо',
+      description: 'Экран призыва к верификации для действующего партнёра',
+      scenario: 3,
+      messages: {
+        promo: {
+          label: 'Текст промо',
+          text: '<b>Хочешь выиграть 1 из 10 мячей, подписанным легендой футбола и амбассадором WINLINE, Роналдиньо?\n\nВерифицируй свой партнёрский аккаунт</b>',
+        },
+      },
+      buttons: {
+        _order: ['btn_verify', 'btn_back'],
+        btn_verify: { label: 'Верифицироваться', action: 'callback:noop', locked: true },
+        btn_back: { label: 'Вернуться назад', action: 'callback:noop', locked: true },
+      },
+    },
+    event_email_prompt: {
+      title: 'Ввод email',
+      description: 'Запрос почты, указанной при регистрации',
+      scenario: 3,
+      messages: {
+        prompt: { label: 'Запрос email', text: '<b>📧 Введите email, указанный при регистрации на платформе</b>' },
+      },
+      buttons: { _order: [] },
+    },
+    event_email_confirmed: {
+      title: 'Почта подтверждена',
+      description: 'Успешное подтверждение email',
+      scenario: 3,
+      messages: {
+        confirmed: { label: 'Текст', text: '<b>✅ Почта подтверждена</b>' },
+      },
+      buttons: { _order: [] },
+    },
+    event_site_status: {
+      title: 'Площадка создана?',
+      description: 'Проверка наличия площадки у партнёра',
+      scenario: 3,
+      messages: {
+        prompt: { label: 'Текст', text: '<b>Проверяем, создана ли у вас площадка…</b>' },
+      },
+      buttons: {
+        _order: ['btn_created', 'btn_not_created'],
+        btn_created: { label: 'Площадка создана', action: 'callback:noop', locked: true },
+        btn_not_created: { label: 'Площадка не создана', action: 'callback:noop', locked: true },
+      },
+    },
+    event_site_wait: {
+      title: 'Ожидаем создание площадки',
+      description: 'Просьба создать площадку и вернуться',
+      scenario: 3,
+      messages: {
+        text: { label: 'Текст', text: '<b>Создай площадку и возвращайся</b>' },
+      },
+      buttons: {
+        _order: ['btn_check'],
+        btn_check: { label: 'Проверить', action: 'callback:noop', locked: true },
+      },
+    },
+    event_congrats: {
+      title: 'Поздравляем — участник розыгрыша',
+      description: 'Финал: выдача номера в розыгрыше',
+      scenario: 3,
+      messages: {
+        text: {
+          label: 'Текст поздравления',
+          text: '<b>Поздравляем, ты стал участником розыгрыша, твой номер №******\n\nИнформация о победителях придёт 27 мая до 15:00</b>',
+        },
+      },
+      buttons: { _order: [] },
+    },
+    event_registration_promo: {
+      title: 'Регистрация — промо',
+      description: 'Экран призыва пройти регистрацию',
+      scenario: 3,
+      messages: {
+        promo: {
+          label: 'Текст промо',
+          text: '<b>Хочешь выиграть 1 из 10 мячей, подписанным легендой футбола и амбассадором WINLINE, Роналдиньо?\n\nПройди регистрацию на сайте WINLINE PARTNERS</b>',
+        },
+      },
+      buttons: {
+        _order: ['btn_register'],
+        btn_register: { label: 'Пройти регистрацию', action: 'callback:noop', locked: true },
+      },
+    },
+    event_registration_instructions: {
+      title: 'Инструкция по регистрации',
+      description: 'Шаги регистрации на сайте',
+      scenario: 3,
+      messages: {
+        text: {
+          label: 'Инструкция',
+          text: '<b>Вам нужно перейти на официальный сайт партнерской программы и зарегистрироваться.</b>\n\nПри регистрации укажите следующую информацию:\n• имя и фамилию;\n• свой email;\n• пароль.\n\nПосле заполнения заявки нажмите кнопку «Регистрация» и активируйте аккаунт по email.',
+        },
+      },
+      buttons: {
+        _order: ['btn_site', 'btn_registered'],
+        btn_site: { label: 'Перейти на сайт', action: 'url:https://p.winline.ru/s/SNwQagLSrj?statid=7723_TGBOT&sub=TGBOT', locked: true },
+        btn_registered: { label: 'Я зарегистрирован', action: 'callback:noop', locked: true },
+      },
+    },
+
     event_flow: {
       title: 'Мероприятие',
       description: 'QR-код для мероприятия',
