@@ -179,8 +179,8 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_yes', 'btn_no'],
-        btn_yes: { label: 'Работаю с WINLINE PARTNERS', action: 'callback:noop', locked: true },
-        btn_no: { label: 'Не работаю с WINLINE PARTNERS', action: 'callback:noop', locked: true },
+        btn_yes: { label: 'Работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_yes', locked: true },
+        btn_no: { label: 'Не работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_no', locked: true },
       },
     },
     event_verify_promo: {
@@ -195,8 +195,8 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_verify', 'btn_back'],
-        btn_verify: { label: 'Верифицироваться', action: 'callback:noop', locked: true },
-        btn_back: { label: 'Вернуться назад', action: 'callback:noop', locked: true },
+        btn_verify: { label: 'Верифицироваться', action: 'callback:event_v2_verify', locked: true },
+        btn_back: { label: 'Вернуться назад', action: 'callback:event_v2_back', locked: true },
       },
     },
     event_email_prompt: {
@@ -239,7 +239,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_check'],
-        btn_check: { label: 'Проверить', action: 'callback:noop', locked: true },
+        btn_check: { label: 'Проверить', action: 'callback:event_v2_site_check', locked: true },
       },
     },
     event_congrats: {
@@ -266,7 +266,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_register'],
-        btn_register: { label: 'Пройти регистрацию', action: 'callback:noop', locked: true },
+        btn_register: { label: 'Пройти регистрацию', action: 'callback:event_v2_register_instructions', locked: true },
       },
     },
     event_registration_instructions: {
@@ -282,7 +282,7 @@ const SEED_DATA = {
       buttons: {
         _order: ['btn_site', 'btn_registered'],
         btn_site: { label: 'Перейти на сайт', action: 'url:https://p.winline.ru/s/SNwQagLSrj?statid=7723_TGBOT&sub=TGBOT', locked: true },
-        btn_registered: { label: 'Я зарегистрирован', action: 'callback:noop', locked: true },
+        btn_registered: { label: 'Я зарегистрирован', action: 'callback:event_v2_registered', locked: true },
       },
     },
 

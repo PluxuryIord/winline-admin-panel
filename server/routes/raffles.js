@@ -1,8 +1,89 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import dbPool from '../config/db.js';
+import { WEBHOOK_SECRET } from '../config/env.js';
 import { logAudit } from '../services/auditLog.js';
 
 const router = Router();
+
+// ─── Auto-migration: scenario-3 raffle tickets ──────────────────────────────
+(async () => {
+  try {
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS wl_event_raffle_tickets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_id INT NOT NULL DEFAULT 0,
+        user_id BIGINT NOT NULL,
+        telegram_id BIGINT NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        ticket_number INT NOT NULL,
+        is_winner TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_event_user (event_id, telegram_id),
+        UNIQUE KEY uniq_event_ticket (event_id, ticket_number),
+        INDEX idx_event (event_id),
+        INDEX idx_email (email)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (e) { console.warn('[raffles] migrate v2:', e.message); }
+})();
+
+// ─── Internal: bot issues / fetches a raffle ticket for a user ──────────────
+// Idempotent: same (event_id, telegram_id) → returns existing ticket_number.
+// Auth: x-webhook-secret OR x-webhook-signature (HMAC-sha256 of body).
+function verifyBotCall(req) {
+  if (!WEBHOOK_SECRET) return false;
+  const plain = req.headers['x-webhook-secret'];
+  if (plain && plain === WEBHOOK_SECRET) return true;
+  const sig = req.headers['x-webhook-signature'];
+  if (!sig) return false;
+  try {
+    const expected = crypto.createHmac('sha256', WEBHOOK_SECRET)
+      .update(JSON.stringify(req.body)).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'));
+  } catch { return false; }
+}
+
+export const raffleInternalRouter = Router();
+raffleInternalRouter.post('/issue', async (req, res) => {
+  if (!verifyBotCall(req)) return res.status(401).json({ error: 'unauthorized' });
+  const event_id = parseInt(req.body?.event_id, 10) || 0;
+  const telegram_id = parseInt(req.body?.telegram_id, 10);
+  const user_id = parseInt(req.body?.user_id, 10) || telegram_id;
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!telegram_id || !email) return res.status(400).json({ error: 'telegram_id and email required' });
+
+  const conn = await dbPool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Existing ticket?
+    const [existing] = await conn.query(
+      'SELECT ticket_number FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
+      [event_id, telegram_id]
+    );
+    if (existing.length) {
+      await conn.commit();
+      return res.json({ ok: true, ticket_number: existing[0].ticket_number, existing: true });
+    }
+    // Next sequential number per event
+    const [maxRow] = await conn.query(
+      'SELECT COALESCE(MAX(ticket_number),0)+1 AS next FROM wl_event_raffle_tickets WHERE event_id=? FOR UPDATE',
+      [event_id]
+    );
+    const next = maxRow[0].next;
+    await conn.query(
+      'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number) VALUES (?,?,?,?,?)',
+      [event_id, user_id, telegram_id, email, next]
+    );
+    await conn.commit();
+    res.json({ ok: true, ticket_number: next, existing: false });
+  } catch (e) {
+    try { await conn.rollback(); } catch {}
+    console.error('[raffle/issue]', e.message);
+    res.status(500).json({ error: 'db error' });
+  } finally {
+    conn.release();
+  }
+});
 
 // GET /api/raffles/eligible — список юзеров, получивших QR коды (без TEST-)
 router.get('/eligible', async (req, res, next) => {
@@ -90,6 +171,58 @@ router.post('/tag-winners', async (req, res, next) => {
     );
 
     res.json({ ok: true, tagged: ids.length, tag: tagName });
+  } catch (err) { next(err); }
+});
+
+// ─── V2 admin: list / draw / mark winners on raffle tickets ─────────────────
+router.get('/v2/list', async (req, res, next) => {
+  try {
+    const eventId = parseInt(req.query.event_id, 10) || 0;
+    const [rows] = await dbPool.query(
+      `SELECT t.id, t.event_id, t.user_id, t.telegram_id, t.email,
+              t.ticket_number, t.is_winner, t.created_at,
+              u.full_name, u.rl_full_name, u.username
+         FROM wl_event_raffle_tickets t
+         LEFT JOIN users u ON u.user_id = t.telegram_id
+        WHERE t.event_id = ?
+        ORDER BY t.ticket_number ASC`,
+      [eventId]
+    );
+    res.json({ tickets: rows, total: rows.length });
+  } catch (err) { next(err); }
+});
+
+router.post('/v2/draw', async (req, res, next) => {
+  try {
+    const eventId = parseInt(req.body?.event_id, 10) || 0;
+    const count = Math.max(1, parseInt(req.body?.count, 10) || 1);
+    const [winners] = await dbPool.query(
+      `SELECT t.ticket_number, t.telegram_id, t.email,
+              u.full_name, u.rl_full_name, u.username
+         FROM wl_event_raffle_tickets t
+         LEFT JOIN users u ON u.user_id = t.telegram_id
+        WHERE t.event_id = ?
+        ORDER BY RAND() LIMIT ?`,
+      [eventId, count]
+    );
+    res.json({ winners, requested: count, drawn: winners.length });
+  } catch (err) { next(err); }
+});
+
+router.post('/v2/mark-winners', async (req, res, next) => {
+  try {
+    const eventId = parseInt(req.body?.event_id, 10) || 0;
+    const numbers = Array.isArray(req.body?.ticket_numbers)
+      ? req.body.ticket_numbers.map(Number).filter(Number.isFinite) : [];
+    if (!numbers.length) return res.status(400).json({ error: 'ticket_numbers required' });
+    await dbPool.query(
+      'UPDATE wl_event_raffle_tickets SET is_winner=1 WHERE event_id=? AND ticket_number IN (?)',
+      [eventId, numbers]
+    );
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'raffle_v2', `event:${eventId}`,
+      `Розыгрыш v2: ${numbers.length} победителей`, null, { event_id: eventId, ticket_numbers: numbers });
+    res.json({ ok: true, marked: numbers.length });
   } catch (err) { next(err); }
 });
 

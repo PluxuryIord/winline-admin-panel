@@ -120,6 +120,7 @@ app.use('/api/chats/stream', streamRouter);
 app.use('/api/broadcasts/bot-membership', broadcastWebhookRouter);
 app.use('/api/broadcasts/poll-vote', pollVoteRouter);
 app.use('/api/broadcasts/groups/check-approved', groupApprovalRouter);
+app.use('/api/internal/event-raffle', raffleInternalRouter);
 
 // Публичный прокси фото KB (img src не может передать Bearer токен)
 import { knowledgePhotoProxy } from './routes/knowledge.js';
@@ -144,7 +145,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/bot/status', statusRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/events', eventsRouter);
-import rafflesRouter from './routes/raffles.js';
+import rafflesRouter, { raffleInternalRouter } from './routes/raffles.js';
 app.use('/api/raffles', rafflesRouter);
 import scenariosRouter from './routes/scenarios.js';
 app.use('/api/scenarios', scenariosRouter);
