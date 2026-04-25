@@ -106,7 +106,7 @@ const SEED_DATA = {
         btn_promo: { label: 'Актуальные крео и лендинги', action: 'callback:client_promo' },
         btn_chat: { label: 'Чат с менеджером', action: 'url:https://t.me/winline_affiliate' },
         btn_socials: { label: 'Наши соц. сети', action: 'callback:client_socials' },
-        btn_event: { label: 'Я на мероприятии!', action: 'callback:client_at_event' },
+        btn_event: { label: 'Я на мероприятии!', action: 'callback:client_at_event', targetScreen: 'event_partner_check' },
         btn_logout: { label: '🚪 Выйти из аккаунта', action: 'callback:client_logout', locked: true },
       },
     },
@@ -179,8 +179,8 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_yes', 'btn_no'],
-        btn_yes: { label: 'Работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_yes', locked: true },
-        btn_no: { label: 'Не работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_no', locked: true },
+        btn_yes: { label: 'Работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_yes', targetScreen: 'event_verify_promo', locked: true },
+        btn_no: { label: 'Не работаю с WINLINE PARTNERS', action: 'callback:event_v2_partner_no', targetScreen: 'anketa_role', locked: true },
       },
     },
     event_verify_promo: {
@@ -195,8 +195,8 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_verify', 'btn_back'],
-        btn_verify: { label: 'Верифицироваться', action: 'callback:event_v2_verify', locked: true },
-        btn_back: { label: 'Вернуться назад', action: 'callback:event_v2_back', locked: true },
+        btn_verify: { label: 'Верифицироваться', action: 'callback:event_v2_verify', targetScreen: 'event_email_prompt', locked: true },
+        btn_back: { label: 'Вернуться назад', action: 'callback:event_v2_back', targetScreen: 'event_partner_check', locked: true },
       },
     },
     event_email_prompt: {
@@ -207,6 +207,7 @@ const SEED_DATA = {
         prompt: { label: 'Запрос email', text: '<b>📧 Введите email, указанный при регистрации на платформе</b>' },
       },
       buttons: { _order: [] },
+      nextScreen: 'event_email_confirmed',
     },
     event_email_confirmed: {
       title: 'Почта подтверждена',
@@ -216,6 +217,7 @@ const SEED_DATA = {
         confirmed: { label: 'Текст', text: '<b>✅ Почта подтверждена</b>' },
       },
       buttons: { _order: [] },
+      nextScreen: 'event_site_status',
     },
     event_site_status: {
       title: 'Площадка создана?',
@@ -226,8 +228,8 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_created', 'btn_not_created'],
-        btn_created: { label: 'Площадка создана', action: 'callback:noop', locked: true },
-        btn_not_created: { label: 'Площадка не создана', action: 'callback:noop', locked: true },
+        btn_created: { label: 'Площадка создана', action: 'callback:noop', targetScreen: 'event_congrats', locked: true },
+        btn_not_created: { label: 'Площадка не создана', action: 'callback:noop', targetScreen: 'event_site_wait', locked: true },
       },
     },
     event_site_wait: {
@@ -239,7 +241,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_check'],
-        btn_check: { label: 'Проверить', action: 'callback:event_v2_site_check', locked: true },
+        btn_check: { label: 'Проверить', action: 'callback:event_v2_site_check', targetScreen: 'event_site_status', locked: true },
       },
     },
     event_congrats: {
@@ -266,7 +268,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_register'],
-        btn_register: { label: 'Пройти регистрацию', action: 'callback:event_v2_register_instructions', locked: true },
+        btn_register: { label: 'Пройти регистрацию', action: 'callback:event_v2_register_instructions', targetScreen: 'event_registration_instructions', locked: true },
       },
     },
     event_registration_instructions: {
@@ -282,7 +284,7 @@ const SEED_DATA = {
       buttons: {
         _order: ['btn_site', 'btn_registered'],
         btn_site: { label: 'Перейти на сайт', action: 'url:https://p.winline.ru/s/SNwQagLSrj?statid=7723_TGBOT&sub=TGBOT', locked: true },
-        btn_registered: { label: 'Я зарегистрирован', action: 'callback:event_v2_registered', locked: true },
+        btn_registered: { label: 'Я зарегистрирован', action: 'callback:event_v2_registered', targetScreen: 'event_email_prompt', locked: true },
       },
     },
 
@@ -468,6 +470,7 @@ const SEED_DATA = {
         },
       },
       buttons: { _order: [] },
+      nextScreen: 'event_registration_promo',
     },
     /* logout_screen removed — button stays in main_menu but is locked */
     // ── Сценарий 4: Работа бота в чатах ──

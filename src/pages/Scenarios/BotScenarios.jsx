@@ -24,9 +24,18 @@ const CALLBACK_TO_SCREEN = {
   client_offers: 'offer_page',
   client_promo: 'promo_page',
   client_socials: 'socials_page',
-  client_at_event: 'event_flow',
+  client_at_event: 'event_partner_check',
   client_event_anketa: 'anketa_role',
   client_logout: 'logout_screen',
+  // Сценарий 3 v2 — расширенный поток мероприятия
+  event_v2_partner_yes: 'event_verify_promo',
+  event_v2_partner_no: 'anketa_role',
+  event_v2_verify: 'event_email_prompt',
+  event_v2_back: 'event_partner_check',
+  event_v2_registered: 'event_email_prompt',
+  event_v2_site_check: 'event_site_status',
+  event_v2_register_instructions: 'event_registration_instructions',
+  event_v2_register_promo: 'event_registration_promo',
 };
 
 // ─── Screen → Callback mapping (for changing connections) ───────────────────
@@ -153,6 +162,25 @@ function migrateData(data) {
       screen.x = pos.x;
       screen.y = pos.y;
       changed = true;
+    }
+
+    // Auto-set nextScreen for event_v2 auto-transition screens
+    const NEXT_SCREEN_DEFAULTS = {
+      event_email_prompt: 'event_email_confirmed',
+      event_email_confirmed: 'event_site_status',
+      anketa_final: 'event_registration_promo',
+    };
+    if (NEXT_SCREEN_DEFAULTS[screenId] && !screen.nextScreen) {
+      screen.nextScreen = NEXT_SCREEN_DEFAULTS[screenId];
+      changed = true;
+    }
+
+    // Hard-wire branch buttons on event_site_status (callback:noop — нет в CALLBACK_TO_SCREEN)
+    if (screenId === 'event_site_status') {
+      const created = screen.buttons?.btn_created;
+      const notCreated = screen.buttons?.btn_not_created;
+      if (created && !created.targetScreen) { created.targetScreen = 'event_congrats'; changed = true; }
+      if (notCreated && !notCreated.targetScreen) { notCreated.targetScreen = 'event_site_wait'; changed = true; }
     }
 
     // Add/remove targetScreen on callback buttons

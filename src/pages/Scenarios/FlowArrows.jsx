@@ -148,7 +148,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
     });
 
     // Draw arrow for text_input / subscription_check anketa nextScreen
-    if (screen.scenario === 5 && (screen.stepType === 'text_input' || screen.stepType === 'subscription_check') && screen.nextScreen && screens[screen.nextScreen]) {
+    if (screen.nextScreen && screens[screen.nextScreen]) {
       const target = screens[screen.nextScreen];
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
