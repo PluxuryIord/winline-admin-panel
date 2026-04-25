@@ -33,3 +33,4 @@ dist-ssr
 
 # Environment variables (токены, пароли — не в git)
 .env
+.claude/launch.json
