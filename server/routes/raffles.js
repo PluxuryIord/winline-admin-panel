@@ -24,8 +24,15 @@ const router = Router();
         INDEX idx_event (event_id),
         INDEX idx_email (email)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-    try { await dbPool.query("ALTER TABLE wl_event_raffle_tickets ADD COLUMN ticket_code VARCHAR(16) NULL"); }
-    catch (e) { if (!/Duplicate column/i.test(e.message)) console.warn('[raffles] migrate ticket_code:', e.message); }
+    // Side table: ticket_code (= EVT- suffix) per (event_id, telegram_id).
+    // Env disallows ALTER on the main tickets table.
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_event_raffle_ticket_codes (
+      event_id INT NOT NULL,
+      telegram_id BIGINT NOT NULL,
+      ticket_code VARCHAR(16) NOT NULL,
+      PRIMARY KEY (event_id, telegram_id),
+      INDEX idx_code (ticket_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   } catch (e) { console.warn('[raffles] migrate v2:', e.message); }
 })();
 
@@ -71,27 +78,27 @@ raffleInternalRouter.post('/issue', async (req, res) => {
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
-    // Existing ticket? (fallback if ticket_code column not yet added)
-    let existing;
-    try {
-      [existing] = await conn.query(
-        'SELECT ticket_number, ticket_code FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
-        [event_id, telegram_id]
-      );
-    } catch (e) {
-      if (!/Unknown column/i.test(e.message)) throw e;
-      [existing] = await conn.query(
-        'SELECT ticket_number FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
-        [event_id, telegram_id]
-      );
-    }
+    const [existing] = await conn.query(
+      `SELECT t.ticket_number, tc.ticket_code
+         FROM wl_event_raffle_tickets t
+         LEFT JOIN wl_event_raffle_ticket_codes tc
+           ON tc.event_id = t.event_id AND tc.telegram_id = t.telegram_id
+        WHERE t.event_id=? AND t.telegram_id=? LIMIT 1`,
+      [event_id, telegram_id]
+    );
     if (existing.length) {
       await conn.commit();
-      // mark merch row as raffle participant if applicable
       if (ticket_code) {
-        try { await dbPool.query("UPDATE wl_event_codes SET raffle_participant=1 WHERE code = ?", [`EVT-${ticket_code}`]); } catch {}
+        try { await dbPool.query(
+          "INSERT INTO wl_event_code_meta (code, raffle_participant) VALUES (?, 1) ON DUPLICATE KEY UPDATE raffle_participant=1",
+          [`EVT-${ticket_code}`]
+        ); } catch {}
+        try { await dbPool.query(
+          "INSERT INTO wl_event_raffle_ticket_codes (event_id, telegram_id, ticket_code) VALUES (?,?,?) ON DUPLICATE KEY UPDATE ticket_code=VALUES(ticket_code)",
+          [event_id, telegram_id, ticket_code]
+        ); } catch {}
       }
-      return res.json({ ok: true, ticket_number: existing[0].ticket_number, ticket_code: existing[0].ticket_code, existing: true });
+      return res.json({ ok: true, ticket_number: existing[0].ticket_number, ticket_code: existing[0].ticket_code || ticket_code, existing: true });
     }
     // Next sequential number per event
     const [maxRow] = await conn.query(
@@ -99,20 +106,19 @@ raffleInternalRouter.post('/issue', async (req, res) => {
       [event_id]
     );
     const next = maxRow[0].next;
-    try {
-      await conn.query(
-        'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number, ticket_code) VALUES (?,?,?,?,?,?)',
-        [event_id, user_id, telegram_id, email, next, ticket_code]
-      );
-    } catch (e) {
-      if (!/Unknown column/i.test(e.message)) throw e;
-      await conn.query(
-        'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number) VALUES (?,?,?,?,?)',
-        [event_id, user_id, telegram_id, email, next]
-      );
-    }
+    await conn.query(
+      'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number) VALUES (?,?,?,?,?)',
+      [event_id, user_id, telegram_id, email, next]
+    );
     if (ticket_code) {
-      try { await conn.query("UPDATE wl_event_codes SET raffle_participant=1 WHERE code = ?", [`EVT-${ticket_code}`]); } catch {}
+      try { await conn.query(
+        "INSERT INTO wl_event_raffle_ticket_codes (event_id, telegram_id, ticket_code) VALUES (?,?,?) ON DUPLICATE KEY UPDATE ticket_code=VALUES(ticket_code)",
+        [event_id, telegram_id, ticket_code]
+      ); } catch {}
+      try { await conn.query(
+        "INSERT INTO wl_event_code_meta (code, raffle_participant) VALUES (?, 1) ON DUPLICATE KEY UPDATE raffle_participant=1",
+        [`EVT-${ticket_code}`]
+      ); } catch {}
     }
     await conn.commit();
     res.json({ ok: true, ticket_number: next, ticket_code, existing: false });

@@ -22,12 +22,17 @@ const router = Router();
 
 // ─── Auto-migrate tables ────────────────────────────────────────────────────
 
-// Tables wl_event_codes and wl_admin_event_scans are pre-created
-// Idempotent column additions for scenario-3 v2 raffle integration:
+// Tables wl_event_codes and wl_admin_event_scans are pre-created.
+// Side-table holds v2 per-code metadata (env disallows ALTER on wl_event_codes):
 (async () => {
-  const tryAdd = async (sql) => { try { await dbPool.query(sql); } catch (e) { if (!/Duplicate column/i.test(e.message)) console.warn('[events] migrate:', e.message); } };
-  await tryAdd("ALTER TABLE wl_event_codes ADD COLUMN kind VARCHAR(20) NOT NULL DEFAULT 'merch'");
-  await tryAdd('ALTER TABLE wl_event_codes ADD COLUMN raffle_participant TINYINT(1) NOT NULL DEFAULT 0');
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_event_code_meta (
+      code VARCHAR(32) PRIMARY KEY,
+      kind VARCHAR(20) NOT NULL DEFAULT 'merch',
+      raffle_participant TINYINT(1) NOT NULL DEFAULT 0,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (e) { console.warn('[events] meta table:', e.message); }
 })();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -90,31 +95,17 @@ router.get('/codes', async (req, res, next) => {
       `SELECT COUNT(*) as total FROM wl_event_codes c LEFT JOIN users u ON u.user_id = c.user_id ${where}`, params
     );
 
-    // Get codes with user info; fall back to legacy schema if v2 columns missing
-    let rows;
-    try {
-      [rows] = await dbPool.query(`
-        SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
-          c.kind, c.raffle_participant,
-          u.full_name, u.rl_full_name, u.username
-        FROM wl_event_codes c
-        LEFT JOIN users u ON u.user_id = c.user_id
-        ${where}
-        ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-      `, [...params, limit, offset]);
-    } catch (e) {
-      if (!/Unknown column/i.test(e.message)) throw e;
-      [rows] = await dbPool.query(`
-        SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
-          u.full_name, u.rl_full_name, u.username
-        FROM wl_event_codes c
-        LEFT JOIN users u ON u.user_id = c.user_id
-        ${where}
-        ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-      `, [...params, limit, offset]);
-    }
+    const [rows] = await dbPool.query(`
+      SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
+        m.kind, m.raffle_participant,
+        u.full_name, u.rl_full_name, u.username
+      FROM wl_event_codes c
+      LEFT JOIN wl_event_code_meta m ON m.code = c.code
+      LEFT JOIN users u ON u.user_id = c.user_id
+      ${where}
+      ORDER BY c.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
 
     const codes = rows.map(r => ({
       id: r.id,
@@ -307,28 +298,16 @@ export async function scanHandler(req, res, next) {
     const scannedValue = String(rawCode || req.body.user_id || '').trim();
     if (!scannedValue) return res.status(400).json({ error: 'code is required' });
 
-    // Find code in event_codes (fallback if `kind` not yet present)
-    let codes;
-    try {
-      [codes] = await dbPool.query(
-        `SELECT c.id, c.code, c.status, c.user_id, c.label, c.kind,
-          u.full_name, u.rl_full_name, u.username
-         FROM wl_event_codes c
-         LEFT JOIN users u ON u.user_id = c.user_id
-         WHERE c.code = ?`,
-        [scannedValue]
-      );
-    } catch (e) {
-      if (!/Unknown column/i.test(e.message)) throw e;
-      [codes] = await dbPool.query(
-        `SELECT c.id, c.code, c.status, c.user_id, c.label,
-          u.full_name, u.rl_full_name, u.username
-         FROM wl_event_codes c
-         LEFT JOIN users u ON u.user_id = c.user_id
-         WHERE c.code = ?`,
-        [scannedValue]
-      );
-    }
+    const [codes] = await dbPool.query(
+      `SELECT c.id, c.code, c.status, c.user_id, c.label,
+        m.kind,
+        u.full_name, u.rl_full_name, u.username
+       FROM wl_event_codes c
+       LEFT JOIN wl_event_code_meta m ON m.code = c.code
+       LEFT JOIN users u ON u.user_id = c.user_id
+       WHERE c.code = ?`,
+      [scannedValue]
+    );
 
     if (!codes.length) {
       return res.json({ status: 'not_found', message: 'Код не найден' });
