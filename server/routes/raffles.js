@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { WEBHOOK_SECRET } from '../config/env.js';
 import { logAudit } from '../services/auditLog.js';
+import requireAdmin from '../middleware/requireAdmin.js';
 
 const router = Router();
 
@@ -196,7 +197,7 @@ router.post('/draw', async (req, res, next) => {
 
 // POST /api/raffles/tag-winners — присвоить тег списку победителей
 // body: { userIds: number[], tag: string }
-router.post('/tag-winners', async (req, res, next) => {
+router.post('/tag-winners', requireAdmin, async (req, res, next) => {
   try {
     const { userIds, tag } = req.body || {};
     const ids = Array.isArray(userIds) ? userIds.map(Number).filter(Boolean) : [];
@@ -248,7 +249,7 @@ router.get('/v2/list', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/v2/reset', async (req, res, next) => {
+router.delete('/v2/reset', requireAdmin, async (req, res, next) => {
   try {
     const eventId = parseInt(req.body?.event_id, 10) || 0;
     const [r1] = await dbPool.query('DELETE FROM wl_event_raffle_tickets WHERE event_id = ?', [eventId]);
@@ -280,7 +281,7 @@ router.post('/v2/draw', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/v2/mark-winners', async (req, res, next) => {
+router.post('/v2/mark-winners', requireAdmin, async (req, res, next) => {
   try {
     const eventId = parseInt(req.body?.event_id, 10) || 0;
     const numbers = Array.isArray(req.body?.ticket_numbers)

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN } from '../config/env.js';
 import { logAudit } from '../services/auditLog.js';
+import requireAdmin from '../middleware/requireAdmin.js';
 
 const router = Router();
 const COMMENT_PREFIX = '__comment__:';
@@ -140,7 +141,7 @@ router.get('/all-tags', async (req, res, next) => {
 });
 
 // PUT /api/users/tags/rename — переименовать тег у всех носителей
-router.put('/tags/rename', async (req, res, next) => {
+router.put('/tags/rename', requireAdmin, async (req, res, next) => {
   try {
     const { oldTag, newTag } = req.body;
     if (!oldTag || !newTag) return res.status(400).json({ error: 'oldTag and newTag required' });
@@ -205,7 +206,7 @@ router.post('/tags/bulk', async (req, res, next) => {
 });
 
 // POST /api/users/tags/bulk-all — добавить/удалить теги у всех юзеров по фильтру
-router.post('/tags/bulk-all', async (req, res, next) => {
+router.post('/tags/bulk-all', requireAdmin, async (req, res, next) => {
   try {
     const { add = [], remove = [], filterTags = [] } = req.body || {};
     const addTags = (Array.isArray(add) ? add : []).map(t => String(t || '').trim()).filter(Boolean);
@@ -253,7 +254,7 @@ router.post('/tags/bulk-all', async (req, res, next) => {
 });
 
 // DELETE /api/users/tags/bulk-delete — удалить тег у всех носителей
-router.delete('/tags/bulk-delete', async (req, res, next) => {
+router.delete('/tags/bulk-delete', requireAdmin, async (req, res, next) => {
   try {
     const tag = req.query.tag;
     if (!tag) return res.status(400).json({ error: 'tag query param required' });

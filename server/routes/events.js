@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { createSheetForQuestions, getSpreadsheetUrl } from '../services/googleSheets.js';
+import requireAdmin from '../middleware/requireAdmin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,7 +147,7 @@ router.patch('/codes/:id/status', async (req, res, next) => {
 
 // ─── DELETE /api/events/codes/all — сбросить все коды (новое мероприятие) ────
 
-router.delete('/codes/all', async (req, res, next) => {
+router.delete('/codes/all', requireAdmin, async (req, res, next) => {
   try {
     const [[{ count }]] = await dbPool.query('SELECT COUNT(*) as count FROM wl_event_codes');
     await dbPool.query('DELETE FROM wl_event_codes');
