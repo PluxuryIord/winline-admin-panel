@@ -9,10 +9,17 @@ import './BotScenarios.css';
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
   'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+  'knowledge_base',
   // Сценарий 3 — расширенный поток мероприятия
   'event_partner_check', 'event_verify_promo', 'event_email_prompt',
   'event_email_confirmed', 'event_site_status', 'event_site_wait',
   'event_congrats', 'event_registration_promo', 'event_registration_instructions',
+  // Сценарий 4 — групповые блоки
+  'group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb',
+  // Сценарий 5 — анкета
+  'anketa_role', 'anketa_traffic_company', 'anketa_traffic_category',
+  'anketa_adv_company', 'anketa_adv_position', 'anketa_other_occupation',
+  'anketa_sub_check', 'anketa_final',
 ]);
 
 // ─── Callback → Screen mapping (for auto-migration) ────────────────────────
@@ -31,7 +38,7 @@ const CALLBACK_TO_SCREEN = {
   event_v2_partner_yes: 'event_verify_promo',
   event_v2_partner_no: 'anketa_role',
   event_v2_verify: 'event_email_prompt',
-  event_v2_back: 'event_partner_check',
+  event_v2_back: 'start_menu',
   event_v2_registered: 'event_email_prompt',
   event_v2_site_check: 'event_site_status',
   event_v2_register_instructions: 'event_registration_instructions',
