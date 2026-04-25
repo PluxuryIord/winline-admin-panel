@@ -13,6 +13,7 @@ import UserProfile from './pages/Users/UserProfile.jsx';
 import Chats from './pages/Chats/Chats.jsx';
 import ChatView from './pages/Chats/ChatView.jsx';
 import EventWork from './pages/EventWork/EventWork.jsx';
+import RaffleV2 from './pages/RaffleV2/RaffleV2.jsx';
 import BotScenarios from './pages/Scenarios/BotScenarios.jsx';
 import AdminUsers from './pages/AdminUsers/AdminUsers.jsx';
 import AuditLog from './pages/AuditLog/AuditLog.jsx';
@@ -63,6 +64,7 @@ function App() {
           <Route path="knowledge" element={<KnowledgeBase />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="events" element={<EventWork />} />
+          <Route path="raffles" element={<RaffleV2 />} />
           <Route path="admin-users" element={<AdminUsers />} />
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="version-history" element={<VersionHistory />} />

@@ -234,8 +234,11 @@ router.get('/v2/list', async (req, res, next) => {
     const [rows] = await dbPool.query(
       `SELECT t.id, t.event_id, t.user_id, t.telegram_id, t.email,
               t.ticket_number, t.is_winner, t.created_at,
+              tc.ticket_code,
               u.full_name, u.rl_full_name, u.username
          FROM wl_event_raffle_tickets t
+         LEFT JOIN wl_event_raffle_ticket_codes tc
+           ON tc.event_id = t.event_id AND tc.telegram_id = t.telegram_id
          LEFT JOIN users u ON u.user_id = t.telegram_id
         WHERE t.event_id = ?
         ORDER BY t.ticket_number ASC`,
