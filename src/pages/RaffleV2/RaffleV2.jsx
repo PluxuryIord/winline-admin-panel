@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Trophy, RefreshCw, Search } from 'lucide-react';
+import { Trophy, RefreshCw, Search, Trash2, Sparkles } from 'lucide-react';
 import { api } from '../../utils/api';
 
 const EVENT_ID = 0;
@@ -8,6 +8,10 @@ export default function RaffleV2() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [drawCount, setDrawCount] = useState(10);
+  const [drawing, setDrawing] = useState(false);
+  const [winners, setWinners] = useState([]);
+  const [resetting, setResetting] = useState(false);
   const ref = useRef('');
 
   const fetchTickets = useCallback(async () => {
@@ -26,6 +30,37 @@ export default function RaffleV2() {
       setLoading(false);
     }
   }, []);
+
+  const handleDraw = async () => {
+    const count = Math.max(1, parseInt(drawCount, 10) || 1);
+    setDrawing(true);
+    try {
+      const res = await api.post('/api/raffles/v2/draw', { event_id: EVENT_ID, count });
+      const data = await res.json();
+      setWinners(data.winners || []);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setDrawing(false); }
+  };
+
+  const handleReset = async () => {
+    if (!confirm(`Удалить ВСЕ ${tickets.length} билетов? Действие необратимо.`)) return;
+    setResetting(true);
+    try {
+      const res = await fetch('/api/raffles/v2/reset', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ event_id: EVENT_ID }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setWinners([]);
+        ref.current = '';
+        fetchTickets();
+      }
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setResetting(false); }
+  };
 
   useEffect(() => {
     fetchTickets();
@@ -62,7 +97,59 @@ export default function RaffleV2() {
           <button className="ew-settings-btn" onClick={fetchTickets}>
             <RefreshCw size={16} /> Обновить
           </button>
+          <button className="ew-reset-btn" onClick={handleReset} disabled={resetting || tickets.length === 0}>
+            <Trash2 size={16} /> {resetting ? 'Удаление…' : 'Сбросить'}
+          </button>
         </div>
+      </div>
+
+      <div className="ew-settings-section" style={{ margin: '12px 0' }}>
+        <h3><Sparkles size={18} /> Случайный розыгрыш</h3>
+        <p className="ew-settings-desc">Выберет указанное число случайных билетов из общего пула.</p>
+        <div className="ew-settings-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="number"
+            min={1}
+            max={tickets.length || 1}
+            value={drawCount}
+            onChange={e => setDrawCount(e.target.value)}
+            className="ew-settings-input"
+            style={{ width: 120 }}
+          />
+          <button className="ew-save-btn" onClick={handleDraw} disabled={drawing || tickets.length === 0}>
+            <Sparkles size={16} /> {drawing ? 'Розыгрыш…' : `Разыграть ${drawCount}`}
+          </button>
+        </div>
+        {winners.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h4>🏆 Победители ({winners.length})</h4>
+            <table className="ew-table" style={{ marginTop: 8 }}>
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Ticket code</th>
+                  <th>Пользователь</th>
+                  <th>Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {winners.map(w => (
+                  <tr key={w.ticket_number}>
+                    <td>{w.ticket_number}</td>
+                    <td className="ew-td-code">{w.ticket_code ? `EVT-${w.ticket_code}` : '—'}</td>
+                    <td>
+                      <div className="ew-user-cell">
+                        <span className="ew-user-name">{w.rl_full_name || w.full_name || w.telegram_id}</span>
+                        {w.username && <span className="ew-user-username">@{w.username}</span>}
+                      </div>
+                    </td>
+                    <td>{w.email}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="ew-stats-bar">

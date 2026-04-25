@@ -248,14 +248,29 @@ router.get('/v2/list', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/v2/reset', async (req, res, next) => {
+  try {
+    const eventId = parseInt(req.body?.event_id, 10) || 0;
+    const [r1] = await dbPool.query('DELETE FROM wl_event_raffle_tickets WHERE event_id = ?', [eventId]);
+    try { await dbPool.query('DELETE FROM wl_event_raffle_ticket_codes WHERE event_id = ?', [eventId]); } catch {}
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'delete', 'raffle_v2', `event:${eventId}`,
+      `Сброс розыгрыша: удалено ${r1.affectedRows} билетов`, null, { event_id: eventId });
+    res.json({ ok: true, deleted: r1.affectedRows });
+  } catch (err) { next(err); }
+});
+
 router.post('/v2/draw', async (req, res, next) => {
   try {
     const eventId = parseInt(req.body?.event_id, 10) || 0;
     const count = Math.max(1, parseInt(req.body?.count, 10) || 1);
     const [winners] = await dbPool.query(
       `SELECT t.ticket_number, t.telegram_id, t.email,
+              tc.ticket_code,
               u.full_name, u.rl_full_name, u.username
          FROM wl_event_raffle_tickets t
+         LEFT JOIN wl_event_raffle_ticket_codes tc
+           ON tc.event_id = t.event_id AND tc.telegram_id = t.telegram_id
          LEFT JOIN users u ON u.user_id = t.telegram_id
         WHERE t.event_id = ?
         ORDER BY RAND() LIMIT ?`,
