@@ -89,10 +89,17 @@ raffleInternalRouter.post('/issue', async (req, res) => {
     if (existing.length) {
       await conn.commit();
       if (ticket_code) {
-        try { await dbPool.query(
-          "INSERT INTO wl_event_code_meta (code, raffle_participant) VALUES (?, 1) ON DUPLICATE KEY UPDATE raffle_participant=1",
-          [`EVT-${ticket_code}`]
-        ); } catch {}
+        // Mark wl_event_codes row as raffle_participant only if it actually exists
+        // («Работаю» path generates ticket_code locally and has no event_codes row).
+        try {
+          const [hit] = await dbPool.query("SELECT 1 FROM wl_event_codes WHERE code = ? LIMIT 1", [`EVT-${ticket_code}`]);
+          if (hit.length) {
+            await dbPool.query(
+              "INSERT INTO wl_event_code_meta (code, raffle_participant) VALUES (?, 1) ON DUPLICATE KEY UPDATE raffle_participant=1",
+              [`EVT-${ticket_code}`]
+            );
+          }
+        } catch {}
         try { await dbPool.query(
           "INSERT INTO wl_event_raffle_ticket_codes (event_id, telegram_id, ticket_code) VALUES (?,?,?) ON DUPLICATE KEY UPDATE ticket_code=VALUES(ticket_code)",
           [event_id, telegram_id, ticket_code]
