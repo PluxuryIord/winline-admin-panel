@@ -375,14 +375,11 @@ const SEED_DATA = {
         question_text: { label: 'Вопрос', text: '<b>Выберите категорию вашего трафика</b>' },
       },
       buttons: {
-        _order: ['btn_cpa_net', 'btn_seo', 'btn_aso', 'btn_sms', 'btn_cpa', 'btn_push', 'btn_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'],
+        _order: ['btn_cpa_net', 'btn_seo_aso_sms', 'btn_cpa', 'btn_push_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'],
         btn_cpa_net: { label: 'CPA-сеть', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
-        btn_seo: { label: 'SEO', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
-        btn_aso: { label: 'ASO', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
-        btn_sms: { label: 'SMS', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_seo_aso_sms: { label: 'SEO ASO SMS', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
         btn_cpa: { label: 'CPA', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
-        btn_push: { label: 'PUSH', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
-        btn_inapp: { label: 'IN APP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
+        btn_push_inapp: { label: 'PUSH IN APP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
         btn_dsp: { label: 'DSP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
         btn_social: { label: 'SOCIAL', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
         btn_influence: { label: 'INFLUENCE', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' },
@@ -555,6 +552,19 @@ router.get('/', async (req, res, next) => {
           data.screens[id] = screen;
           changed = true;
         }
+      }
+      // One-time migration: collapse SEO/ASO/SMS and PUSH/IN APP into combined buttons
+      const tc = data.screens.anketa_traffic_category;
+      if (tc?.buttons && (tc.buttons.btn_seo || tc.buttons.btn_aso || tc.buttons.btn_sms || tc.buttons.btn_push || tc.buttons.btn_inapp)) {
+        delete tc.buttons.btn_seo;
+        delete tc.buttons.btn_aso;
+        delete tc.buttons.btn_sms;
+        delete tc.buttons.btn_push;
+        delete tc.buttons.btn_inapp;
+        tc.buttons.btn_seo_aso_sms = { label: 'SEO ASO SMS', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' };
+        tc.buttons.btn_push_inapp = { label: 'PUSH IN APP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' };
+        tc.buttons._order = ['btn_cpa_net', 'btn_seo_aso_sms', 'btn_cpa', 'btn_push_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'];
+        changed = true;
       }
       if (changed) await saveScenarios(data, dbId);
     }
