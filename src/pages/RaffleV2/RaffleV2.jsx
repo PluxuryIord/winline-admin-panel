@@ -82,7 +82,7 @@ export default function RaffleV2() {
     );
   });
 
-  const winners = tickets.filter(t => t.is_winner).length;
+  const winnersCount = tickets.filter(t => t.is_winner).length;
 
   return (
     <div className="ew-container">
@@ -163,7 +163,7 @@ export default function RaffleV2() {
         <div className="ew-mini-stat">
           <div className="ew-mini-stat-icon"><Trophy size={18} /></div>
           <div className="ew-mini-stat-info">
-            <span className="ew-mini-stat-value">{winners}</span>
+            <span className="ew-mini-stat-value">{winnersCount}</span>
             <span className="ew-mini-stat-label">Победителей</span>
           </div>
         </div>
