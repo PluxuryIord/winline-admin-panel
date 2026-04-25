@@ -39,6 +39,8 @@ export const TG_ADMIN_CHAT_ID = process.env.TG_ADMIN_CHAT_ID || projectEnv.TG_AD
 
 // Bot admin API (Python aiohttp on bot server, port 5050)
 export const BOT_API_URL = process.env.BOT_API_URL || projectEnv.BOT_API_URL || '';
+// Shared secret for X-API-Key header on calls to bot's admin_api.py
+export const BOT_API_KEY = process.env.BOT_API_KEY || projectEnv.BOT_API_KEY || '';
 
 // Google Sheets (service account credentials JSON string)
 export const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || projectEnv.GOOGLE_SERVICE_ACCOUNT || '';

@@ -48,8 +48,9 @@ export function invalidateProfileCache(userId) {
 }
 
 export default async function authMiddleware(req, res, next) {
-  // Skip auth endpoints
-  if (req.path.startsWith('/auth/')) return next();
+  // Note: auth endpoints are mounted before this middleware in app.js, so they
+  // never reach here. The previous `req.path.startsWith('/auth/')` bypass was
+  // dead code and a footgun if middleware order changed — removed.
 
   const header = req.headers.authorization;
   let token;

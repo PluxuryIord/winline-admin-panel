@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { uploadToS3 } from '../services/s3.js';
+import { validateImageFile } from '../services/fileValidation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'data', 'uploads');
@@ -27,6 +28,13 @@ router.post('/', async (req, res, next) => {
     const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const buffer = Buffer.from(match[2], 'base64');
     const name = `image.${ext}`;
+
+    // Verify magic bytes match the declared image type — defends against polyglot
+    // payloads where the data: prefix lies about content type.
+    const validation = await validateImageFile(buffer, name);
+    if (!validation.ok) {
+      return res.status(400).json({ error: validation.reason });
+    }
 
     const { url } = await uploadToS3(buffer, name, `image/${match[1]}`, 'knowledge');
     res.json({ url });

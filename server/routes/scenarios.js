@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
-import { BOT_API_URL } from '../config/env.js';
+import { BOT_API_URL, BOT_API_KEY } from '../config/env.js';
 import { logAudit } from '../services/auditLog.js';
 import { createDailySnapshot } from '../services/snapshots.js';
 
@@ -10,7 +10,9 @@ const router = Router();
 async function notifyBotReload() {
   if (!BOT_API_URL) return;
   try {
-    const resp = await fetch(`${BOT_API_URL}/reload-texts`);
+    const resp = await fetch(`${BOT_API_URL}/reload-texts`, {
+      headers: BOT_API_KEY ? { 'X-API-Key': BOT_API_KEY } : {},
+    });
     const data = await resp.json();
     console.log('[scenarios] Bot reload:', data);
   } catch (err) {

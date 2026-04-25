@@ -120,8 +120,8 @@ function broadcast(event) {
 // SSE stream — exported separately, mounted before JWT middleware (EventSource can't send headers)
 export const streamRouter = Router();
 streamRouter.get('/', (req, res) => {
-  // Accept JWT via httpOnly cookie (preferred) or query param (legacy)
-  const token = req.cookies?.wl_token || req.query.token;
+  // Accept JWT only via httpOnly cookie. Query-string tokens leak via nginx logs / Referer headers.
+  const token = req.cookies?.wl_token;
   if (!token) return res.status(401).json({ error: 'Token required' });
   try {
     jwt.verify(token, JWT_SECRET);

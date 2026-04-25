@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 import dbPool from '../config/db.js';
-import { BOT_API_URL } from '../config/env.js';
+import { BOT_API_URL, BOT_API_KEY } from '../config/env.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -345,7 +345,10 @@ export async function scanHandler(req, res, next) {
     if (BOT_API_URL && eventCode.user_id) {
       fetch(`${BOT_API_URL}/event/merch-given`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(BOT_API_KEY ? { 'X-API-Key': BOT_API_KEY } : {}),
+        },
         body: JSON.stringify({ user_id: eventCode.user_id }),
       }).catch(err => console.warn('[scan] merch-given push failed:', err.message));
     }
