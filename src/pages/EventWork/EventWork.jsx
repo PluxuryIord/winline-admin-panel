@@ -148,7 +148,7 @@ function CodesSection() {
             ) : codes.length === 0 ? (
               <tr><td colSpan={6} className="ew-table-empty">Нет QR-кодов. Коды появятся когда пользователи нажмут «Я на мероприятии» в боте.</td></tr>
             ) : codes.map(c => (
-              <tr key={c.id}>
+              <tr key={c.id} style={c.kind === 'raffle_only' ? { background: 'rgba(170, 100, 255, 0.06)' } : undefined}>
                 <td className="ew-td-code">
                   {c.code}
                   {c.kind === 'raffle_only' && (
@@ -169,8 +169,12 @@ function CodesSection() {
                 <td className="ew-td-date">{c.usedAt ? new Date(c.usedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                 <td>
                   <div className="ew-actions-cell">
-                    <button className="ew-qr-btn" onClick={() => setQrModal(c.code)} title="Показать QR"><Eye size={16} /></button>
-                    <button className={`ew-toggle-status-btn ${c.status}`} onClick={() => handleToggleStatus(c.id, c.status)} title={c.status === 'active' ? 'Пометить использованным' : 'Активировать'}><RefreshCw size={14} /></button>
+                    {c.kind !== 'raffle_only' && (
+                      <>
+                        <button className="ew-qr-btn" onClick={() => setQrModal(c.code)} title="Показать QR"><Eye size={16} /></button>
+                        <button className={`ew-toggle-status-btn ${c.status}`} onClick={() => handleToggleStatus(c.id, c.status)} title={c.status === 'active' ? 'Пометить использованным' : 'Активировать'}><RefreshCw size={14} /></button>
+                      </>
+                    )}
                     <button className="ew-disable-btn" onClick={() => handleDelete(c.id)} title="Удалить"><Trash2 size={14} /></button>
                   </div>
                 </td>
