@@ -23,6 +23,12 @@ const router = Router();
 // ─── Auto-migrate tables ────────────────────────────────────────────────────
 
 // Tables wl_event_codes and wl_admin_event_scans are pre-created
+// Idempotent column additions for scenario-3 v2 raffle integration:
+(async () => {
+  const tryAdd = async (sql) => { try { await dbPool.query(sql); } catch (e) { if (!/Duplicate column/i.test(e.message)) console.warn('[events] migrate:', e.message); } };
+  await tryAdd("ALTER TABLE wl_event_codes ADD COLUMN kind VARCHAR(20) NOT NULL DEFAULT 'merch'");
+  await tryAdd('ALTER TABLE wl_event_codes ADD COLUMN raffle_participant TINYINT(1) NOT NULL DEFAULT 0');
+})();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -32,7 +38,7 @@ function generateCode() {
 
 async function getSettings() {
   const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'event_settings' LIMIT 1");
-  const base = { event_starts: false, code_limit: 0, qr_bg_url: '', qr_caption_text: '' };
+  const base = { event_starts: false, code_limit: 0, qr_bg_url: '', qr_caption_text: '', raffle_hidden: false };
   if (rows.length) {
     const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     Object.assign(base, data);
@@ -87,6 +93,7 @@ router.get('/codes', async (req, res, next) => {
     // Get codes with user info
     const [rows] = await dbPool.query(`
       SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
+        c.kind, c.raffle_participant,
         u.full_name, u.rl_full_name, u.username
       FROM wl_event_codes c
       LEFT JOIN users u ON u.user_id = c.user_id
@@ -103,6 +110,8 @@ router.get('/codes', async (req, res, next) => {
       userName: r.rl_full_name || r.full_name || null,
       username: r.username || null,
       status: r.status || 'active',
+      kind: r.kind || 'merch',
+      raffleParticipant: !!r.raffle_participant,
       createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
       usedAt: r.used_at ? new Date(r.used_at).toISOString() : null,
     }));
@@ -286,7 +295,7 @@ export async function scanHandler(req, res, next) {
 
     // Find code in event_codes
     const [codes] = await dbPool.query(
-      `SELECT c.id, c.code, c.status, c.user_id, c.label,
+      `SELECT c.id, c.code, c.status, c.user_id, c.label, c.kind,
         u.full_name, u.rl_full_name, u.username
        FROM wl_event_codes c
        LEFT JOIN users u ON u.user_id = c.user_id
@@ -300,6 +309,10 @@ export async function scanHandler(req, res, next) {
 
     const eventCode = codes[0];
     const userName = eventCode.rl_full_name || eventCode.full_name || eventCode.label || eventCode.code;
+
+    if (eventCode.kind === 'raffle_only') {
+      return res.json({ status: 'raffle_only', user_name: userName, message: 'Этот код только для розыгрыша — мерч не выдаётся' });
+    }
 
     // Atomic claim: only the caller whose UPDATE flips status='active'→'used' wins.
     // Protects against double-scans from retries on flaky network.
@@ -460,6 +473,7 @@ router.put('/settings', async (req, res, next) => {
     if (req.body.event_starts !== undefined) updated.event_starts = !!req.body.event_starts;
     if (req.body.qr_caption_text !== undefined) updated.qr_caption_text = String(req.body.qr_caption_text || '');
     if (req.body.qr_bg_url !== undefined) updated.qr_bg_url = String(req.body.qr_bg_url || '');
+    if (req.body.raffle_hidden !== undefined) updated.raffle_hidden = !!req.body.raffle_hidden;
     await saveSettings(updated);
     res.json({ ok: true, settings: updated });
   } catch (err) { next(err); }

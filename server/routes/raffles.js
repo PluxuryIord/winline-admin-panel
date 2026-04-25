@@ -24,8 +24,19 @@ const router = Router();
         INDEX idx_event (event_id),
         INDEX idx_email (email)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    try { await dbPool.query("ALTER TABLE wl_event_raffle_tickets ADD COLUMN ticket_code VARCHAR(16) NULL"); }
+    catch (e) { if (!/Duplicate column/i.test(e.message)) console.warn('[raffles] migrate ticket_code:', e.message); }
   } catch (e) { console.warn('[raffles] migrate v2:', e.message); }
 })();
+
+async function isRaffleHidden() {
+  try {
+    const [rows] = await dbPool.query("SELECT data FROM texts WHERE category = 'event_settings' LIMIT 1");
+    if (!rows.length) return false;
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    return !!data?.raffle_hidden;
+  } catch { return false; }
+}
 
 // ─── Internal: bot issues / fetches a raffle ticket for a user ──────────────
 // Idempotent: same (event_id, telegram_id) → returns existing ticket_number.
@@ -50,19 +61,28 @@ raffleInternalRouter.post('/issue', async (req, res) => {
   const telegram_id = parseInt(req.body?.telegram_id, 10);
   const user_id = parseInt(req.body?.user_id, 10) || telegram_id;
   const email = String(req.body?.email || '').trim().toLowerCase();
+  const ticket_code = String(req.body?.ticket_code || '').trim().toUpperCase().slice(0, 16) || null;
   if (!telegram_id || !email) return res.status(400).json({ error: 'telegram_id and email required' });
+
+  if (await isRaffleHidden()) {
+    return res.json({ ok: true, disabled: true });
+  }
 
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
     // Existing ticket?
     const [existing] = await conn.query(
-      'SELECT ticket_number FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
+      'SELECT ticket_number, ticket_code FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
       [event_id, telegram_id]
     );
     if (existing.length) {
       await conn.commit();
-      return res.json({ ok: true, ticket_number: existing[0].ticket_number, existing: true });
+      // mark merch row as raffle participant if applicable
+      if (ticket_code) {
+        try { await dbPool.query("UPDATE wl_event_codes SET raffle_participant=1 WHERE code = ?", [`EVT-${ticket_code}`]); } catch {}
+      }
+      return res.json({ ok: true, ticket_number: existing[0].ticket_number, ticket_code: existing[0].ticket_code, existing: true });
     }
     // Next sequential number per event
     const [maxRow] = await conn.query(
@@ -71,11 +91,14 @@ raffleInternalRouter.post('/issue', async (req, res) => {
     );
     const next = maxRow[0].next;
     await conn.query(
-      'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number) VALUES (?,?,?,?,?)',
-      [event_id, user_id, telegram_id, email, next]
+      'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number, ticket_code) VALUES (?,?,?,?,?,?)',
+      [event_id, user_id, telegram_id, email, next, ticket_code]
     );
+    if (ticket_code) {
+      try { await conn.query("UPDATE wl_event_codes SET raffle_participant=1 WHERE code = ?", [`EVT-${ticket_code}`]); } catch {}
+    }
     await conn.commit();
-    res.json({ ok: true, ticket_number: next, existing: false });
+    res.json({ ok: true, ticket_number: next, ticket_code, existing: false });
   } catch (e) {
     try { await conn.rollback(); } catch {}
     console.error('[raffle/issue]', e.message);

@@ -149,7 +149,15 @@ function CodesSection() {
               <tr><td colSpan={6} className="ew-table-empty">Нет QR-кодов. Коды появятся когда пользователи нажмут «Я на мероприятии» в боте.</td></tr>
             ) : codes.map(c => (
               <tr key={c.id}>
-                <td className="ew-td-code">{c.code}</td>
+                <td className="ew-td-code">
+                  {c.code}
+                  {c.kind === 'raffle_only' && (
+                    <span className="ew-status-badge" style={{ marginLeft: 6, background: '#3b2a4a', color: '#c9a4ff' }} title="Только розыгрыш — без QR для мерча">🎟 без QR</span>
+                  )}
+                  {c.raffleParticipant && c.kind !== 'raffle_only' && (
+                    <span className="ew-status-badge" style={{ marginLeft: 6, background: '#2a3a4a', color: '#a4d4ff' }} title="Участник розыгрыша">🎟 розыгрыш</span>
+                  )}
+                </td>
                 <td>
                   <div className="ew-user-cell">
                     <span className="ew-user-name">{c.userName || c.label || '—'}</span>
@@ -308,6 +316,8 @@ function SettingsModal({ onClose }) {
   const [codeLimit, setCodeLimit] = useState(0);
   const [qrCaptionText, setQrCaptionText] = useState('');
   const [qrBgUrl, setQrBgUrl] = useState('');
+  const [raffleHidden, setRaffleHidden] = useState(false);
+  const [savingRaffle, setSavingRaffle] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -328,6 +338,7 @@ function SettingsModal({ onClose }) {
         setCodeLimit(data.code_limit ?? 0);
         setQrCaptionText(data.qr_caption_text ?? '');
         setQrBgUrl(data.qr_bg_url ?? '');
+        setRaffleHidden(!!data.raffle_hidden);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     })();
@@ -382,6 +393,16 @@ function SettingsModal({ onClose }) {
   };
 
   const handleRemoveBg = () => setQrBgUrl('');
+
+  const handleToggleRaffle = async () => {
+    setSavingRaffle(true);
+    try {
+      const next = !raffleHidden;
+      await api.put('/api/events/settings', { raffle_hidden: next });
+      setRaffleHidden(next);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    finally { setSavingRaffle(false); }
+  };
 
   const handleReset = async () => {
     if (!confirm('Вы уверены? Все QR-коды и сканирования будут удалены. Это необратимо!')) return;
@@ -472,6 +493,20 @@ function SettingsModal({ onClose }) {
                   {savedLimit ? <><Check size={14} /> Сохранено</> : savingLimit ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>
+            </div>
+
+            {/* Raffle visibility */}
+            <div className="ew-settings-section">
+              <h3>Розыгрыш мячей</h3>
+              <p className="ew-settings-desc">Когда скрыто — бот не показывает экраны и сообщения о розыгрыше. Билеты не выдаются.</p>
+              <button
+                className={`ew-header-toggle ${!raffleHidden ? 'on' : ''}`}
+                onClick={handleToggleRaffle}
+                disabled={savingRaffle}
+              >
+                {!raffleHidden ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                <span className="ew-header-toggle-label">{raffleHidden ? 'Скрыт' : 'Активен'}</span>
+              </button>
             </div>
 
             {/* Hostess link */}
