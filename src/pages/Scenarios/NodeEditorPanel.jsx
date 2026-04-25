@@ -633,6 +633,8 @@ export default function NodeEditorPanel({
                       value={btn.label}
                       onChange={e => onUpdateButtonLabel(key, e.target.value)}
                       placeholder="Текст кнопки"
+                      disabled={isStructureLocked}
+                      style={isStructureLocked ? { opacity: 0.7 } : undefined}
                     />
                     {!isStructureLocked && (
                       <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">

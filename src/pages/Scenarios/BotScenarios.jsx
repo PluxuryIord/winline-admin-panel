@@ -713,11 +713,6 @@ export default function BotScenarios() {
         }}
       />
 
-      {/* Add new block button */}
-      <button className="sc-add-block-btn" onClick={openCreateModal} title="Добавить блок">
-        <Plus size={22} />
-      </button>
-
       {/* Create block modal */}
       {showCreateModal && (
         <div className="sc-modal-overlay" onClick={() => setShowCreateModal(false)}>
