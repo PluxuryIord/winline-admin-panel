@@ -71,11 +71,20 @@ raffleInternalRouter.post('/issue', async (req, res) => {
   const conn = await dbPool.getConnection();
   try {
     await conn.beginTransaction();
-    // Existing ticket?
-    const [existing] = await conn.query(
-      'SELECT ticket_number, ticket_code FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
-      [event_id, telegram_id]
-    );
+    // Existing ticket? (fallback if ticket_code column not yet added)
+    let existing;
+    try {
+      [existing] = await conn.query(
+        'SELECT ticket_number, ticket_code FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
+        [event_id, telegram_id]
+      );
+    } catch (e) {
+      if (!/Unknown column/i.test(e.message)) throw e;
+      [existing] = await conn.query(
+        'SELECT ticket_number FROM wl_event_raffle_tickets WHERE event_id=? AND telegram_id=? LIMIT 1',
+        [event_id, telegram_id]
+      );
+    }
     if (existing.length) {
       await conn.commit();
       // mark merch row as raffle participant if applicable
@@ -90,10 +99,18 @@ raffleInternalRouter.post('/issue', async (req, res) => {
       [event_id]
     );
     const next = maxRow[0].next;
-    await conn.query(
-      'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number, ticket_code) VALUES (?,?,?,?,?,?)',
-      [event_id, user_id, telegram_id, email, next, ticket_code]
-    );
+    try {
+      await conn.query(
+        'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number, ticket_code) VALUES (?,?,?,?,?,?)',
+        [event_id, user_id, telegram_id, email, next, ticket_code]
+      );
+    } catch (e) {
+      if (!/Unknown column/i.test(e.message)) throw e;
+      await conn.query(
+        'INSERT INTO wl_event_raffle_tickets (event_id, user_id, telegram_id, email, ticket_number) VALUES (?,?,?,?,?)',
+        [event_id, user_id, telegram_id, email, next]
+      );
+    }
     if (ticket_code) {
       try { await conn.query("UPDATE wl_event_codes SET raffle_participant=1 WHERE code = ?", [`EVT-${ticket_code}`]); } catch {}
     }

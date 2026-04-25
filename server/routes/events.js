@@ -90,17 +90,31 @@ router.get('/codes', async (req, res, next) => {
       `SELECT COUNT(*) as total FROM wl_event_codes c LEFT JOIN users u ON u.user_id = c.user_id ${where}`, params
     );
 
-    // Get codes with user info
-    const [rows] = await dbPool.query(`
-      SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
-        c.kind, c.raffle_participant,
-        u.full_name, u.rl_full_name, u.username
-      FROM wl_event_codes c
-      LEFT JOIN users u ON u.user_id = c.user_id
-      ${where}
-      ORDER BY c.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...params, limit, offset]);
+    // Get codes with user info; fall back to legacy schema if v2 columns missing
+    let rows;
+    try {
+      [rows] = await dbPool.query(`
+        SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
+          c.kind, c.raffle_participant,
+          u.full_name, u.rl_full_name, u.username
+        FROM wl_event_codes c
+        LEFT JOIN users u ON u.user_id = c.user_id
+        ${where}
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `, [...params, limit, offset]);
+    } catch (e) {
+      if (!/Unknown column/i.test(e.message)) throw e;
+      [rows] = await dbPool.query(`
+        SELECT c.id, c.code, c.label, c.user_id, c.status, c.created_at, c.used_at,
+          u.full_name, u.rl_full_name, u.username
+        FROM wl_event_codes c
+        LEFT JOIN users u ON u.user_id = c.user_id
+        ${where}
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+      `, [...params, limit, offset]);
+    }
 
     const codes = rows.map(r => ({
       id: r.id,
@@ -293,15 +307,28 @@ export async function scanHandler(req, res, next) {
     const scannedValue = String(rawCode || req.body.user_id || '').trim();
     if (!scannedValue) return res.status(400).json({ error: 'code is required' });
 
-    // Find code in event_codes
-    const [codes] = await dbPool.query(
-      `SELECT c.id, c.code, c.status, c.user_id, c.label, c.kind,
-        u.full_name, u.rl_full_name, u.username
-       FROM wl_event_codes c
-       LEFT JOIN users u ON u.user_id = c.user_id
-       WHERE c.code = ?`,
-      [scannedValue]
-    );
+    // Find code in event_codes (fallback if `kind` not yet present)
+    let codes;
+    try {
+      [codes] = await dbPool.query(
+        `SELECT c.id, c.code, c.status, c.user_id, c.label, c.kind,
+          u.full_name, u.rl_full_name, u.username
+         FROM wl_event_codes c
+         LEFT JOIN users u ON u.user_id = c.user_id
+         WHERE c.code = ?`,
+        [scannedValue]
+      );
+    } catch (e) {
+      if (!/Unknown column/i.test(e.message)) throw e;
+      [codes] = await dbPool.query(
+        `SELECT c.id, c.code, c.status, c.user_id, c.label,
+          u.full_name, u.rl_full_name, u.username
+         FROM wl_event_codes c
+         LEFT JOIN users u ON u.user_id = c.user_id
+         WHERE c.code = ?`,
+        [scannedValue]
+      );
+    }
 
     if (!codes.length) {
       return res.json({ status: 'not_found', message: 'Код не найден' });
