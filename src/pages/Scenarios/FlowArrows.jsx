@@ -264,23 +264,6 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
             fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(255,126,0,0.5)'}
             transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
           />
-          {/* Button label near start of arrow */}
-          {label && (
-            <g transform={`translate(${sx + (tx >= sx ? 8 : -8)},${sy - 8})`}>
-              <text
-                textAnchor={tx >= sx ? 'start' : 'end'}
-                fontSize="11"
-                fontWeight="500"
-                fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(180,180,180,0.85)'}
-                stroke="rgba(20,20,20,0.85)"
-                strokeWidth="3"
-                paintOrder="stroke"
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                {label.length > 28 ? label.slice(0, 27) + '…' : label}
-              </text>
-            </g>
-          )}
           {/* Start/end dots */}
           <circle cx={sx} cy={sy} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
