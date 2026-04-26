@@ -27,8 +27,11 @@ function getPreviewHeight(screen) {
 function getNodeHeight(screen) {
   const btnCount = (screen.buttons?._order || []).length;
   const previewH = getPreviewHeight(screen);
-  // text_input anketa nodes have one pseudo-button row for "next"
-  const extraRows = (screen.scenario === 5 && screen.stepType === 'text_input') ? 1 : 0;
+  // anketa nodes with text_input / subscription_check / finish render an extra pseudo-button row
+  const extraRows = (screen.scenario === 5 &&
+    (screen.stepType === 'text_input' ||
+     screen.stepType === 'subscription_check' ||
+     screen.stepType === 'finish')) ? 1 : 0;
   // answerKey row adds ~18px
   const answerKeyH = (screen.scenario === 5 && screen.answerKey) ? 18 : 0;
   return NODE_HEADER_H + answerKeyH + previewH + 8 + (btnCount + extraRows) * BTN_ROW_H + 10;
@@ -67,6 +70,11 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
   const arrows = [];
   const drawnPairs = new Set(); // track srcId->targetScreen to deduplicate
 
+  // Loop-back arrows used by bot logic but visually noisy on the flow chart
+  const HIDDEN_LOOPBACKS = new Set([
+    'event_site_wait->event_site_status',
+  ]);
+
   for (const [srcId, screen] of Object.entries(screens)) {
     const order = screen.buttons?._order || [];
     const srcX = screen.x ?? 0;
@@ -80,6 +88,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
       if (btn.targetScreen === srcId) return;
       // logout_screen is hidden in canvas — don't draw arrows toward it
       if (btn.targetScreen === 'logout_screen') return;
+      if (HIDDEN_LOOPBACKS.has(`${srcId}->${btn.targetScreen}`)) return;
 
       const labelLower = (btn.label || '').toLowerCase();
       const actionLower = (btn.action || '').toLowerCase();

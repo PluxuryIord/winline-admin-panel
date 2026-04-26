@@ -8,7 +8,7 @@ import './BotScenarios.css';
 // System screens that cannot be deleted
 const SYSTEM_SCREENS = new Set([
   'start_menu', 'registration_flow', 'auth_flow', 'main_menu',
-  'offer_page', 'promo_page', 'socials_page', 'event_flow', 'logout_screen',
+  'offer_page', 'promo_page', 'socials_page', 'logout_screen',
   'knowledge_base',
   // Сценарий 3 — расширенный поток мероприятия
   'event_partner_check', 'event_verify_promo', 'event_email_prompt',
@@ -54,7 +54,6 @@ const SCREEN_TO_CALLBACK = {
   offer_page: 'client_offers',
   promo_page: 'client_promo',
   socials_page: 'client_socials',
-  event_flow: 'client_at_event',
   logout_screen: 'client_logout',
 };
 
@@ -70,9 +69,6 @@ const DEFAULT_POSITIONS = {
   offer_page:        { x: 100, y: 700 },
   promo_page:        { x: 500, y: 700 },
   socials_page:      { x: 900, y: 700 },
-
-  // Сценарий 3: Мероприятие
-  event_flow:        { x: 900, y: 350 },
 
   // Сценарий 3: Расширенный поток мероприятия (колонка правее анкеты)
   event_partner_check:           { x: 2000, y: 60 },
@@ -145,6 +141,22 @@ function migrateData(data) {
       const btn = scr.buttons[btnKey];
       if (btn?.targetScreen === 'event_anketa') {
         btn.targetScreen = 'anketa_role';
+        changed = true;
+      }
+    }
+  }
+
+  // One-time cleanup: remove deprecated event_flow block (replaced by event_partner_check)
+  if (data.screens.event_flow) {
+    delete data.screens.event_flow;
+    changed = true;
+  }
+  for (const scr of Object.values(data.screens)) {
+    const order = scr.buttons?._order || [];
+    for (const btnKey of order) {
+      const btn = scr.buttons[btnKey];
+      if (btn?.targetScreen === 'event_flow') {
+        btn.targetScreen = 'event_partner_check';
         changed = true;
       }
     }

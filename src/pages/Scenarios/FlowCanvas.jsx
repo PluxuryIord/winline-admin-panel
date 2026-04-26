@@ -8,7 +8,9 @@ import { NODE_W, NODE_HEADER_H, BTN_ROW_H } from './FlowNode';
 const SCENARIO_GROUPS = {
   'Сценарий 1': ['start_menu', 'registration_flow'],
   'Сценарий 2': ['auth_flow', 'main_menu', 'offer_page', 'promo_page', 'socials_page'],
-  'Сценарий 3': ['event_flow'],
+  'Сценарий 3': ['event_partner_check', 'event_verify_promo', 'event_email_prompt',
+    'event_email_confirmed', 'event_site_status', 'event_site_wait',
+    'event_congrats', 'event_registration_promo', 'event_registration_instructions'],
   'Сценарий 4': ['group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb'],
   'Анкета': [],  // Dynamic — filled from screens with scenario:5
 };
@@ -17,7 +19,7 @@ const SCENARIO_GROUPS = {
 const SCENARIO_CENTER = {
   'Сценарий 1': 'registration_flow',
   'Сценарий 2': 'auth_flow',
-  'Сценарий 3': 'event_flow',
+  'Сценарий 3': 'event_partner_check',
   'Сценарий 4': 'group_menu',
   'Анкета': 'anketa_role',
 };
