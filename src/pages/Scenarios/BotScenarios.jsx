@@ -393,6 +393,14 @@ export default function BotScenarios() {
     setSaved(false);
   }, []);
 
+  // Persist position after drag finishes
+  const moveNodeEnd = useCallback(() => {
+    setScenarios(prev => {
+      api.put('/api/scenarios', prev).catch(() => {});
+      return prev;
+    });
+  }, []);
+
   // Edit message text
   const updateMessage = (key, text) => {
     setEditData(prev => {
@@ -703,6 +711,7 @@ export default function BotScenarios() {
         activeScreen={activeScreen}
         onSelectNode={selectScreen}
         onMoveNode={moveNode}
+        onMoveNodeEnd={moveNodeEnd}
         onDuplicate={duplicateBlock}
         onDeleteBlock={deleteBlock}
         searchQuery={searchQuery}

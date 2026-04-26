@@ -23,7 +23,7 @@ const SCENARIO_CENTER = {
 };
 
 export default function FlowCanvas({
-  screens, activeScreen, onSelectNode, onMoveNode,
+  screens, activeScreen, onSelectNode, onMoveNode, onMoveNodeEnd,
   onDuplicate, onDeleteBlock, searchQuery, setSearchQuery,
   hoveredNode, setHoveredNode, onStartTest,
   bendOffsets, onBendChange,
@@ -311,6 +311,7 @@ export default function FlowCanvas({
             isHighlighted={id === highlightedNode}
             onSelect={onSelectNode}
             onMove={onMoveNode}
+            onMoveEnd={onMoveNodeEnd}
             onDuplicate={onDuplicate}
             onDelete={onDeleteBlock}
             onHover={setHoveredNode}

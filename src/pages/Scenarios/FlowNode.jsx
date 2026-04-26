@@ -41,7 +41,7 @@ export const NODE_PAD_BOTTOM = 10;
 
 export default function FlowNode({
   screenId, screen, position, isActive, isSearchMatch, isConnected, isHovered, isHighlighted,
-  onSelect, onMove, onDuplicate, onDelete, onHover, zoom,
+  onSelect, onMove, onMoveEnd, onDuplicate, onDelete, onHover, zoom,
 }) {
   const dragRef = useRef(null);
   const [contextMenu, setContextMenu] = useState(null);
@@ -76,11 +76,12 @@ export default function FlowNode({
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
       if (!moved) onSelect(screenId);
+      else onMoveEnd?.(screenId);
     };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  }, [screenId, position, onSelect, onMove, zoom]);
+  }, [screenId, position, onSelect, onMove, onMoveEnd, zoom]);
 
   // Context menu (right click)
   const handleContextMenu = useCallback((e) => {

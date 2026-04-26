@@ -78,8 +78,10 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
       if (!btn?.targetScreen || !screens[btn.targetScreen]) return;
       // Skip self-referencing arrows
       if (btn.targetScreen === srcId) return;
+      // logout_screen is hidden in canvas — don't draw arrows toward it
+      if (btn.targetScreen === 'logout_screen') return;
 
-      if (btn.label?.includes('Назад') || btn.label?.includes('Меню') && btnKey.includes('back')) return;
+      if (btn.label?.includes('Назад') || (btn.label?.includes('Меню') && btnKey.includes('back'))) return;
 
       // Deduplicate: only draw one arrow per src→target pair
       const pairKey = `${srcId}->${btn.targetScreen}`;
@@ -148,7 +150,14 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
     });
 
     // Draw arrow for text_input / subscription_check anketa nextScreen
-    if (screen.nextScreen && screens[screen.nextScreen]) {
+    if (
+      screen.nextScreen &&
+      screens[screen.nextScreen] &&
+      screen.nextScreen !== srcId &&
+      screen.nextScreen !== 'logout_screen' &&
+      !drawnPairs.has(`${srcId}->${screen.nextScreen}`)
+    ) {
+      drawnPairs.add(`${srcId}->${screen.nextScreen}`);
       const target = screens[screen.nextScreen];
       const tgtX = target.x ?? 0;
       const tgtY = target.y ?? 0;
