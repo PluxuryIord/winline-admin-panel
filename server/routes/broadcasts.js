@@ -16,8 +16,15 @@ function isValidChatId(chatId) {
 
 const router = Router();
 
-async function markBlockedIfNeeded(userId, errorText) {
-  if (errorText && (errorText.includes('blocked by the user') || errorText.includes('Forbidden'))) {
+async function markBlockedIfNeeded(userId, errorTextOrResponse) {
+  let blocked = false;
+  if (errorTextOrResponse && typeof errorTextOrResponse === 'object') {
+    blocked = errorTextOrResponse.error_code === 403;
+  } else if (typeof errorTextOrResponse === 'string' && errorTextOrResponse) {
+    blocked = errorTextOrResponse.includes('blocked by the user') ||
+              errorTextOrResponse.includes('Forbidden');
+  }
+  if (blocked) {
     try {
       await dbPool.query('UPDATE users SET banned = 1 WHERE user_id = ?', [userId]);
       console.log(`[blocked] User ${userId} marked as banned (blocked bot)`);

@@ -44,7 +44,8 @@ router.post('/:id/rollback', requireAdmin, async (req, res, next) => {
 // PUT /api/snapshots/:id/note — set/update note
 router.put('/:id/note', requireAdmin, async (req, res, next) => {
   try {
-    await setSnapshotNote(Number(req.params.id), req.body?.note || '');
+    const note = String(req.body?.note || '').slice(0, 2000);
+    await setSnapshotNote(Number(req.params.id), note);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

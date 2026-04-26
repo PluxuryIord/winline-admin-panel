@@ -77,8 +77,18 @@ export async function cleanupDuplicateChats() {
   }
 }
 
-async function markBlockedIfNeeded(userId, errorText) {
-  if (errorText && (errorText.includes('blocked by the user') || errorText.includes('Forbidden'))) {
+async function markBlockedIfNeeded(userId, errorTextOrResponse) {
+  // Telegram returns error_code 403 when the user blocked the bot — that's the
+  // authoritative signal. Fall back to substring match only when we don't have
+  // the structured response (network errors, exceptions).
+  let blocked = false;
+  if (errorTextOrResponse && typeof errorTextOrResponse === 'object') {
+    blocked = errorTextOrResponse.error_code === 403;
+  } else if (typeof errorTextOrResponse === 'string') {
+    blocked = errorTextOrResponse.includes('blocked by the user') ||
+              errorTextOrResponse.includes('Forbidden');
+  }
+  if (blocked) {
     try {
       await dbPool.query('UPDATE users SET banned = 1 WHERE user_id = ?', [userId]);
       console.log(`[blocked] User ${userId} marked as banned (blocked bot)`);
