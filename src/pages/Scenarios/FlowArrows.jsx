@@ -81,7 +81,14 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
       // logout_screen is hidden in canvas — don't draw arrows toward it
       if (btn.targetScreen === 'logout_screen') return;
 
-      if (btn.label?.includes('Назад') || (btn.label?.includes('Меню') && btnKey.includes('back'))) return;
+      const labelLower = (btn.label || '').toLowerCase();
+      const actionLower = (btn.action || '').toLowerCase();
+      const isBackButton =
+        labelLower.includes('назад') ||
+        labelLower.includes('вернуться') ||
+        (labelLower.includes('меню') && btnKey.includes('back')) ||
+        /(_back\b|back_to_|back_menu)/.test(actionLower);
+      if (isBackButton) return;
 
       // Deduplicate: only draw one arrow per src→target pair
       const pairKey = `${srcId}->${btn.targetScreen}`;
@@ -103,27 +110,31 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
 
       let sx, sy, tx, ty, cp1x, cp1y, cp2x, cp2y;
 
+      // Target always lands at the top anchor (matches the visual top dot)
+      tx = tgtX + NODE_W / 2;
+      ty = tgtY;
+
       if (absDx > absDy * 0.6) {
+        // Source exits from the side of the button row
         if (dx > 0) {
           sx = srcX + NODE_W; sy = btnCenterY;
-          tx = tgtX; ty = tgtY + tgtH / 2;
-          const cpOff = Math.max(60, absDx * 0.4);
-          cp1x = sx + cpOff; cp1y = sy; cp2x = tx - cpOff; cp2y = ty;
         } else {
           sx = srcX; sy = btnCenterY;
-          tx = tgtX + NODE_W; ty = tgtY + tgtH / 2;
-          const cpOff = Math.max(60, absDx * 0.4);
-          cp1x = sx - cpOff; cp1y = sy; cp2x = tx + cpOff; cp2y = ty;
         }
+        const cpOffX = Math.max(60, absDx * 0.4);
+        const cpOffY = Math.max(60, Math.abs(ty - sy) * 0.4);
+        cp1x = sx + (dx > 0 ? cpOffX : -cpOffX); cp1y = sy;
+        cp2x = tx; cp2y = ty - cpOffY;
       } else {
+        // Source above or below — vertical exit
         if (dy > 0) {
           sx = srcX + NODE_W / 2; sy = srcY + srcH;
-          tx = tgtX + NODE_W / 2; ty = tgtY;
           const cpOff = Math.max(60, absDy * 0.4);
           cp1x = sx; cp1y = sy + cpOff; cp2x = tx; cp2y = ty - cpOff;
         } else {
           sx = srcX + NODE_W / 2; sy = srcY;
-          tx = tgtX + NODE_W / 2; ty = tgtY + tgtH;
+          // Target is above source; land at bottom of target instead
+          ty = tgtY + tgtH;
           const cpOff = Math.max(60, absDy * 0.4);
           cp1x = sx; cp1y = sy - cpOff; cp2x = tx; cp2y = ty + cpOff;
         }
@@ -146,6 +157,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
         key: arrowKey,
         d: `M ${sx},${sy} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${tx},${ty}`,
         highlighted, mid, angle, sx, sy, tx, ty,
+        label: btn.label || '',
       });
     });
 
@@ -165,7 +177,13 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
 
       const srcPreviewH = getPreviewHeight(screen);
       const btnCount = order.length;
-      const pseudoBtnY = srcY + NODE_HEADER_H + srcPreviewH + 8 + btnCount * BTN_ROW_H + BTN_ROW_H / 2;
+      // Only anketa text_input / subscription_check render a visual pseudo-button row.
+      // For other screens (e.g. event_email_prompt) source must come from the actual node bottom.
+      const hasPseudoBtnRow = screen.scenario === 5 &&
+        (screen.stepType === 'text_input' || screen.stepType === 'subscription_check');
+      const pseudoBtnY = hasPseudoBtnRow
+        ? srcY + NODE_HEADER_H + srcPreviewH + 8 + btnCount * BTN_ROW_H + BTN_ROW_H / 2
+        : srcY + srcH;
 
       const dx = (tgtX + NODE_W / 2) - (srcX + NODE_W / 2);
       const absDx = Math.abs(dx);
@@ -173,27 +191,28 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
       const absDy = Math.abs(dy2);
 
       let sx2, sy2, tx2, ty2, cp1x2, cp1y2, cp2x2, cp2y2;
-      if (absDx > absDy * 0.6) {
+      tx2 = tgtX + NODE_W / 2;
+      ty2 = tgtY;
+
+      if (absDx > absDy * 0.6 && hasPseudoBtnRow) {
+        // Side exit only when there's a real pseudo-button row to anchor to
         if (dx > 0) {
           sx2 = srcX + NODE_W; sy2 = pseudoBtnY;
-          tx2 = tgtX; ty2 = tgtY + tgtH / 2;
-          const cpOff = Math.max(60, absDx * 0.4);
-          cp1x2 = sx2 + cpOff; cp1y2 = sy2; cp2x2 = tx2 - cpOff; cp2y2 = ty2;
         } else {
           sx2 = srcX; sy2 = pseudoBtnY;
-          tx2 = tgtX + NODE_W; ty2 = tgtY + tgtH / 2;
-          const cpOff = Math.max(60, absDx * 0.4);
-          cp1x2 = sx2 - cpOff; cp1y2 = sy2; cp2x2 = tx2 + cpOff; cp2y2 = ty2;
         }
+        const cpOffX = Math.max(60, absDx * 0.4);
+        const cpOffY = Math.max(60, Math.abs(ty2 - sy2) * 0.4);
+        cp1x2 = sx2 + (dx > 0 ? cpOffX : -cpOffX); cp1y2 = sy2;
+        cp2x2 = tx2; cp2y2 = ty2 - cpOffY;
       } else {
         if (dy2 > 0) {
           sx2 = srcX + NODE_W / 2; sy2 = srcY + srcH;
-          tx2 = tgtX + NODE_W / 2; ty2 = tgtY;
           const cpOff = Math.max(60, absDy * 0.4);
           cp1x2 = sx2; cp1y2 = sy2 + cpOff; cp2x2 = tx2; cp2y2 = ty2 - cpOff;
         } else {
           sx2 = srcX + NODE_W / 2; sy2 = srcY;
-          tx2 = tgtX + NODE_W / 2; ty2 = tgtY + tgtH;
+          ty2 = tgtY + tgtH;
           const cpOff = Math.max(60, absDy * 0.4);
           cp1x2 = sx2; cp1y2 = sy2 - cpOff; cp2x2 = tx2; cp2y2 = ty2 + cpOff;
         }
@@ -219,7 +238,7 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
 
   return (
     <g>
-      {arrows.map(({ key, d, highlighted, mid, angle, sx, sy, tx, ty }) => (
+      {arrows.map(({ key, d, highlighted, mid, angle, sx, sy, tx, ty, label }) => (
         <g key={key}>
           {/* Invisible thick path for easy hover/click */}
           <path
@@ -245,6 +264,23 @@ export default function FlowArrows({ screens, activeScreen, hoveredNode, bendOff
             fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(255,126,0,0.5)'}
             transform={`translate(${mid.x},${mid.y}) rotate(${angle})`}
           />
+          {/* Button label near start of arrow */}
+          {label && (
+            <g transform={`translate(${sx + (tx >= sx ? 8 : -8)},${sy - 8})`}>
+              <text
+                textAnchor={tx >= sx ? 'start' : 'end'}
+                fontSize="11"
+                fontWeight="500"
+                fill={highlighted ? 'rgba(255,126,0,1)' : 'rgba(180,180,180,0.85)'}
+                stroke="rgba(20,20,20,0.85)"
+                strokeWidth="3"
+                paintOrder="stroke"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {label.length > 28 ? label.slice(0, 27) + '…' : label}
+              </text>
+            </g>
+          )}
           {/* Start/end dots */}
           <circle cx={sx} cy={sy} r={4}
             fill={highlighted ? 'var(--color-orange)' : 'rgba(255,126,0,0.4)'} />
