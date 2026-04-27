@@ -12,12 +12,11 @@ let _transporter = null;
 
 function getTransporter() {
   if (_transporter) return _transporter;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
-  _transporter = nodemailer.createTransport({
+  if (!SMTP_HOST) return null;
+  const opts = {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
     // Таймауты: короткие, но дают серверу дохнуть
     connectionTimeout: 30_000,
     greetingTimeout: 30_000,
@@ -25,7 +24,12 @@ function getTransporter() {
     tls: { rejectUnauthorized: false },
     logger: false,
     debug: false,
-  });
+  };
+  // Internal relays may auth by IP and not require user/pass
+  if (SMTP_USER && SMTP_PASS) {
+    opts.auth = { user: SMTP_USER, pass: SMTP_PASS };
+  }
+  _transporter = nodemailer.createTransport(opts);
   return _transporter;
 }
 
@@ -33,7 +37,7 @@ function getTransporter() {
 export async function verifyMailer() {
   if (isResend()) return verifyResend();
   const t = getTransporter();
-  if (!t) throw new Error('SMTP не настроен (SMTP_HOST/USER/PASS пустые)');
+  if (!t) throw new Error('SMTP не настроен (SMTP_HOST пуст)');
   return t.verify();
 }
 
@@ -41,7 +45,7 @@ function isResend() { return MAIL_PROVIDER === 'resend'; }
 
 export function isMailerConfigured() {
   if (isResend()) return !!(RESEND_API_KEY && RESEND_FROM);
-  return !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+  return !!SMTP_HOST;
 }
 
 async function sendViaResend({ to, subject, text, html }) {
