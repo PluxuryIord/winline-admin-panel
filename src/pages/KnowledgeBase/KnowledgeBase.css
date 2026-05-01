@@ -379,6 +379,33 @@
   color: #000;
 }
 
+/* Карточки подтем под контентом темы */
+.kb-subtopic-cards {
+  padding: 16px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-subtopic-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.15s;
+}
+
+.kb-subtopic-card:hover {
+  background-color: rgba(255, 126, 0, 0.08);
+  border-color: rgba(255, 126, 0, 0.3);
+  color: var(--color-white);
+}
+
 /* Пустое состояние */
 .kb-empty {
   flex: 1;

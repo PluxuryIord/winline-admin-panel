@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   FileText, Edit3, Save, Loader, BookOpen, Image as ImageIcon, X, Upload, Trash2,
-  Plus, MoreHorizontal, Pencil
+  Plus, MoreHorizontal, Pencil, ChevronRight, ChevronDown, FolderPlus, GripVertical,
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
@@ -12,6 +12,8 @@ export default function KnowledgeBase() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeKey, setActiveKey] = useState(null);
+  const [activeSubKey, setActiveSubKey] = useState(null); // если выбрана подтема
+  const [expanded, setExpanded] = useState({}); // { parentKey: bool }
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -24,16 +26,27 @@ export default function KnowledgeBase() {
   const [createTitle, setCreateTitle] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const [deleteModal, setDeleteModal] = useState(null); // { key, title } or null
+  // { kind: 'topic'|'subtopic', parentKey?, key, title, subCount? }
+  const [deleteModal, setDeleteModal] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [renameModal, setRenameModal] = useState(null); // { key, title } or null
+  // { kind, parentKey?, key, title }
+  const [renameModal, setRenameModal] = useState(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [renaming, setRenaming] = useState(false);
 
-  // Kebab menu
-  const [openMenu, setOpenMenu] = useState(null); // key of open menu
+  // { parentKey, parentTitle }
+  const [createSubModal, setCreateSubModal] = useState(null);
+  const [createSubTitle, setCreateSubTitle] = useState('');
+  const [creatingSub, setCreatingSub] = useState(false);
+
+  // Kebab menu — { kind, key, parentKey? }
+  const [openMenu, setOpenMenu] = useState(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  // D&D state
+  const [dragTopic, setDragTopic] = useState(null);          // key being dragged
+  const [dragSub, setDragSub] = useState(null);              // { parentKey, key }
 
   const fetchArticles = () => {
     api.get('/api/knowledge')
@@ -46,6 +59,7 @@ export default function KnowledgeBase() {
         setArticles(list);
         if (list.length > 0 && !list.find(a => a.key === activeKey)) {
           setActiveKey(list[0].key);
+          setActiveSubKey(null);
         }
         setLoading(false);
       })
@@ -54,7 +68,6 @@ export default function KnowledgeBase() {
 
   useEffect(() => { fetchArticles(); }, []);
 
-  // Close kebab menu on click outside
   useEffect(() => {
     if (!openMenu) return;
     const handler = () => setOpenMenu(null);
@@ -62,8 +75,29 @@ export default function KnowledgeBase() {
     return () => document.removeEventListener('click', handler);
   }, [openMenu]);
 
-  const active = articles.find(a => a.key === activeKey);
+  const activeTopic = articles.find(a => a.key === activeKey);
+  const activeSub = activeSubKey && activeTopic
+    ? (activeTopic.subtopics || []).find(s => s.key === activeSubKey)
+    : null;
+  const active = activeSub || activeTopic;
 
+  /** Open menu helper */
+  const openKebab = (e, descriptor) => {
+    e.stopPropagation();
+    if (openMenu && openMenu.uniq === descriptor.uniq) {
+      setOpenMenu(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setMenuPos({
+      top: spaceBelow < 160 ? rect.top - 130 : rect.bottom + 4,
+      left: Math.min(rect.right, window.innerWidth - 200),
+    });
+    setOpenMenu(descriptor);
+  };
+
+  // ─── EDIT / SAVE ────────────────────────────────────────────────────────────
   const handleEdit = () => {
     if (!active) return;
     setEditContent(active.content);
@@ -74,9 +108,23 @@ export default function KnowledgeBase() {
     if (!active) return;
     setSaving(true);
     try {
-      const res = await api.put(`/api/knowledge/${active.key}`, { content: editContent });
+      const url = activeSub
+        ? `/api/knowledge/${activeKey}/subtopic/${activeSub.key}`
+        : `/api/knowledge/${active.key}`;
+      const res = await api.put(url, { content: editContent });
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
-      setArticles(prev => prev.map(a => a.key === active.key ? { ...a, content: editContent } : a));
+      setArticles(prev => prev.map(a => {
+        if (activeSub) {
+          if (a.key !== activeKey) return a;
+          return {
+            ...a,
+            subtopics: (a.subtopics || []).map(s =>
+              s.key === activeSub.key ? { ...s, content: editContent } : s
+            ),
+          };
+        }
+        return a.key === active.key ? { ...a, content: editContent } : a;
+      }));
       setIsEditing(false);
     } catch (err) {
       alert('Ошибка сохранения: ' + err.message);
@@ -89,14 +137,14 @@ export default function KnowledgeBase() {
     setEditContent('');
   };
 
-  /** Get photo display URL — prefer S3, fallback to proxy */
-  function getPhotoSrc(article) {
-    if (article.photoS3Url) return article.photoS3Url;
-    if (article.photoFileId) return `/api/knowledge/photo/${article.photoFileId}`;
+  // ─── PHOTO ──────────────────────────────────────────────────────────────────
+  const getPhotoSrc = (item) => {
+    if (!item) return null;
+    if (item.photoS3Url) return item.photoS3Url;
+    if (item.photoFileId) return `/api/knowledge/photo/${item.photoFileId}`;
     return null;
-  }
+  };
 
-  /** Upload new photo for current article */
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !active?.photoKey) return;
@@ -113,12 +161,19 @@ export default function KnowledgeBase() {
       const data = await res.json();
       if (data.ok) {
         setArticles(prev => prev.map(a => {
+          if (activeSub) {
+            if (a.key !== activeKey) return a;
+            return {
+              ...a,
+              subtopics: (a.subtopics || []).map(s =>
+                s.key === activeSub.key
+                  ? { ...s, photoFileId: data.fileId || s.photoFileId, photoS3Url: data.s3Url || s.photoS3Url }
+                  : s
+              ),
+            };
+          }
           if (a.key !== active.key) return a;
-          return {
-            ...a,
-            photoFileId: data.fileId || a.photoFileId,
-            photoS3Url: data.s3Url || a.photoS3Url,
-          };
+          return { ...a, photoFileId: data.fileId || a.photoFileId, photoS3Url: data.s3Url || a.photoS3Url };
         }));
       } else {
         alert('Ошибка загрузки: ' + (data.error || 'unknown'));
@@ -130,7 +185,6 @@ export default function KnowledgeBase() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  /** Delete photo from current article */
   const handlePhotoDelete = async () => {
     if (!active?.photoKey || !active?.photoFileId) return;
     if (!confirm('Удалить фото из статьи?')) return;
@@ -139,6 +193,15 @@ export default function KnowledgeBase() {
       const result = await res.json();
       if (result.ok) {
         setArticles(prev => prev.map(a => {
+          if (activeSub) {
+            if (a.key !== activeKey) return a;
+            return {
+              ...a,
+              subtopics: (a.subtopics || []).map(s =>
+                s.key === activeSub.key ? { ...s, photoFileId: null, photoS3Url: null } : s
+              ),
+            };
+          }
           if (a.key !== active.key) return a;
           return { ...a, photoFileId: null, photoS3Url: null };
         }));
@@ -148,7 +211,7 @@ export default function KnowledgeBase() {
     }
   };
 
-  /** Create new topic */
+  // ─── CRUD ───────────────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!createTitle.trim()) return;
     setCreating(true);
@@ -160,6 +223,7 @@ export default function KnowledgeBase() {
         setCreateTitle('');
         fetchArticles();
         setActiveKey(result.key);
+        setActiveSubKey(null);
         setIsEditing(false);
       } else {
         alert('Ошибка: ' + (result.error || 'unknown'));
@@ -170,16 +234,48 @@ export default function KnowledgeBase() {
     setCreating(false);
   };
 
-  /** Delete topic */
+  const handleCreateSub = async () => {
+    if (!createSubModal || !createSubTitle.trim()) return;
+    setCreatingSub(true);
+    try {
+      const res = await api.post(`/api/knowledge/${createSubModal.parentKey}/subtopic`,
+        { title: createSubTitle.trim() });
+      const result = await res.json();
+      if (result.ok) {
+        setCreateSubModal(null);
+        setCreateSubTitle('');
+        fetchArticles();
+        setExpanded(prev => ({ ...prev, [result.parentKey]: true }));
+        setActiveKey(result.parentKey);
+        setActiveSubKey(result.key);
+        setIsEditing(false);
+      } else {
+        alert('Ошибка: ' + (result.error || 'unknown'));
+      }
+    } catch (err) {
+      alert('Ошибка создания: ' + err.message);
+    }
+    setCreatingSub(false);
+  };
+
   const handleDelete = async () => {
     if (!deleteModal) return;
     setDeleting(true);
     try {
-      const res = await api.delete(`/api/knowledge/${deleteModal.key}`);
+      const url = deleteModal.kind === 'subtopic'
+        ? `/api/knowledge/${deleteModal.parentKey}/subtopic/${deleteModal.key}`
+        : `/api/knowledge/${deleteModal.key}`;
+      const res = await api.delete(url);
       const result = await res.json();
       if (result.ok) {
+        if (deleteModal.kind === 'topic' && activeKey === deleteModal.key) {
+          setActiveKey(null);
+          setActiveSubKey(null);
+        }
+        if (deleteModal.kind === 'subtopic' && activeSubKey === deleteModal.key) {
+          setActiveSubKey(null);
+        }
         setDeleteModal(null);
-        if (activeKey === deleteModal.key) setActiveKey(null);
         setIsEditing(false);
         fetchArticles();
       } else {
@@ -191,17 +287,28 @@ export default function KnowledgeBase() {
     setDeleting(false);
   };
 
-  /** Rename topic */
   const handleRename = async () => {
     if (!renameModal || !renameTitle.trim()) return;
     setRenaming(true);
     try {
-      const res = await api.put(`/api/knowledge/${renameModal.key}/title`, { title: renameTitle.trim() });
+      const url = renameModal.kind === 'subtopic'
+        ? `/api/knowledge/${renameModal.parentKey}/subtopic/${renameModal.key}/title`
+        : `/api/knowledge/${renameModal.key}/title`;
+      const res = await api.put(url, { title: renameTitle.trim() });
       const result = await res.json();
       if (result.ok) {
-        setArticles(prev => prev.map(a =>
-          a.key === renameModal.key ? { ...a, title: renameTitle.trim() } : a
-        ));
+        setArticles(prev => prev.map(a => {
+          if (renameModal.kind === 'subtopic') {
+            if (a.key !== renameModal.parentKey) return a;
+            return {
+              ...a,
+              subtopics: (a.subtopics || []).map(s =>
+                s.key === renameModal.key ? { ...s, title: renameTitle.trim() } : s
+              ),
+            };
+          }
+          return a.key === renameModal.key ? { ...a, title: renameTitle.trim() } : a;
+        }));
         setRenameModal(null);
         setRenameTitle('');
       } else {
@@ -213,8 +320,62 @@ export default function KnowledgeBase() {
     setRenaming(false);
   };
 
-  /** Telegram HTML → safe display HTML */
-  // Reuse editor's conversion so display matches edit mode exactly
+  // ─── D&D ────────────────────────────────────────────────────────────────────
+  const persistTopicOrder = async (newOrder) => {
+    try {
+      await api.put('/api/knowledge/order', { order: newOrder });
+    } catch (e) {
+      console.error('reorder topics failed', e);
+      fetchArticles(); // откатить через перезагрузку
+    }
+  };
+
+  const persistSubOrder = async (parentKey, newOrder) => {
+    try {
+      await api.put(`/api/knowledge/${parentKey}/subtopics/order`, { order: newOrder });
+    } catch (e) {
+      console.error('reorder subtopics failed', e);
+      fetchArticles();
+    }
+  };
+
+  const onTopicDragStart = (key) => setDragTopic(key);
+  const onTopicDragOver = (e) => e.preventDefault();
+  const onTopicDrop = (targetKey) => {
+    if (!dragTopic || dragTopic === targetKey) { setDragTopic(null); return; }
+    setArticles(prev => {
+      const arr = [...prev];
+      const fromIdx = arr.findIndex(a => a.key === dragTopic);
+      const toIdx = arr.findIndex(a => a.key === targetKey);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      persistTopicOrder(arr.map(a => a.key));
+      return arr;
+    });
+    setDragTopic(null);
+  };
+
+  const onSubDragStart = (parentKey, subK) => setDragSub({ parentKey, key: subK });
+  const onSubDrop = (parentKey, targetSubKey) => {
+    if (!dragSub || dragSub.parentKey !== parentKey || dragSub.key === targetSubKey) {
+      setDragSub(null);
+      return;
+    }
+    setArticles(prev => prev.map(a => {
+      if (a.key !== parentKey) return a;
+      const subs = [...(a.subtopics || [])];
+      const fromIdx = subs.findIndex(s => s.key === dragSub.key);
+      const toIdx = subs.findIndex(s => s.key === targetSubKey);
+      if (fromIdx < 0 || toIdx < 0) return a;
+      const [moved] = subs.splice(fromIdx, 1);
+      subs.splice(toIdx, 0, moved);
+      persistSubOrder(parentKey, subs.map(s => s.key));
+      return { ...a, subtopics: subs };
+    }));
+    setDragSub(null);
+  };
+
   const tgHtmlToDisplay = tgHtmlToEditable;
 
   if (loading) {
@@ -226,6 +387,9 @@ export default function KnowledgeBase() {
   }
 
   const photoSrc = active ? getPhotoSrc(active) : null;
+  // На странице темы с подтемами показываем сверху её собственный контент
+  // и снизу — карточки подтем (если выбрана сама тема, не подтема).
+  const isParentView = !!activeTopic && !activeSub && (activeTopic.subtopics?.length > 0);
 
   return (
     <div className="kb-container">
@@ -234,71 +398,178 @@ export default function KnowledgeBase() {
       <div className="kb-sidebar">
         <div className="kb-sidebar-header">
           <h3><BookOpen size={18} /> База знаний</h3>
-          <button className="add-topic-btn" onClick={() => { setCreateModal(true); setCreateTitle(''); }} title="Добавить тему">
+          <button
+            className="add-topic-btn"
+            onClick={() => { setCreateModal(true); setCreateTitle(''); }}
+            title="Добавить тему"
+          >
             <Plus size={18} />
           </button>
         </div>
 
         <div className="kb-topic-list">
-          {articles.map((article) => (
-            <div
-              key={article.key}
-              className={`kb-topic-item ${activeKey === article.key ? 'active' : ''}`}
-              onClick={() => { setActiveKey(article.key); setIsEditing(false); }}
-            >
-              <FileText size={16} />
-              <span style={{ flex: 1 }}>{article.title}</span>
-              {(article.photoFileId || article.photoS3Url) && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
-
-              {/* Kebab menu */}
-              <div className="kb-item-menu-wrapper" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className={`kb-item-menu-btn ${openMenu === article.key ? 'open' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (openMenu === article.key) {
-                      setOpenMenu(null);
-                    } else {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const spaceBelow = window.innerHeight - rect.bottom;
-                      setMenuPos({
-                        top: spaceBelow < 120 ? rect.top - 90 : rect.bottom + 4,
-                        left: Math.min(rect.right, window.innerWidth - 180),
-                      });
-                      setOpenMenu(article.key);
-                    }
+          {articles.map((article) => {
+            const hasSubs = (article.subtopics || []).length > 0;
+            const isOpen = !!expanded[article.key];
+            const topicMenuId = `topic:${article.key}`;
+            return (
+              <div key={article.key}>
+                <div
+                  className={`kb-topic-item ${activeKey === article.key && !activeSubKey ? 'active' : ''}`}
+                  draggable
+                  onDragStart={() => onTopicDragStart(article.key)}
+                  onDragOver={onTopicDragOver}
+                  onDrop={() => onTopicDrop(article.key)}
+                  onClick={() => {
+                    setActiveKey(article.key);
+                    setActiveSubKey(null);
+                    setIsEditing(false);
+                    if (hasSubs) setExpanded(prev => ({ ...prev, [article.key]: true }));
                   }}
                 >
-                  <MoreHorizontal size={16} />
-                </button>
-                {openMenu === article.key && (
-                  <div className="kb-item-menu-dropdown" style={{ top: menuPos.top, left: menuPos.left }}>
+                  <GripVertical size={14} style={{ opacity: 0.3, cursor: 'grab' }} />
+                  {hasSubs ? (
                     <button
-                      className="kb-item-menu-item"
-                      onClick={() => {
-                        setOpenMenu(null);
-                        setRenameModal({ key: article.key, title: article.title });
-                        setRenameTitle(article.title);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpanded(prev => ({ ...prev, [article.key]: !prev[article.key] }));
                       }}
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex' }}
+                      title={isOpen ? 'Свернуть' : 'Развернуть'}
                     >
-                      <Pencil size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-                      Переименовать
+                      {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </button>
+                  ) : (
+                    <FileText size={16} />
+                  )}
+                  <span style={{ flex: 1 }}>{article.title}</span>
+                  {(article.photoFileId || article.photoS3Url) && <ImageIcon size={14} style={{ opacity: 0.4 }} />}
+
+                  <div className="kb-item-menu-wrapper" onClick={(e) => e.stopPropagation()}>
                     <button
-                      className="kb-item-menu-item danger"
-                      onClick={() => {
-                        setOpenMenu(null);
-                        setDeleteModal({ key: article.key, title: article.title });
-                      }}
+                      className={`kb-item-menu-btn ${openMenu?.uniq === topicMenuId ? 'open' : ''}`}
+                      onClick={(e) => openKebab(e, { uniq: topicMenuId, kind: 'topic', key: article.key })}
                     >
-                      <Trash2 size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-                      Удалить
+                      <MoreHorizontal size={16} />
                     </button>
+                    {openMenu?.uniq === topicMenuId && (
+                      <div className="kb-item-menu-dropdown" style={{ top: menuPos.top, left: menuPos.left }}>
+                        <button
+                          className="kb-item-menu-item"
+                          onClick={() => {
+                            setOpenMenu(null);
+                            setCreateSubModal({ parentKey: article.key, parentTitle: article.title });
+                            setCreateSubTitle('');
+                          }}
+                        >
+                          <FolderPlus size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                          Добавить подтему
+                        </button>
+                        <button
+                          className="kb-item-menu-item"
+                          onClick={() => {
+                            setOpenMenu(null);
+                            setRenameModal({ kind: 'topic', key: article.key, title: article.title });
+                            setRenameTitle(article.title);
+                          }}
+                        >
+                          <Pencil size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                          Переименовать
+                        </button>
+                        <button
+                          className="kb-item-menu-item danger"
+                          onClick={() => {
+                            setOpenMenu(null);
+                            setDeleteModal({
+                              kind: 'topic',
+                              key: article.key,
+                              title: article.title,
+                              subCount: (article.subtopics || []).length,
+                            });
+                          }}
+                        >
+                          <Trash2 size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                          Удалить
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {hasSubs && isOpen && (
+                  <div className="kb-subtopics">
+                    {article.subtopics.map((sub) => {
+                      const subMenuId = `sub:${article.key}:${sub.key}`;
+                      const isActive = activeKey === article.key && activeSubKey === sub.key;
+                      return (
+                        <div
+                          key={sub.key}
+                          className={`kb-subtopic-item ${isActive ? 'active' : ''}`}
+                          draggable
+                          onDragStart={(e) => { e.stopPropagation(); onSubDragStart(article.key, sub.key); }}
+                          onDragOver={onTopicDragOver}
+                          onDrop={(e) => { e.stopPropagation(); onSubDrop(article.key, sub.key); }}
+                          onClick={() => {
+                            setActiveKey(article.key);
+                            setActiveSubKey(sub.key);
+                            setIsEditing(false);
+                          }}
+                        >
+                          <GripVertical size={12} style={{ opacity: 0.3, cursor: 'grab' }} />
+                          <FileText size={13} />
+                          <span style={{ flex: 1 }}>{sub.title}</span>
+                          {(sub.photoFileId || sub.photoS3Url) && <ImageIcon size={12} style={{ opacity: 0.4 }} />}
+                          <div className="kb-item-menu-wrapper" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className={`kb-item-menu-btn ${openMenu?.uniq === subMenuId ? 'open' : ''}`}
+                              onClick={(e) => openKebab(e, { uniq: subMenuId, kind: 'subtopic', parentKey: article.key, key: sub.key })}
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                            {openMenu?.uniq === subMenuId && (
+                              <div className="kb-item-menu-dropdown" style={{ top: menuPos.top, left: menuPos.left }}>
+                                <button
+                                  className="kb-item-menu-item"
+                                  onClick={() => {
+                                    setOpenMenu(null);
+                                    setRenameModal({
+                                      kind: 'subtopic',
+                                      parentKey: article.key,
+                                      key: sub.key,
+                                      title: sub.title,
+                                    });
+                                    setRenameTitle(sub.title);
+                                  }}
+                                >
+                                  <Pencil size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                                  Переименовать
+                                </button>
+                                <button
+                                  className="kb-item-menu-item danger"
+                                  onClick={() => {
+                                    setOpenMenu(null);
+                                    setDeleteModal({
+                                      kind: 'subtopic',
+                                      parentKey: article.key,
+                                      key: sub.key,
+                                      title: sub.title,
+                                    });
+                                  }}
+                                >
+                                  <Trash2 size={14} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                                  Удалить
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -307,7 +578,10 @@ export default function KnowledgeBase() {
         {active ? (
           <>
             <div className="kb-content-header">
-              <div className="kb-breadcrumbs">База знаний</div>
+              <div className="kb-breadcrumbs">
+                База знаний
+                {activeSub && <> / {activeTopic?.title}</>}
+              </div>
               <div className="kb-header-row">
                 <h2>{active.title}</h2>
                 {!isEditing ? (
@@ -328,7 +602,6 @@ export default function KnowledgeBase() {
               </div>
             </div>
 
-            {/* Photo section */}
             {active.photoKey && (
               <div className="kb-article-photo">
                 {photoSrc ? (
@@ -386,10 +659,27 @@ export default function KnowledgeBase() {
             )}
 
             {!isEditing ? (
-              <div
-                className="kb-article html-content"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(tgHtmlToDisplay(active.content)) }}
-              />
+              <>
+                <div
+                  className="kb-article html-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(tgHtmlToDisplay(active.content)) }}
+                />
+                {isParentView && (
+                  <div className="kb-subtopic-cards">
+                    {activeTopic.subtopics.map(sub => (
+                      <div
+                        key={sub.key}
+                        className="kb-subtopic-card"
+                        onClick={() => { setActiveSubKey(sub.key); setIsEditing(false); }}
+                      >
+                        <FileText size={16} />
+                        <span style={{ flex: 1 }}>{sub.title}</span>
+                        <ChevronRight size={16} style={{ opacity: 0.5 }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="kb-editor-area">
                 <TgHtmlEditor
@@ -408,14 +698,13 @@ export default function KnowledgeBase() {
         )}
       </div>
 
-      {/* Lightbox */}
       {lightboxSrc && (
         <div className="kb-lightbox" onClick={() => setLightboxSrc(null)}>
           <img src={lightboxSrc} alt="" className="kb-lightbox-img" />
         </div>
       )}
 
-      {/* Create topic modal */}
+      {/* Create topic */}
       {createModal && (
         <div className="prompt-overlay" onClick={() => setCreateModal(false)}>
           <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
@@ -438,13 +727,51 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      {/* Delete topic modal */}
+      {/* Create subtopic */}
+      {createSubModal && (
+        <div className="prompt-overlay" onClick={() => setCreateSubModal(null)}>
+          <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="prompt-title">Новая подтема</div>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', margin: 0 }}>
+              В теме <b>"{createSubModal.parentTitle}"</b>
+            </p>
+            <input
+              className="prompt-input"
+              placeholder="Название подтемы"
+              value={createSubTitle}
+              onChange={(e) => setCreateSubTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateSub()}
+              autoFocus
+            />
+            <div className="prompt-actions">
+              <button className="prompt-btn prompt-btn-cancel" onClick={() => setCreateSubModal(null)}>Отмена</button>
+              <button className="prompt-btn prompt-btn-ok" onClick={handleCreateSub} disabled={creatingSub || !createSubTitle.trim()}>
+                {creatingSub ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete */}
       {deleteModal && (
         <div className="prompt-overlay" onClick={() => setDeleteModal(null)}>
           <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="prompt-title">Удалить тему</div>
+            <div className="prompt-title">
+              {deleteModal.kind === 'subtopic' ? 'Удалить подтему' : 'Удалить тему'}
+            </div>
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', margin: 0 }}>
-              Тема <b>"{deleteModal.title}"</b> будет удалена вместе с фото. Это действие нельзя отменить.
+              {deleteModal.kind === 'subtopic' ? (
+                <>Подтема <b>"{deleteModal.title}"</b> будет удалена вместе с фото. Это действие нельзя отменить.</>
+              ) : deleteModal.subCount > 0 ? (
+                <>
+                  Тема <b>"{deleteModal.title}"</b> содержит <b>{deleteModal.subCount}</b>{' '}
+                  {deleteModal.subCount === 1 ? 'подтему' : (deleteModal.subCount < 5 ? 'подтемы' : 'подтем')}.
+                  Они будут удалены вместе с темой. Это действие нельзя отменить.
+                </>
+              ) : (
+                <>Тема <b>"{deleteModal.title}"</b> будет удалена вместе с фото. Это действие нельзя отменить.</>
+              )}
             </p>
             <div className="prompt-actions">
               <button className="prompt-btn prompt-btn-cancel" onClick={() => setDeleteModal(null)}>Отмена</button>
@@ -456,11 +783,13 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      {/* Rename topic modal */}
+      {/* Rename */}
       {renameModal && (
         <div className="prompt-overlay" onClick={() => setRenameModal(null)}>
           <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="prompt-title">Переименовать тему</div>
+            <div className="prompt-title">
+              {renameModal.kind === 'subtopic' ? 'Переименовать подтему' : 'Переименовать тему'}
+            </div>
             <input
               className="prompt-input"
               value={renameTitle}

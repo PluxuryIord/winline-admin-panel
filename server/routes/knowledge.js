@@ -90,6 +90,32 @@ async function saveKB(data, dbId) {
 }
 
 // GET /api/knowledge — список статей
+/** Build subtopic key under parent: `parent__sub`. */
+function subKey(parentKey, sub) { return `${parentKey}__${sub}`; }
+
+/** Read subtopics array for a parent from _meta. */
+function buildSubtopics(data, parentKey) {
+  const subMeta = data._meta?.subtopics?.[parentKey];
+  if (!subMeta || !Array.isArray(subMeta.order)) return [];
+  const out = [];
+  for (const sk of subMeta.order) {
+    const fullKey = subKey(parentKey, sk);
+    if (data[fullKey] === undefined) continue;
+    const photoKey = getPhotoKey(fullKey);
+    out.push({
+      key: sk,
+      fullKey,
+      parentKey,
+      title: subMeta.titles?.[sk] || sk,
+      content: data[fullKey] || '',
+      photoKey,
+      photoFileId: data[photoKey] || null,
+      photoS3Url: data[`${photoKey}_s3`] || null,
+    });
+  }
+  return out;
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const { dbId, data } = await loadKB();
@@ -113,6 +139,7 @@ router.get('/', async (req, res, next) => {
         photoKey,
         photoFileId,
         photoS3Url,
+        subtopics: buildSubtopics(data, key),
       });
     }
 
@@ -257,6 +284,32 @@ router.delete('/photo/:photoKey', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PUT /api/knowledge/order — переставить порядок верхнеуровневых тем (D&D)
+// ВАЖНО: должен быть до /:key чтобы не перехватывался
+router.put('/order', async (req, res, next) => {
+  try {
+    const { order } = req.body;
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be array' });
+
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+    await ensureMeta(data, dbId);
+
+    const existing = new Set(data._meta.order);
+    const incoming = new Set(order);
+    if (existing.size !== incoming.size || [...existing].some(k => !incoming.has(k))) {
+      return res.status(400).json({ error: 'order must contain exactly the existing keys' });
+    }
+    data._meta.order = [...order];
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'reorder', 'knowledge', null, 'topics', null, { order });
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/knowledge/:key/title — переименовать тему
 router.put('/:key/title', async (req, res, next) => {
   try {
@@ -330,6 +383,19 @@ router.delete('/:key', async (req, res, next) => {
       delete data[`${legacyPhotoKey}_s3`];
     }
 
+    // Cascade-delete subtopics: контент, фото, _meta.subtopics запись
+    const subMeta = data._meta.subtopics?.[key];
+    if (subMeta && Array.isArray(subMeta.order)) {
+      for (const sk of subMeta.order) {
+        const full = subKey(key, sk);
+        const subPhotoKey = getPhotoKey(full);
+        delete data[full];
+        delete data[subPhotoKey];
+        delete data[`${subPhotoKey}_s3`];
+      }
+    }
+    if (data._meta.subtopics) delete data._meta.subtopics[key];
+
     // Remove from _meta
     data._meta.order = data._meta.order.filter(k => k !== key);
     delete data._meta.titles[key];
@@ -341,6 +407,164 @@ router.delete('/:key', async (req, res, next) => {
     createDailySnapshot('knowledge', req.user.id, userName);
 
     res.json({ ok: true, key, deleted: true });
+  } catch (err) { next(err); }
+});
+
+// ===================== SUBTOPICS =====================
+
+// POST /api/knowledge/:parentKey/subtopic — создать подтему
+router.post('/:parentKey/subtopic', async (req, res, next) => {
+  try {
+    const { parentKey } = req.params;
+    const { title } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ error: 'title is required' });
+
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+    await ensureMeta(data, dbId);
+
+    if (data[parentKey] === undefined) return res.status(404).json({ error: `Parent "${parentKey}" not found` });
+
+    if (!data._meta.subtopics) data._meta.subtopics = {};
+    if (!data._meta.subtopics[parentKey]) data._meta.subtopics[parentKey] = { order: [], titles: {} };
+    const subMeta = data._meta.subtopics[parentKey];
+
+    let sk = toKey(title.trim());
+    if (!sk) sk = 'sub_' + Date.now();
+    let finalSk = sk;
+    let suffix = 2;
+    while (data[subKey(parentKey, finalSk)] !== undefined || subMeta.order.includes(finalSk)) {
+      finalSk = `${sk}_${suffix++}`;
+    }
+
+    const fullKey = subKey(parentKey, finalSk);
+    data[fullKey] = '';
+    subMeta.order.push(finalSk);
+    subMeta.titles[finalSk] = title.trim();
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'create', 'knowledge', fullKey, title.trim(), null,
+             { parentKey, key: finalSk, title: title.trim() });
+    createDailySnapshot('knowledge', req.user.id, userName);
+
+    res.json({ ok: true, parentKey, key: finalSk, title: title.trim() });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/knowledge/:parentKey/subtopic/:subK — обновить контент подтемы
+router.put('/:parentKey/subtopic/:subK', async (req, res, next) => {
+  try {
+    const { parentKey, subK } = req.params;
+    const { content } = req.body;
+    if (content === undefined) return res.status(400).json({ error: 'content is required' });
+
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const fullKey = subKey(parentKey, subK);
+    if (data[fullKey] === undefined) return res.status(404).json({ error: 'subtopic not found' });
+
+    const oldContent = data[fullKey];
+    data[fullKey] = content;
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    const title = data._meta?.subtopics?.[parentKey]?.titles?.[subK] || subK;
+    logAudit(req.user.id, userName, 'update', 'knowledge', fullKey, title, { content: oldContent }, { content });
+    createDailySnapshot('knowledge', req.user.id, userName);
+
+    res.json({ ok: true, parentKey, key: subK, content });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/knowledge/:parentKey/subtopic/:subK/title — переименовать подтему
+router.put('/:parentKey/subtopic/:subK/title', async (req, res, next) => {
+  try {
+    const { parentKey, subK } = req.params;
+    const { title } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ error: 'title is required' });
+
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const subMeta = data._meta?.subtopics?.[parentKey];
+    if (!subMeta || !subMeta.titles?.[subK]) return res.status(404).json({ error: 'subtopic not found' });
+
+    const oldTitle = subMeta.titles[subK];
+    subMeta.titles[subK] = title.trim();
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'update', 'knowledge', subKey(parentKey, subK), title.trim(),
+             { title: oldTitle }, { title: title.trim() });
+    createDailySnapshot('knowledge', req.user.id, userName);
+
+    res.json({ ok: true, parentKey, key: subK, title: title.trim() });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/knowledge/:parentKey/subtopic/:subK — удалить подтему
+router.delete('/:parentKey/subtopic/:subK', async (req, res, next) => {
+  try {
+    const { parentKey, subK } = req.params;
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const fullKey = subKey(parentKey, subK);
+    if (data[fullKey] === undefined) return res.status(404).json({ error: 'subtopic not found' });
+
+    const subMeta = data._meta?.subtopics?.[parentKey];
+    const oldTitle = subMeta?.titles?.[subK];
+    const oldContent = data[fullKey];
+
+    delete data[fullKey];
+    const photoKey = getPhotoKey(fullKey);
+    delete data[photoKey];
+    delete data[`${photoKey}_s3`];
+
+    if (subMeta) {
+      subMeta.order = subMeta.order.filter(k => k !== subK);
+      delete subMeta.titles[subK];
+      if (subMeta.order.length === 0) delete data._meta.subtopics[parentKey];
+    }
+
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'delete', 'knowledge', fullKey, oldTitle || subK,
+             { title: oldTitle, content: oldContent }, null);
+    createDailySnapshot('knowledge', req.user.id, userName);
+
+    res.json({ ok: true, parentKey, key: subK, deleted: true });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/knowledge/:parentKey/subtopics/order — переставить порядок подтем
+router.put('/:parentKey/subtopics/order', async (req, res, next) => {
+  try {
+    const { parentKey } = req.params;
+    const { order } = req.body;
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be array' });
+
+    const { dbId, data } = await loadKB();
+    if (!data) return res.status(404).json({ error: 'Knowledge base not found' });
+
+    const subMeta = data._meta?.subtopics?.[parentKey];
+    if (!subMeta) return res.status(404).json({ error: 'no subtopics for parent' });
+
+    const existing = new Set(subMeta.order);
+    const incoming = new Set(order);
+    if (existing.size !== incoming.size || [...existing].some(k => !incoming.has(k))) {
+      return res.status(400).json({ error: 'order must contain exactly the existing subtopic keys' });
+    }
+    subMeta.order = [...order];
+    await saveKB(data, dbId);
+
+    const userName = req.user.displayName || req.user.username;
+    logAudit(req.user.id, userName, 'reorder', 'knowledge', parentKey, 'subtopics', null, { order });
+
+    res.json({ ok: true, parentKey });
   } catch (err) { next(err); }
 });
 
