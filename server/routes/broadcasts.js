@@ -427,11 +427,22 @@ router.delete('/channels/:id', async (req, res, next) => {
 
 router.get('/groups', async (req, res, next) => {
   try {
+    // Скрываем обычные группы, у которых уже есть супергрупповой "двойник"
+    // с тем же названием — это след миграции, который мы пропустили
+    // (либо случилось до подключения авто-обработчика). Сами супергруппы
+    // и одинокие обычные группы возвращаются как обычно.
     const [rows] = await dbPool.query(`
       SELECT g.id, g.chat_id AS chatId, g.title, g.added_at AS addedAt,
              IFNULL(a.approved, 1) AS approved
       FROM wl_admin_groups g
       LEFT JOIN wl_admin_groups_approved a ON a.chat_id = g.chat_id
+      WHERE NOT (
+        g.chat_id NOT LIKE '-100%'
+        AND EXISTS (
+          SELECT 1 FROM wl_admin_groups g2
+          WHERE g2.chat_id LIKE '-100%' AND g2.title = g.title
+        )
+      )
       ORDER BY g.id ASC
     `);
     res.json(rows);
