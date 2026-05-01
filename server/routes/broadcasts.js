@@ -108,6 +108,57 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
   }
 });
 
+// Bot calls this when a regular group is upgraded to a supergroup.
+// Telegram changes the chat_id; without migration we end up with two records
+// (the old dead one + the new live one) and broadcasts may target either.
+broadcastWebhookRouter.post('/groups/migrate', async (req, res, next) => {
+  if (!verifyBroadcastWebhook(req)) {
+    return res.status(403).json({ error: 'Invalid webhook secret or signature' });
+  }
+  try {
+    const { old_id, new_id, title } = req.body;
+    if (!old_id || !new_id) {
+      return res.status(400).json({ error: 'old_id and new_id required' });
+    }
+    const oldStr = String(old_id);
+    const newStr = String(new_id);
+
+    // Read old approval state (if any) so we can carry it over
+    const [appRows] = await dbPool.query(
+      'SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
+    const wasApproved = appRows.length ? !!appRows[0].approved : false;
+
+    // Ensure new group exists with correct title
+    const [newRows] = await dbPool.query('SELECT id FROM wl_admin_groups WHERE chat_id = ?', [newStr]);
+    if (newRows.length) {
+      if (title) {
+        await dbPool.query('UPDATE wl_admin_groups SET title = ? WHERE chat_id = ?', [title, newStr]);
+      }
+    } else {
+      await dbPool.query('INSERT INTO wl_admin_groups (chat_id, title) VALUES (?, ?)',
+        [newStr, title || newStr]);
+    }
+
+    // Carry over approval if it was set
+    if (wasApproved) {
+      await dbPool.query(
+        `INSERT INTO wl_admin_groups_approved (chat_id, approved, approved_at) VALUES (?, 1, NOW())
+         ON DUPLICATE KEY UPDATE approved = 1, approved_at = NOW()`, [newStr]);
+    }
+
+    // Drop old records — their chat no longer exists in Telegram
+    await dbPool.query('DELETE FROM wl_admin_groups WHERE chat_id = ?', [oldStr]);
+    await dbPool.query('DELETE FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
+    await dbPool.query('DELETE FROM wl_admin_groups_archive WHERE chat_id = ?', [oldStr]);
+
+    console.log(`[group-migrate] ${oldStr} → ${newStr} (approved=${wasApproved})`);
+    res.json({ ok: true, old_id: oldStr, new_id: newStr });
+  } catch (err) {
+    console.error('[group-migrate] ERROR:', err.message);
+    next(err);
+  }
+});
+
 // ===================== MULTER (memory) =====================
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
