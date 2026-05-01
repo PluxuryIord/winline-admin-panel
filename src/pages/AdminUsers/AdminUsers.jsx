@@ -123,7 +123,7 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {users.filter((u) => u.username !== 'WinlineAdmin').map((u) => (
               <tr key={u.id}>
                 <td>{u.display_name || '—'}</td>
                 <td>{u.username}</td>
