@@ -1,143 +1,187 @@
-import { BOT_TOKEN } from '../config/env.js';
+/**
+ * Telegram Bot API client.
+ *
+ * Если задан BOT_API_URL — все вызовы Telegram идут через relay-эндпоинт на боте
+ * (POST {BOT_API_URL}/telegram/relay), потому что прямой outbound от
+ * панели на api.telegram.org заблокирован у российского хостера.
+ * Иначе — обычный прямой вызов api.telegram.org (legacy).
+ */
+import { BOT_TOKEN, BOT_API_URL, BOT_API_KEY } from '../config/env.js';
 import fs from 'fs';
 import path from 'path';
 
-export async function tgSend(chatId, text, parseMode = 'HTML') {
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+const TG_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const RELAY_URL = BOT_API_URL ? `${BOT_API_URL.replace(/\/$/, '')}/telegram/relay` : null;
+
+/** Низкоуровневый вызов Telegram метода. JSON-параметры для текстовых, file/files — для multipart. */
+async function tgCall(method, params = {}, multipart = null) {
+  if (RELAY_URL) {
+    const body = { method, params };
+    if (multipart?.file) body.file = multipart.file;
+    if (multipart?.files) body.files = multipart.files;
+    const r = await fetch(RELAY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(BOT_API_KEY ? { 'X-API-Key': BOT_API_KEY } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    return r.json();
+  }
+
+  // Legacy прямой путь
+  if (multipart?.file) {
+    const buf = await downloadBufferFromUrl(multipart.file.url);
+    const form = new FormData();
+    for (const [k, v] of Object.entries(params)) {
+      form.append(k, typeof v === 'string' ? v : JSON.stringify(v));
+    }
+    const blob = new Blob([buf], { type: multipart.file.mime || 'application/octet-stream' });
+    form.append(multipart.file.field || 'document', new File([blob], multipart.file.filename || 'file',
+      { type: multipart.file.mime || 'application/octet-stream' }));
+    const r = await fetch(`${TG_BASE}/${method}`, { method: 'POST', body: form });
+    return r.json();
+  }
+  if (multipart?.files) {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(params)) {
+      form.append(k, typeof v === 'string' ? v : JSON.stringify(v));
+    }
+    for (const f of multipart.files) {
+      const buf = await downloadBufferFromUrl(f.url);
+      const blob = new Blob([buf], { type: f.mime || 'application/octet-stream' });
+      form.append(f.attach || f.field || 'file',
+        new File([blob], f.filename || 'file', { type: f.mime || 'application/octet-stream' }));
+    }
+    const r = await fetch(`${TG_BASE}/${method}`, { method: 'POST', body: form });
+    return r.json();
+  }
+  const r = await fetch(`${TG_BASE}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: parseMode }),
+    body: JSON.stringify(params),
   });
   return r.json();
 }
 
+async function downloadBufferFromUrl(url) {
+  const r = await fetch(url);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+export async function tgSend(chatId, text, parseMode = 'HTML') {
+  return tgCall('sendMessage', { chat_id: chatId, text, parse_mode: parseMode });
+}
+
 /**
- * Отправить медиа-файл в Telegram.
- * @param {string|number} chatId
- * @param {string|object} source — путь к файлу (string) ИЛИ { buffer, filename, mimeType }
- * @param {string} [mimeTypeOrCaption] — MIME (если source строка) или caption (если source объект)
- * @param {string} [caption] — подпись (HTML)
- * @returns {Promise<object>} ответ Telegram API
+ * Отправить медиа в Telegram.
+ * Если задан BOT_API_URL — передаём S3 URL прямо боту, бот сам скачает и зальёт.
+ * Иначе панель скачивает буфер и шлёт multipart напрямую.
+ *
+ * source: { url, filename, mimeType } — предпочитаемая форма (для relay).
+ *         | { buffer, filename, mimeType } — legacy, для совместимости.
+ *         | "/path/on/disk" — legacy путь к файлу.
  */
 export async function tgSendMedia(chatId, source, mimeTypeOrCaption = '', caption = '') {
-  let fileBuffer, fileName, mimeType;
-
+  let url, fileName, mimeType, fileBuffer = null;
   if (typeof source === 'string') {
-    // Legacy: file path on disk
     fileBuffer = fs.readFileSync(source);
     fileName = path.basename(source);
     mimeType = mimeTypeOrCaption;
+  } else if (source && source.url) {
+    url = source.url;
+    fileName = source.filename || 'file';
+    mimeType = source.mimeType || 'application/octet-stream';
+    caption = mimeTypeOrCaption || caption;
   } else {
-    // New: { buffer, filename, mimeType }
     fileBuffer = source.buffer;
     fileName = source.filename || 'file';
     mimeType = source.mimeType || 'application/octet-stream';
-    caption = mimeTypeOrCaption; // second arg is caption in this case
+    caption = mimeTypeOrCaption;
   }
 
   let method = 'sendDocument';
-  let fieldName = 'document';
+  let field = 'document';
+  if (mimeType.startsWith('image/'))      { method = 'sendPhoto';    field = 'photo'; }
+  else if (mimeType.startsWith('video/')) { method = 'sendVideo';    field = 'video'; }
+  else if (mimeType.startsWith('audio/')) { method = 'sendAudio';    field = 'audio'; }
 
-  if (mimeType.startsWith('image/')) {
-    method = 'sendPhoto';
-    fieldName = 'photo';
-  } else if (mimeType.startsWith('video/')) {
-    method = 'sendVideo';
-    fieldName = 'video';
-  } else if (mimeType.startsWith('audio/')) {
-    method = 'sendAudio';
-    fieldName = 'audio';
-  }
-
-  const blob = new Blob([fileBuffer], { type: mimeType });
-  const file = new File([blob], fileName, { type: mimeType });
-
-  const form = new FormData();
-  form.set('chat_id', String(chatId));
-  form.set(fieldName, file);
+  const params = { chat_id: String(chatId) };
   if (caption) {
-    form.set('caption', caption);
-    form.set('parse_mode', 'HTML');
+    params.caption = caption;
+    params.parse_mode = 'HTML';
   }
 
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
-    method: 'POST',
-    body: form,
-  });
+  if (url) {
+    return tgCall(method, params, { file: { url, filename: fileName, mime: mimeType, field } });
+  }
+
+  // Legacy buffer path — only if relay disabled (panel→TG direct)
+  const form = new FormData();
+  for (const [k, v] of Object.entries(params)) form.append(k, v);
+  const blob = new Blob([fileBuffer], { type: mimeType });
+  form.append(field, new File([blob], fileName, { type: mimeType }));
+  const r = await fetch(`${TG_BASE}/${method}`, { method: 'POST', body: form });
   return r.json();
 }
 
 /**
- * Отправить альбом (media group) в Telegram.
- * @param {string|number} chatId
- * @param {Array<{buffer: Buffer, filename: string, mimeType: string}>} items
- * @param {string} [caption] — подпись к первому элементу
- * @returns {Promise<object>} ответ Telegram API
+ * Отправить media group (album).
+ * items: [{ url, filename, mimeType }] (S3) — предпочтительно
+ *        | [{ buffer, filename, mimeType }] — legacy
  */
 export async function tgSendMediaGroup(chatId, items, caption = '') {
-  const form = new FormData();
-  form.set('chat_id', String(chatId));
-
-  const mediaArr = items.map((item, i) => {
-    const attachName = `file${i}`;
-    const blob = new Blob([item.buffer], { type: item.mimeType });
-    const file = new File([blob], item.filename, { type: item.mimeType });
-    form.set(attachName, file);
-
+  const mediaArr = items.map((it, i) => {
+    const attach = `file${i}`;
     let type = 'document';
-    if (item.mimeType.startsWith('image/')) type = 'photo';
-    else if (item.mimeType.startsWith('video/')) type = 'video';
-
-    const entry = { type, media: `attach://${attachName}` };
+    if ((it.mimeType || '').startsWith('image/')) type = 'photo';
+    else if ((it.mimeType || '').startsWith('video/')) type = 'video';
+    const entry = { type, media: `attach://${attach}` };
     if (i === 0 && caption) {
       entry.caption = caption;
       entry.parse_mode = 'HTML';
     }
     return entry;
   });
+  const params = { chat_id: String(chatId), media: mediaArr };
 
-  form.set('media', JSON.stringify(mediaArr));
+  const useUrls = items.every(it => !!it.url);
+  if (useUrls) {
+    const files = items.map((it, i) => ({
+      url: it.url, filename: it.filename || `file${i}`, mime: it.mimeType || 'application/octet-stream',
+      attach: `file${i}`,
+    }));
+    return tgCall('sendMediaGroup', params, { files });
+  }
 
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
-    method: 'POST',
-    body: form,
-  });
+  // Legacy buffer path
+  const form = new FormData();
+  form.append('chat_id', String(chatId));
+  form.append('media', JSON.stringify(mediaArr));
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const blob = new Blob([it.buffer], { type: it.mimeType || 'application/octet-stream' });
+    form.append(`file${i}`, new File([blob], it.filename || `file${i}`,
+      { type: it.mimeType || 'application/octet-stream' }));
+  }
+  const r = await fetch(`${TG_BASE}/sendMediaGroup`, { method: 'POST', body: form });
   return r.json();
 }
 
-/**
- * Отправить нативный опрос/викторину в Telegram.
- * @param {string|number} chatId
- * @param {string} question — вопрос (1-300 символов)
- * @param {string[]} options — варианты ответов (2-10 штук)
- * @param {object} [opts] — доп. параметры
- * @param {string} [opts.type] — 'regular' (опрос) или 'quiz' (викторина)
- * @param {number} [opts.correct_option_id] — индекс правильного ответа (для quiz)
- * @param {boolean} [opts.is_anonymous] — анонимный (по умолчанию true)
- * @returns {Promise<object>} ответ Telegram API
- */
 export async function tgSendPoll(chatId, question, options, opts = {}) {
-  const body = {
+  const params = {
     chat_id: chatId,
     question,
     options: options.map(text => ({ text })),
-    is_anonymous: opts.is_anonymous === true,  // default: NOT anonymous (видны результаты)
+    is_anonymous: opts.is_anonymous === true,
   };
-  if (opts.type) body.type = opts.type;
+  if (opts.type) params.type = opts.type;
   if (opts.type === 'quiz' && opts.correct_option_id != null) {
-    body.correct_option_id = opts.correct_option_id;
+    params.correct_option_id = opts.correct_option_id;
   }
-
-  console.log('[tgSendPoll] Sending:', JSON.stringify(body, null, 2));
-
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPoll`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const result = await r.json();
-  if (!result.ok) {
-    console.error('[tgSendPoll] Error:', JSON.stringify(result));
-  }
-  return result;
+  return tgCall('sendPoll', params);
 }
+
+// Низкоуровневый помощник на случай если кому-то нужен прямой вызов произвольного метода
+export const tgRaw = tgCall;

@@ -4,7 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import dbPool from '../config/db.js';
 import { BOT_TOKEN, WEBHOOK_SECRET } from '../config/env.js';
-import { tgSend, tgSendMedia, tgSendPoll } from '../services/telegram.js';
+import { tgSend, tgSendMedia, tgSendPoll, tgRaw } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 import { logAudit } from '../services/auditLog.js';
 import { validateUploadedFile } from '../services/fileValidation.js';
@@ -260,19 +260,13 @@ function buildPollMessage(poll, pollId) {
 /** Отправить inline-опрос в ЛС (с retry) */
 async function sendInlinePoll(chatId, poll, pollId, attempt = 0) {
   const { text, keyboard } = buildPollMessage(poll, pollId);
-  const body = {
-    chat_id: chatId,
-    text,
-    parse_mode: 'HTML',
-    reply_markup: JSON.stringify({ inline_keyboard: keyboard }),
-  };
   try {
-    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const data = await tgRaw('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard },
     });
-    const data = await r.json();
     if (data.parameters?.retry_after && attempt < 3) {
       await new Promise(ok => setTimeout(ok, (data.parameters.retry_after + 1) * 1000));
       return sendInlinePoll(chatId, poll, pollId, attempt + 1);
@@ -293,7 +287,7 @@ async function sendNativePoll(chatId, poll, targetType, attempt = 0) {
   const body = {
     chat_id: chatId,
     question: poll.question,
-    options: JSON.stringify(poll.options.map(o => typeof o === 'string' ? { text: o } : o)),
+    options: poll.options.map(o => typeof o === 'string' ? { text: o } : o),
     is_anonymous: isChannel,
     type: poll.type === 'quiz' ? 'quiz' : 'regular',
   };
@@ -301,12 +295,7 @@ async function sendNativePoll(chatId, poll, targetType, attempt = 0) {
     body.correct_option_id = poll.correctIndex;
   }
   try {
-    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPoll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await r.json();
+    const data = await tgRaw('sendPoll', body);
     if (data.parameters?.retry_after && attempt < 3) {
       await new Promise(ok => setTimeout(ok, (data.parameters.retry_after + 1) * 1000));
       return sendNativePoll(chatId, poll, targetType, attempt + 1);
@@ -330,8 +319,11 @@ async function sendToChat(chatId, text, media, poll, targetType, pollId) {
     return sendNativePoll(chatId, poll, targetType || 'channels');
   }
   if (media?.url) {
-    const buffer = await downloadBuffer(media.url);
-    return tgSendMedia(chatId, { buffer, filename: media.originalName || 'file', mimeType: media.mimeType }, text || '');
+    return tgSendMedia(chatId, {
+      url: media.url,
+      filename: media.originalName || 'file',
+      mimeType: media.mimeType || 'application/octet-stream',
+    }, text || '');
   }
   return tgSend(chatId, text);
 }
