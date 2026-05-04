@@ -608,33 +608,27 @@ export default function NodeEditorPanel({
                   className={`node-editor-btn-block ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
                 >
                   <div className="sc-button-row">
-                    {!isStructureLocked && (
-                      <>
-                        {/* Drag handle */}
-                        <div
-                          className="sc-drag-handle"
-                          onMouseDown={(e) => handleDragStart(e, idx)}
-                          title="Перетащите для перемещения"
-                        >
-                          <GripVertical size={16} />
-                        </div>
-                        <div className="sc-button-arrows">
-                          <button className="sc-arrow-btn" onClick={() => onMoveButton(key, -1)} disabled={idx === 0}>
-                            <ChevronUp size={14} />
-                          </button>
-                          <button className="sc-arrow-btn" onClick={() => onMoveButton(key, 1)} disabled={idx === buttonOrder.length - 1}>
-                            <ChevronDown size={14} />
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    {/* Drag handle и стрелки порядка — разрешены и для системных блоков */}
+                    <div
+                      className="sc-drag-handle"
+                      onMouseDown={(e) => handleDragStart(e, idx)}
+                      title="Перетащите для перемещения"
+                    >
+                      <GripVertical size={16} />
+                    </div>
+                    <div className="sc-button-arrows">
+                      <button className="sc-arrow-btn" onClick={() => onMoveButton(key, -1)} disabled={idx === 0}>
+                        <ChevronUp size={14} />
+                      </button>
+                      <button className="sc-arrow-btn" onClick={() => onMoveButton(key, 1)} disabled={idx === buttonOrder.length - 1}>
+                        <ChevronDown size={14} />
+                      </button>
+                    </div>
                     <input
                       className="sc-button-input"
                       value={btn.label}
                       onChange={e => onUpdateButtonLabel(key, e.target.value)}
                       placeholder="Текст кнопки"
-                      disabled={isStructureLocked}
-                      style={isStructureLocked ? { opacity: 0.7 } : undefined}
                     />
                     {!isStructureLocked && (
                       <button className="sc-delete-btn-small" onClick={() => onDeleteButton(key)} title="Удалить кнопку">
