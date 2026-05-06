@@ -162,6 +162,27 @@ function migrateData(data) {
     }
   }
 
+  // One-time cleanup: drop "Я на мероприятии" buttons (action callback:client_at_event)
+  // Entry to S3 is now controlled by the event_starts flag, not a menu button.
+  for (const scr of Object.values(data.screens)) {
+    if (!scr.buttons) continue;
+    const order = scr.buttons._order || [];
+    const toRemove = [];
+    for (const btnKey of order) {
+      const btn = scr.buttons[btnKey];
+      if (btn?.action === 'callback:client_at_event') {
+        toRemove.push(btnKey);
+      }
+    }
+    if (toRemove.length) {
+      for (const k of toRemove) {
+        delete scr.buttons[k];
+      }
+      scr.buttons._order = order.filter(k => !toRemove.includes(k));
+      changed = true;
+    }
+  }
+
   // One-time migration: move anketa blocks to the left if they're overlapping main blocks
   const ANKETA_IDS = new Set(['anketa_role','anketa_traffic_company','anketa_traffic_category',
     'anketa_adv_company','anketa_adv_position','anketa_other_occupation','anketa_sub_check','anketa_final']);
