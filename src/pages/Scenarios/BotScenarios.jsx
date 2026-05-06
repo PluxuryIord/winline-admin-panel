@@ -183,6 +183,30 @@ function migrateData(data) {
     }
   }
 
+  // Surface buttons that the bot was injecting at runtime via extra_buttons.
+  // They now live in the scenarios JSON so admins can rename/reorder them.
+  // Conditional rendering (admin-only / AI-only) is still applied bot-side.
+  if (data.screens.main_menu) {
+    const main = data.screens.main_menu;
+    if (!main.buttons) main.buttons = { _order: [] };
+    if (!Array.isArray(main.buttons._order)) main.buttons._order = [];
+
+    const ensureBtn = (key, label, action) => {
+      // Skip if a button with this action already exists under any key
+      for (const k of main.buttons._order) {
+        if (main.buttons[k]?.action === action) return;
+      }
+      main.buttons[key] = { label, action };
+      main.buttons._order.push(key);
+      changed = true;
+    };
+
+    ensureBtn('btn_my_stats',     '📊 Моя статистика',           'callback:client_my_stats');
+    ensureBtn('btn_ask_ai',       '❓ Спросить ИИ',              'callback:client_ask_ai');
+    ensureBtn('btn_calendar',     '📅 Календарь мероприятий',    'callback:client_calendar');
+    ensureBtn('btn_admin_menu',   '⚙️ Меню администратора',      'callback:admin_menu');
+  }
+
   // One-time migration: move anketa blocks to the left if they're overlapping main blocks
   const ANKETA_IDS = new Set(['anketa_role','anketa_traffic_company','anketa_traffic_category',
     'anketa_adv_company','anketa_adv_position','anketa_other_occupation','anketa_sub_check','anketa_final']);
