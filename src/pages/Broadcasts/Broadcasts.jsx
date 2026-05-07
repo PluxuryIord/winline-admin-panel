@@ -1119,9 +1119,14 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     try {
       const body = { channelIds: selectedChannels, ...composeBody };
       const res = await api.post('/api/broadcasts', body);
-      const data = await res.json();
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON (proxy timeout HTML) */ }
       if (!res.ok) {
-        setSendResult({ error: data.error });
+        setSendResult({ error: data?.error || 'Сервер не ответил. Проверьте «Историю» — рассылка могла пройти в фоне.' });
+      } else if (!data) {
+        setSendResult({ error: 'Ответ задержался. Проверьте «Историю» — рассылка скорее всего прошла.' });
+        resetCompose();
+        setSelectedChannels([]);
       } else {
         setSendResult(data);
         resetCompose();
@@ -1432,9 +1437,13 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
       const body = { filters, ...composeBody };
 
       const res = await api.post('/api/broadcasts/users', body);
-      const data = await res.json();
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON (proxy timeout HTML) */ }
       if (!res.ok) {
-        setSendResult({ error: data.error });
+        setSendResult({ error: data?.error || 'Сервер не ответил. Проверьте «Историю» — рассылка могла пройти в фоне.' });
+      } else if (!data) {
+        setSendResult({ error: 'Ответ задержался. Проверьте «Историю» — рассылка скорее всего прошла.' });
+        resetCompose();
       } else {
         setSendResult(data);
         resetCompose();
@@ -1883,9 +1892,14 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     try {
       const body = { groupIds: selectedGroups, ...composeBody };
       const res = await api.post('/api/broadcasts/groups/send', body);
-      const data = await res.json();
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON (proxy timeout HTML) */ }
       if (!res.ok) {
-        setSendResult({ error: data.error });
+        setSendResult({ error: data?.error || 'Сервер не ответил. Проверьте «Историю» — рассылка могла пройти в фоне.' });
+      } else if (!data) {
+        setSendResult({ error: 'Ответ задержался. Проверьте «Историю» — рассылка скорее всего прошла.' });
+        resetCompose();
+        setSelectedGroups([]);
       } else {
         setSendResult(data);
         resetCompose();
