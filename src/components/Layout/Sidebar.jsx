@@ -70,15 +70,16 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
     return sections[0]?.key;
   }, [location.pathname, sections]);
 
-  const [openSections, setOpenSections] = useState(() => ({ [activeSectionKey]: true }));
+  // Accordion: одновременно открыта только одна секция (или ни одной).
+  const [openSection, setOpenSection] = useState(activeSectionKey);
 
-  // При навигации авто-открываем секцию активного пункта (если была закрыта).
+  // При навигации в новый раздел переключаемся на его секцию.
   useEffect(() => {
-    setOpenSections(prev => prev[activeSectionKey] ? prev : { ...prev, [activeSectionKey]: true });
+    setOpenSection(activeSectionKey);
   }, [activeSectionKey]);
 
   const toggleSection = (key) => {
-    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    setOpenSection(prev => prev === key ? null : key);
   };
 
   // В свернутом режиме рендерим плоский список иконок (заголовки секций бесполезны).
@@ -102,7 +103,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
   const renderSectioned = () => (
     <nav className="menu">
       {sections.map(section => {
-        const isOpen = !!openSections[section.key];
+        const isOpen = openSection === section.key;
         return (
           <div key={section.key} className="menu-section">
             <button
