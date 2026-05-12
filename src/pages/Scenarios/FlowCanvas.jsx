@@ -196,16 +196,20 @@ export default function FlowCanvas({
 
   // ─── При первой загрузке центрируем канвас на main_menu, чтобы
   // пользователь не оказывался посреди пустоты.
+  // Если в URL есть ?scenario=N — пропускаем, отдаём управление эффекту ниже.
   const initialCenteredRef = useRef(false);
   useEffect(() => {
     if (initialCenteredRef.current) return;
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('scenario')) {
+      // отметим как «обработано», но не центрируем — это сделает scenario-эффект
+      initialCenteredRef.current = true;
+      return;
+    }
     if (!screens || !screens['main_menu']) return;
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     initialCenteredRef.current = true;
-    // используем существующий centerOnNode после следующего тика, чтобы
-    // ref-функция была инициализирована
     requestAnimationFrame(() => centerOnNodeRef.current?.('main_menu'));
   }, [screens]);
 
