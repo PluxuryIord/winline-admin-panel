@@ -187,7 +187,7 @@ const SEED_DATA = {
     },
     event_verify_promo: {
       title: 'Верификация — промо',
-      description: 'Экран призыва к верификации для действующего партнёра',
+      description: 'Экран призыва к верификации для действующего партнёра. «Вернуться назад» в боте возвращает в стартовое меню, а не на event_partner_check — поэтому стрелки в диаграмме у этой кнопки нет.',
       scenario: 3,
       messages: {
         promo: {
@@ -198,7 +198,7 @@ const SEED_DATA = {
       buttons: {
         _order: ['btn_verify', 'btn_back'],
         btn_verify: { label: 'Верифицироваться', action: 'callback:event_v2_verify', targetScreen: 'event_email_prompt', locked: true },
-        btn_back: { label: 'Вернуться назад', action: 'callback:event_v2_back', targetScreen: 'event_partner_check', locked: true },
+        btn_back: { label: 'Вернуться назад', action: 'callback:event_v2_back', locked: true },
       },
     },
     event_email_prompt: {
@@ -248,7 +248,7 @@ const SEED_DATA = {
     },
     event_congrats: {
       title: 'Поздравляем — участник розыгрыша',
-      description: 'Финал: выдача номера в розыгрыше',
+      description: 'Финал раффла. Кнопка «🎁 Хочу мерч» добавляется ботом динамически и показывается только во флоу «Работаю с WL» (там анкета ещё не пройдена) — для «Не работаю»-флоу мерч-QR выдаётся ещё в конце анкеты, и кнопка скрывается.',
       scenario: 3,
       messages: {
         text: {
@@ -256,7 +256,15 @@ const SEED_DATA = {
           text: '<b>Поздравляем, ты стал участником розыгрыша, твой номер №******\n\nИнформация о победителях придёт 27 мая до 15:00</b>',
         },
       },
-      buttons: { _order: [] },
+      buttons: {
+        _order: ['btn_merch'],
+        btn_merch: {
+          label: '🎁 Хочу мерч',
+          action: 'callback:event_v2_want_merch',
+          targetScreen: 'anketa_role',
+          locked: true,
+        },
+      },
     },
     event_registration_promo: {
       title: 'Регистрация — промо',
@@ -566,6 +574,31 @@ router.get('/', async (req, res, next) => {
         tc.buttons.btn_seo_aso_sms = { label: 'SEO ASO SMS', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' };
         tc.buttons.btn_push_inapp = { label: 'PUSH IN APP', action: 'callback:anketa_answer', targetScreen: 'anketa_sub_check' };
         tc.buttons._order = ['btn_cpa_net', 'btn_seo_aso_sms', 'btn_cpa', 'btn_push_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'];
+        changed = true;
+      }
+      // One-time migration: event_congrats gets a static btn_merch (the bot
+      // adds/strips it conditionally, but the diagram should show the edge to
+      // anketa_role so the «Работаю»-flow loop is visible).
+      const cg = data.screens.event_congrats;
+      if (cg && (!cg.buttons || !cg.buttons.btn_merch)) {
+        cg.buttons = cg.buttons || { _order: [] };
+        cg.buttons.btn_merch = {
+          label: '🎁 Хочу мерч',
+          action: 'callback:event_v2_want_merch',
+          targetScreen: 'anketa_role',
+          locked: true,
+        };
+        cg.buttons._order = ['btn_merch', ...(cg.buttons._order || []).filter((k) => k !== 'btn_merch')];
+        cg.description = 'Финал раффла. Кнопка «🎁 Хочу мерч» добавляется ботом динамически и показывается только во флоу «Работаю с WL» (там анкета ещё не пройдена) — для «Не работаю»-флоу мерч-QR выдаётся ещё в конце анкеты, и кнопка скрывается.';
+        changed = true;
+      }
+      // One-time migration: drop the misleading targetScreen on
+      // event_verify_promo.btn_back. The bot actually returns to the start
+      // menu, not to event_partner_check, so the arrow on the canvas was wrong.
+      const vp = data.screens.event_verify_promo;
+      if (vp?.buttons?.btn_back?.targetScreen === 'event_partner_check') {
+        delete vp.buttons.btn_back.targetScreen;
+        vp.description = 'Экран призыва к верификации для действующего партнёра. «Вернуться назад» в боте возвращает в стартовое меню, а не на event_partner_check — поэтому стрелки в диаграмме у этой кнопки нет.';
         changed = true;
       }
       if (changed) await saveScenarios(data, dbId);
