@@ -1296,6 +1296,34 @@
 .node-editor-locked-hint {
   font-size: 0.75rem;
   opacity: 0.5;
+  position: relative;
+  cursor: help;
+}
+
+/* Custom tooltip — показывается СЛЕВА от иконки, чтобы не вылезал
+   за правый край панели редактора. Триггер — атрибут data-tip. */
+.node-editor-locked-hint[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1d1d28;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.node-editor-locked-hint[data-tip]:hover::after {
+  opacity: 1;
 }
 
 .node-editor-target-select:disabled {

@@ -569,7 +569,12 @@ export default function NodeEditorPanel({
         <div className="sc-section-header">
           <h3 className="sc-section-title">
             <MousePointer size={16} /> Кнопки
-            {isStructureLocked && <span className="node-editor-locked-hint" title="Структура заблокирована — можно менять только текст">🔒</span>}
+            {isStructureLocked && (
+              <span
+                className="node-editor-locked-hint"
+                data-tip="Структура заблокирована — можно менять только текст"
+              >🔒</span>
+            )}
           </h3>
           {!isStructureLocked && (
             <button className="sc-add-btn" onClick={onAddButton} title="Добавить кнопку">
@@ -687,14 +692,18 @@ export default function NodeEditorPanel({
                           value={btn.targetScreen || ''}
                           onChange={e => onUpdateButtonTarget(key, e.target.value)}
                           disabled={isConnectionsLocked || btn.locked}
-                          title={isConnectionsLocked ? 'Связи этого блока нельзя менять' : ''}
                         >
                           <option value="">— Действие без перехода —</option>
                           {screenOptions.map(opt => (
                             <option key={opt.id} value={opt.id}>{opt.title}</option>
                           ))}
                         </select>
-                        {isConnectionsLocked && <span className="node-editor-locked-hint">🔒</span>}
+                        {isConnectionsLocked && (
+                          <span
+                            className="node-editor-locked-hint"
+                            data-tip="Связи этого блока нельзя менять"
+                          >🔒</span>
+                        )}
                       </div>
                     )}
                   </div>

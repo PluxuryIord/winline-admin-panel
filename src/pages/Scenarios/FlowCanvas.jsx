@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useMemo } from 'react';
+import { useRef, useCallback, useState, useMemo, useEffect } from 'react';
 import { Search, Maximize2, Play, Filter } from 'lucide-react';
 import FlowNode from './FlowNode';
 import FlowArrows from './FlowArrows';
@@ -193,6 +193,24 @@ export default function FlowCanvas({
     return groups;
   }, [screens]);
 
+  // ─── При первой загрузке центрируем канвас на main_menu, чтобы
+  // пользователь не оказывался посреди пустоты.
+  const initialCenteredRef = useRef(false);
+  useEffect(() => {
+    if (initialCenteredRef.current) return;
+    if (!screens || !screens['main_menu']) return;
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    initialCenteredRef.current = true;
+    // используем существующий centerOnNode после следующего тика, чтобы
+    // ref-функция была инициализирована
+    requestAnimationFrame(() => centerOnNodeRef.current?.('main_menu'));
+  }, [screens]);
+
+  // ref на актуальный centerOnNode (объявлен ниже) — обновляется в эффекте.
+  const centerOnNodeRef = useRef(null);
+
   // ─── Center on a single node ────────────────────────────────────────────────
   const centerOnNode = useCallback((nodeId, targetZoom = 0.85) => {
     requestAnimationFrame(() => {
@@ -216,6 +234,8 @@ export default function FlowCanvas({
       });
     });
   }, [screens]);
+  // экспонируем последнюю версию для use в первичном эффекте
+  useEffect(() => { centerOnNodeRef.current = centerOnNode; }, [centerOnNode]);
 
   // ─── Scenario filter handler ─────────────────────────────────────────────────
   const handleFilter = (name) => {
