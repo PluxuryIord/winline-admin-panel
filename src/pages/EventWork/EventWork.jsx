@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Gift, ScanLine, Calendar,
   ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
-  ToggleLeft, ToggleRight, Upload, ImageIcon,
+  ToggleLeft, ToggleRight, Upload, ImageIcon, BookOpen,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -612,6 +613,9 @@ export default function EventWork() {
           <p>QR-коды, сканирования и управление мероприятием</p>
         </div>
         <div className="ew-header-actions">
+          <RouterLink to="/scenarios?scenario=3" className="ew-spreadsheet-btn">
+            <BookOpen size={16} /> Сценарий 3
+          </RouterLink>
           <SpreadsheetButton />
           <button className="ew-settings-btn" onClick={() => setSettingsOpen(true)}>
             <Settings size={18} /> Настройки

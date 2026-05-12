@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Maximize2, Play, Filter } from 'lucide-react';
 import FlowNode from './FlowNode';
 import FlowArrows from './FlowArrows';
@@ -237,6 +238,10 @@ export default function FlowCanvas({
   // экспонируем последнюю версию для use в первичном эффекте
   useEffect(() => { centerOnNodeRef.current = centerOnNode; }, [centerOnNode]);
 
+  // ─── Auto-select scenario filter из query-параметра ?scenario=3 ──────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoFilterAppliedRef = useRef(false);
+
   // ─── Scenario filter handler ─────────────────────────────────────────────────
   const handleFilter = (name) => {
     if (name === null) {
@@ -257,6 +262,28 @@ export default function FlowCanvas({
       }
     }
   };
+
+  // Применяем фильтр из URL (?scenario=3 → «Сценарий 3») один раз после
+  // того, как screens прогрузились и контейнер получил размеры.
+  useEffect(() => {
+    if (autoFilterAppliedRef.current) return;
+    const sc = searchParams.get('scenario');
+    if (!sc) return;
+    if (!screens || Object.keys(screens).length === 0) return;
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const name = `Сценарий ${sc}`;
+    autoFilterAppliedRef.current = true;
+    // также подавим initial-center на main_menu, т.к. сейчас сами центруем
+    initialCenteredRef.current = true;
+    handleFilter(name);
+    // вычищаем параметр из URL, чтобы при ручном переключении он не доминировал
+    const next = new URLSearchParams(searchParams);
+    next.delete('scenario');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screens, searchParams]);
 
   // ─── Fit all handler ─────────────────────────────────────────────────────────
   const handleFitAll = () => {
