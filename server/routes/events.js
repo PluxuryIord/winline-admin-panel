@@ -173,6 +173,26 @@ router.get('/codes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── GET /api/events/assets/qr-template — публичный фон для QR-карточки ────
+// Нужен боту, чтобы рендерить карточку локально без HTTP-roundtrip за PNG.
+router.get('/assets/qr-template', (req, res) => {
+  if (!fs.existsSync(QR_TEMPLATE_PATH)) {
+    return res.status(404).end();
+  }
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Content-Type', 'image/jpeg');
+  fs.createReadStream(QR_TEMPLATE_PATH).pipe(res);
+});
+
+router.get('/assets/qr-font', (req, res) => {
+  if (!fs.existsSync(FONT_PATH)) {
+    return res.status(404).end();
+  }
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Content-Type', 'font/ttf');
+  fs.createReadStream(FONT_PATH).pipe(res);
+});
+
 // ─── PATCH /api/events/codes/:id/status — toggle active↔used ────────────────
 
 router.patch('/codes/:id/status', async (req, res, next) => {
