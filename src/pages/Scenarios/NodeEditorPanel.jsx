@@ -30,6 +30,7 @@ const LOCKED_STRUCTURE = new Set([
   'anketa_adv_company', 'anketa_adv_position', 'anketa_other_occupation',
   'anketa_sub_check', 'anketa_final',
   'group_menu', 'group_promo', 'group_calendar', 'group_landings', 'group_kb',
+  'event_intro',
   'event_partner_check', 'event_verify_promo', 'event_email_prompt',
   'event_email_confirmed', 'event_site_status', 'event_site_wait',
   'event_congrats', 'event_registration_promo', 'event_registration_instructions',
@@ -593,15 +594,23 @@ export default function NodeEditorPanel({
               const isDragOver = dragOverIdx === idx && dragIdx !== idx;
 
               if (btn.locked) {
+                // Заблокированная кнопка: разрешаем менять ТОЛЬКО текст label.
+                // Action, targetScreen, порядок и удаление остаются недоступны —
+                // логику кнопки трогать нельзя, чтобы не сломать сценарий бота.
                 return (
                   <div key={key} className="node-editor-btn-block node-editor-btn-locked">
                     <div className="sc-button-row">
                       <input
                         className="sc-button-input"
                         value={btn.label}
-                        disabled
-                        style={{ opacity: 0.5 }}
+                        onChange={e => onUpdateButtonLabel(key, e.target.value)}
+                        placeholder="Текст кнопки"
                       />
+                      <span
+                        className="node-editor-locked-hint"
+                        data-tip="Логика этой кнопки залочена. Можно менять только текст."
+                        style={{ marginLeft: 8 }}
+                      >🔒</span>
                     </div>
                   </div>
                 );
