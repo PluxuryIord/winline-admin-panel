@@ -428,8 +428,29 @@ export default function NodeEditorPanel({
     }
   };
 
+  // Перехватываем pinch-zoom / Ctrl+wheel на боковой панели:
+  // браузер по умолчанию начинает зумить весь viewport, и панель уезжает
+  // вместе со страницей. Гасим event только когда курсор над панелью.
+  // Обычный scroll (без ctrlKey) при этом продолжает работать как обычно.
+  //
+  // ВАЖНО: React-овский onWheel вешается как passive listener, preventDefault
+  // в нём не работает. Поэтому навешиваем нативный listener через useEffect
+  // с явным passive: false.
+  const panelRef = useRef(null);
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   return (
-    <div className="node-editor-panel">
+    <div className="node-editor-panel" ref={panelRef}>
       <div className="node-editor-header">
         <div>
           <h2>{SCREEN_ICONS[screenId] || '📄'} {editData.title}</h2>
