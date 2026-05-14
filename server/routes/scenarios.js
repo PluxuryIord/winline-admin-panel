@@ -172,6 +172,21 @@ const SEED_DATA = {
       },
     },
     // ── Сценарий 3: Мероприятие — визуальные блоки потока ──
+    event_intro: {
+      title: 'Интро — мероприятие',
+      description: 'Стартовый экран сценария 3. Показывается до вопроса «Вы работаете с WL?» с приветственным баннером и кнопкой «Далее». Картинка прикрепляется через media к сообщению welcome.',
+      scenario: 3,
+      messages: {
+        welcome: {
+          label: 'Приветственный текст',
+          text: '<b>Хочешь получить эксклюзивный мерч, стать партнёром и зарабатывать вместе с WINLINE PARTNERS?</b>\n\nРегистрируйся и заполняй анкету! После регистрации, с тобой свяжется наш Affiliate-менеджер @winline_affiliate и расскажет об условиях.',
+        },
+      },
+      buttons: {
+        _order: ['btn_next'],
+        btn_next: { label: 'Далее', action: 'callback:event_v2_intro_next', targetScreen: 'event_partner_check', locked: true },
+      },
+    },
     event_partner_check: {
       title: 'Вы работаете с WINLINE PARTNERS?',
       description: 'Выбор: действующий партнёр / новый',
