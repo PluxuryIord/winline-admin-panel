@@ -134,6 +134,10 @@ app.get('/api/events/public-stats', statsHandler);
 app.get('/api/events/codes/:code/qr', qrHandler);
 // QR-карточка с фоном и текстом (публичный, бот скачивает без токена)
 app.get('/api/events/codes/:code/qr-card', qrCardHandler);
+// QR-template image и font (бот скачивает один раз при старте, без авторизации)
+import { qrTemplateAssetHandler, qrFontAssetHandler } from './routes/events.js';
+app.get('/api/events/assets/qr-template', qrTemplateAssetHandler);
+app.get('/api/events/assets/qr-font', qrFontAssetHandler);
 
 app.use('/api', authMiddleware);
 
