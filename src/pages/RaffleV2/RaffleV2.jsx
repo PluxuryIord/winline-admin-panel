@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Trophy, RefreshCw, Search, Trash2, Sparkles } from 'lucide-react';
+import { Trophy, RefreshCw, Search, Trash2, Sparkles, Tag, CheckCircle2 } from 'lucide-react';
 import { api } from '../../utils/api';
 
 const EVENT_ID = 0;
@@ -12,6 +12,9 @@ export default function RaffleV2() {
   const [drawing, setDrawing] = useState(false);
   const [winners, setWinners] = useState([]);
   const [resetting, setResetting] = useState(false);
+  const [tagName, setTagName] = useState('Победитель розыгрыша мячей');
+  const [tagging, setTagging] = useState(false);
+  const [tagResult, setTagResult] = useState(null);
   const ref = useRef('');
 
   const fetchTickets = useCallback(async () => {
@@ -40,6 +43,35 @@ export default function RaffleV2() {
       setWinners(data.winners || []);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setDrawing(false); }
+  };
+
+  const handleTagWinners = async () => {
+    if (!winners.length || !tagName.trim()) return;
+    setTagging(true);
+    setTagResult(null);
+    try {
+      // Победителям присваиваем тег + помечаем is_winner=1 в БД параллельно.
+      // tag-winners принимает userIds — у нас это telegram_id'ы из v2-схемы.
+      const ids = winners.map(w => w.telegram_id).filter(Boolean);
+      const ticketNumbers = winners.map(w => w.ticket_number).filter(Number.isFinite);
+
+      const [tagRes, markRes] = await Promise.all([
+        api.post('/api/raffles/tag-winners', { userIds: ids, tag: tagName.trim() }),
+        api.post('/api/raffles/v2/mark-winners', { event_id: EVENT_ID, ticket_numbers: ticketNumbers }),
+      ]);
+      const tagData = await tagRes.json();
+      const markData = await markRes.json();
+      if (tagData.ok && markData.ok) {
+        setTagResult({ ok: true, count: tagData.tagged, tag: tagData.tag });
+        fetchTickets();  // обновляем таблицу: теперь у победителей колонка «🏆 Победитель»
+      } else {
+        setTagResult({ ok: false, error: tagData.error || markData.error || 'Ошибка' });
+      }
+    } catch (e) {
+      setTagResult({ ok: false, error: e.message });
+    } finally {
+      setTagging(false);
+    }
   };
 
   const handleReset = async () => {
@@ -148,6 +180,45 @@ export default function RaffleV2() {
                 ))}
               </tbody>
             </table>
+
+            <div className="ew-settings-section" style={{ marginTop: 16 }}>
+              <h4><Tag size={16} /> Присвоить тег победителям</h4>
+              <p className="ew-settings-desc">
+                Тег навешивается на этих {winners.length} пользователей и помечает
+                их билеты как победительные. Потом запусти рассылку по этому тегу
+                в разделе «Рассылки» — придёт уведомление о выигрыше.
+              </p>
+              <div className="ew-settings-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={tagName}
+                  onChange={e => setTagName(e.target.value)}
+                  placeholder="Название тега"
+                  className="ew-settings-input"
+                  style={{ flex: '1 1 240px', minWidth: 200 }}
+                />
+                <button
+                  className="ew-save-btn"
+                  onClick={handleTagWinners}
+                  disabled={tagging || !tagName.trim()}
+                >
+                  <Tag size={16} /> {tagging ? 'Применение…' : 'Присвоить тег'}
+                </button>
+              </div>
+              {tagResult && (
+                <div style={{ marginTop: 12 }}>
+                  {tagResult.ok ? (
+                    <div style={{ color: '#2BB673', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle2 size={16} />
+                      Готово! Тег «{tagResult.tag}» присвоен {tagResult.count} победителям.
+                      Перейди в «Рассылки» и настрой сообщение с фильтром по этому тегу.
+                    </div>
+                  ) : (
+                    <div style={{ color: '#e74c3c' }}>Ошибка: {tagResult.error}</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
