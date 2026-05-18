@@ -806,7 +806,9 @@ router.post('/users', async (req, res, next) => {
       record = {
         text: (text || '').substring(0, 200), type: 'users', channels: [`Пользователи (${rows.length})`],
         total: rows.length, success: successCount, failed: rows.length - successCount,
-        date: new Date().toISOString(), status: successCount === rows.length ? 'published' : 'partial',
+        // Бинарный статус: 'published' если хоть кому-то ушло, 'failed' если никому.
+        // Статус 'partial' больше не пишем — UI всё равно показывает его как «Доставлена».
+        date: new Date().toISOString(), status: successCount > 0 ? 'published' : 'failed',
       };
     }
 
@@ -1444,7 +1446,10 @@ setInterval(async () => {
 
 async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media, pollId }, conn) {
   const db = conn || dbPool;
-  const status = success === total ? 'published' : (success > 0 ? 'partial' : 'failed');
+  // Бинарный статус: если хоть кому-то ушло — «Доставлена», иначе — «Ошибка».
+  // Старый 'partial' (success > 0 && success < total) больше не используем
+  // — UI всё равно показывал его как доставлено. Один статус — одна реальность.
+  const status = success > 0 ? 'published' : 'failed';
   const withMedia = await checkMediaColumn();
 
   const baseCols = 'text, type, channels_json, channel_ids_json, total, success, failed, results_json, status';

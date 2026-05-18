@@ -2093,37 +2093,69 @@ input[type="checkbox"]:checked {
   overflow-y: auto;
   padding: 8px 12px;
   max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .bc-delivery-item {
-  display: flex;
+  /* grid: иконка | юзер-блок | ошибка
+     для адекватного выравнивания когда ошибка переносится на 2-3 строки */
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
   font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.15s;
 }
+.bc-delivery-item:hover { background: rgba(255, 255, 255, 0.04); }
 .bc-delivery-item--ok { color: rgba(255, 255, 255, 0.7); }
-.bc-delivery-item--fail { color: #ef4444; }
-.bc-delivery-icon { flex-shrink: 0; }
+.bc-delivery-item--fail {
+  background: rgba(239, 68, 68, 0.06);
+}
+.bc-delivery-item--fail:hover { background: rgba(239, 68, 68, 0.1); }
+.bc-delivery-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bc-delivery-item--ok .bc-delivery-icon { color: #2bb673; }
+.bc-delivery-item--fail .bc-delivery-icon { color: #ef4444; }
+
+.bc-delivery-user-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
 .bc-delivery-user-name {
   font-weight: 500;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
 }
 .bc-delivery-username {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.45);
   font-size: 0.8rem;
-  margin-left: 4px;
+  white-space: nowrap;
 }
 .bc-delivery-user-id {
   font-family: monospace;
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.3);
-  margin-left: 4px;
 }
 .bc-delivery-error {
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.75rem;
-  margin-left: auto;
+  color: rgba(239, 68, 68, 0.75);
+  font-size: 0.72rem;
+  text-align: right;
+  max-width: 240px;
+  line-height: 1.35;
+  font-style: italic;
 }
 .bc-delivery-empty {
   padding: 20px;

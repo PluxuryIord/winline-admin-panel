@@ -38,10 +38,16 @@ function renderTgHtml(html) {
 
 const STATUS_LABELS = {
   published: 'Доставлена',
-  partial: 'Частично',
+  partial: 'Доставлена', // legacy 'partial' теперь показываем как «Доставлена»
   failed: 'Ошибка',
   scheduled: 'Отложена',
 };
+
+// Нормализация статуса для отображения: partial и published — одно и то же,
+// показываем «Доставлена» если хоть кому-то ушло. failed — только когда никому.
+function displayStatus(s) {
+  return s === 'partial' ? 'published' : s;
+}
 
 const SECTIONS = [
   { id: 'channels', label: 'Каналы', icon: Hash },
@@ -2597,7 +2603,7 @@ export default function Broadcasts() {
           </div>
           <div className="bc-filter-group">
             <span className="bc-filter-label">Статус:</span>
-            {[['', 'Все'], ['published', 'Доставлена'], ['partial', 'Частично'], ['failed', 'Ошибка'], ['scheduled', 'Отложена']].map(([v, l]) => (
+            {[['', 'Все'], ['published', 'Доставлена'], ['failed', 'Ошибка'], ['scheduled', 'Отложена']].map(([v, l]) => (
               <button key={v} className={`bc-filter-chip ${filterStatus === v ? 'active' : ''}`} onClick={() => { setFilterStatus(v); setVisibleCount(20); }}>{l}</button>
             ))}
           </div>
@@ -2633,10 +2639,9 @@ export default function Broadcasts() {
                     {(b.channels || []).join(', ') || '—'}
                   </td>
                   <td>
-                    <span className={`bc-status bc-status--${b.status}`}>
-                      {b.status === 'published' && <CheckCircle size={12} />}
+                    <span className={`bc-status bc-status--${displayStatus(b.status)}`}>
+                      {(b.status === 'published' || b.status === 'partial') && <CheckCircle size={12} />}
                       {b.status === 'failed' && <XCircle size={12} />}
-                      {b.status === 'partial' && <AlertCircle size={12} />}
                       {b.status === 'scheduled' && <Clock size={12} />}
                       {STATUS_LABELS[b.status] || b.status}
                       {b.total > 0 && (
@@ -2741,10 +2746,12 @@ export default function Broadcasts() {
             <div className="bc-delivery-list">
               {(deliveryModal.results || []).map((r, i) => (
                 <div key={i} className={`bc-delivery-item ${r.ok ? 'bc-delivery-item--ok' : 'bc-delivery-item--fail'}`}>
-                  <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}</span>
-                  <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
-                  {r.username && <span className="bc-delivery-username">@{r.username}</span>}
-                  {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
+                  <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}</span>
+                  <div className="bc-delivery-user-block">
+                    <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
+                    {r.username && <span className="bc-delivery-username">@{r.username}</span>}
+                    {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
+                  </div>
                   {r.error && <span className="bc-delivery-error">{r.error}</span>}
                 </div>
               ))}
