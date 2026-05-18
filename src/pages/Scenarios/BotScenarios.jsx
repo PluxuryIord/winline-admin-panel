@@ -130,11 +130,13 @@ function migrateData(data) {
     }
   }
 
-  // One-time cleanup: remove deprecated event_anketa block and rewire pointers to anketa_role
-  if (data.screens.event_anketa) {
-    delete data.screens.event_anketa;
-    changed = true;
-  }
+  // ── Историческая миграция: переадресовка указателей со старых блоков ──
+  // Сами блоки event_anketa / event_flow удалены из SEED_DATA на сервере
+  // (см. scenarios.js), поэтому здесь больше НЕ удаляем сами экраны —
+  // иначе ползёт ложная пара «Удалён экран Мероприятие/Анкета мероприятия»
+  // в audit log на каждое открытие /scenarios. Если эти экраны вдруг
+  // окажутся в БД (легаси-данные) — оставляем как есть, никто их не
+  // удаляет автоматически. Указатели всё ещё чиним идемпотентно.
   for (const scr of Object.values(data.screens)) {
     const order = scr.buttons?._order || [];
     for (const btnKey of order) {
@@ -143,18 +145,6 @@ function migrateData(data) {
         btn.targetScreen = 'anketa_role';
         changed = true;
       }
-    }
-  }
-
-  // One-time cleanup: remove deprecated event_flow block (replaced by event_partner_check)
-  if (data.screens.event_flow) {
-    delete data.screens.event_flow;
-    changed = true;
-  }
-  for (const scr of Object.values(data.screens)) {
-    const order = scr.buttons?._order || [];
-    for (const btnKey of order) {
-      const btn = scr.buttons[btnKey];
       if (btn?.targetScreen === 'event_flow') {
         btn.targetScreen = 'event_partner_check';
         changed = true;

@@ -313,51 +313,13 @@ const SEED_DATA = {
       },
     },
 
-    event_flow: {
-      title: 'Мероприятие',
-      description: 'QR-код для мероприятия',
-      messages: {
-        welcome: {
-          label: 'Приветствие мероприятия',
-          text: '<b>Приветственный текст для мероприятия\n\nЧтобы продолжить, пожалуйста, заполните небольшую анкету</b>',
-        },
-        qr_caption: {
-          label: 'Подпись к QR-коду',
-          text: '<b>Вот ваш QR для получения подарка!</b>',
-        },
-        no_event: {
-          label: 'Нет активных мероприятий',
-          text: 'Сейчас нет активных мероприятий',
-        },
-        limit_reached: {
-          label: 'Лимит кодов достигнут',
-          text: 'К сожалению, все коды уже разобраны!',
-        },
-      },
-      buttons: {
-        _order: ['btn_become_partner'],
-        btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner' },
-      },
-    },
-    event_anketa: {
-      title: 'Анкета мероприятия',
-      description: 'Предсобытийная анкета для неавторизованных пользователей',
-      messages: {
-        anketa_question_prompt: {
-          label: 'Вопрос анкеты (шаблон)',
-          text: '<b>{question_text}</b>',
-        },
-        anketa_complete: {
-          label: 'Анкета завершена',
-          text: '<b>Спасибо за заполнение анкеты!</b>',
-        },
-      },
-      buttons: {
-        _order: ['btn_fill_anketa', 'btn_become_partner'],
-        btn_fill_anketa: { label: 'Заполнить анкету', action: 'callback:client_event_anketa', targetScreen: 'anketa_role' },
-        btn_become_partner: { label: 'Стать партнёром', action: 'callback:client_new_partner', targetScreen: 'registration_flow' },
-      },
-    },
+    // Устаревшие экраны event_flow и event_anketa удалены из SEED, потому что
+    // фронтовая миграция (BotScenarios.jsx → migrateData) их специально
+    // выпиливает при каждом открытии страницы. Если оставить их в сиде —
+    // GET-handler auto-merge вернёт их обратно, фронт удалит, и в audit
+    // log сыплется ложная пара «Удалён экран Мероприятие/Анкета мероприятия»
+    // на каждое открытие /scenarios. См. журнал действий до 2026-05-18.
+    // Эти экраны заменены на event_partner_check + anketa_role соответственно.
 
     // ── Анкета: Ваша роль (точка входа) ──
     anketa_role: {
@@ -591,6 +553,27 @@ router.get('/', async (req, res, next) => {
         tc.buttons._order = ['btn_cpa_net', 'btn_seo_aso_sms', 'btn_cpa', 'btn_push_inapp', 'btn_dsp', 'btn_social', 'btn_influence', 'btn_other_traffic'];
         changed = true;
       }
+      // One-time migration: убрать устаревшие event_flow и event_anketa из БД.
+      // Они уже не в SEED_DATA (выпилили), но если ранее были сохранены в
+      // БД через auto-merge — удаляем их БЕЗ записи в audit (это не действие
+      // админа, а техническая чистка миграцией).
+      for (const oldId of ['event_flow', 'event_anketa']) {
+        if (data.screens[oldId]) {
+          delete data.screens[oldId];
+          changed = true;
+        }
+      }
+      // Перенаправляем targetScreen в кнопках, которые ссылались на legacy:
+      for (const scr of Object.values(data.screens)) {
+        const order = scr.buttons?._order || [];
+        for (const btnKey of order) {
+          const btn = scr.buttons?.[btnKey];
+          if (!btn) continue;
+          if (btn.targetScreen === 'event_anketa') { btn.targetScreen = 'anketa_role'; changed = true; }
+          if (btn.targetScreen === 'event_flow')   { btn.targetScreen = 'event_partner_check'; changed = true; }
+        }
+      }
+
       // One-time migration: event_congrats gets a static btn_merch (the bot
       // adds/strips it conditionally, but the diagram should show the edge to
       // anketa_role so the «Работаю»-flow loop is visible).
