@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Закрыто от поисковой индексации: это закрытая админ-панель,
+         поисковикам туда нечего отдавать. Дублируется на уровне:
+         public/robots.txt (Disallow: /), HTTP-заголовка X-Robots-Tag
+         (см. server/app.js), и этого мета-тега. -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="yandex" content="noindex, nofollow" />
     <title>Winline Admin</title>
   </head>
   <body>

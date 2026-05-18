@@ -29,6 +29,17 @@ if (!JWT_SECRET) {
 const app = express();
 app.set('trust proxy', 1); // Trust reverse proxy (nginx/caddy) for secure cookies
 
+// Закрыто от поисковой индексации: админ-панель — внутренний инструмент,
+// в SERP ей делать нечего. Дублируется в:
+//   - public/robots.txt (Disallow: /)
+//   - <meta name="robots"> в index.html
+// X-Robots-Tag — самый сильный сигнал, его уважают и Google, и Yandex,
+// даже когда страница не отдаёт HTML (картинки, JSON, ассеты).
+app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+  next();
+});
+
 // === Rate limiting ===
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 минут
