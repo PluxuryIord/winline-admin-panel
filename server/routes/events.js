@@ -13,7 +13,10 @@ import requireAdmin from '../middleware/requireAdmin.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
-const QR_TEMPLATE_PATH = path.join(ASSETS_DIR, 'qr-template.jpg');
+// Захардкоженный фон QR-карточки (WINLINE PARTNERS логотип сверху).
+// Заменяется только заменой файла в репозитории. UI-кнопка «Загрузить фон»
+// удалена — фон должен быть единым для всего бренда.
+const QR_TEMPLATE_PATH = path.join(ASSETS_DIR, 'qr-template.png');
 const FONT_PATH = path.join(ASSETS_DIR, 'pfdintextcomppro-bold.ttf');
 
 // Preload font as base64 for SVG embedding
@@ -181,7 +184,7 @@ router.get('/codes', async (req, res, next) => {
 export function qrTemplateAssetHandler(req, res) {
   if (!fs.existsSync(QR_TEMPLATE_PATH)) return res.status(404).end();
   res.set('Cache-Control', 'public, max-age=86400');
-  res.set('Content-Type', 'image/jpeg');
+  res.set('Content-Type', 'image/png');
   fs.createReadStream(QR_TEMPLATE_PATH).pipe(res);
 }
 
@@ -258,30 +261,24 @@ export async function qrCardHandler(req, res, next) {
     const code = req.params.code;
     const settings = await getSettings();
     const captionText = settings.qr_caption_text || '';
-    const bgUrl = settings.qr_bg_url || '';
+    // qr_bg_url из settings больше не учитывается — фон строго из репозитория.
+    // Поле в БД может ещё содержать старое значение, но мы его игнорируем.
 
     // Local constants kept readable; CARD_W/CARD_H are module-level above.
     const QR_SIZE = 320;
     const QR_TOP = 200;
 
-    // 1+2 in parallel: background (template or cached custom URL) and QR raw
-    // bytes are independent — run them concurrently to save ~200-400ms vs
-    // the previous sequential pipeline. Both rely on warm caches when possible.
-    const [customBg, qrRawBuffer, fallbackBg] = await Promise.all([
-      getCustomBgBuffer(bgUrl),
+    // Параллельно: фон-шаблон + рендер QR. Кастомного источника фона больше нет.
+    const [bg, qrRawBuffer] = await Promise.all([
+      getTemplateBgBuffer(),
       QRCode.toBuffer(String(code), {
         type: 'png',
         width: QR_SIZE,
         margin: 2,
         color: { dark: '#FF6A13', light: '#00000000' },
-        // 'M' (15% error correction) is the QR-spec sweet spot for on-screen
-        // scans. 'H' (30%) doubled raster density without practical benefit.
         errorCorrectionLevel: 'M',
       }),
-      getTemplateBgBuffer(),
     ]);
-
-    const bg = customBg || fallbackBg;
 
     // Rounded-corner pass kept as a separate step — sharp is single-thread per
     // pipeline so this stays after the parallel block.

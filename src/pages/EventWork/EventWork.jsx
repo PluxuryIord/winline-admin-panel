@@ -3,7 +3,7 @@ import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Gift, ScanLine, Calendar,
   ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
-  ToggleLeft, ToggleRight, Upload, ImageIcon, BookOpen,
+  ToggleLeft, ToggleRight, ImageIcon, BookOpen,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -318,7 +318,7 @@ function SettingsModal({ onClose }) {
   const [eventStarts, setEventStarts] = useState(false);
   const [codeLimit, setCodeLimit] = useState(0);
   const [qrCaptionText, setQrCaptionText] = useState('');
-  const [qrBgUrl, setQrBgUrl] = useState('');
+  // qrBgUrl больше не используется — фон захардкожен (см. server/assets/qr-template.png).
   const [raffleHidden, setRaffleHidden] = useState(false);
   const [savingRaffle, setSavingRaffle] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -328,8 +328,7 @@ function SettingsModal({ onClose }) {
   const [savingLimit, setSavingLimit] = useState(false);
   const [savedLimit, setSavedLimit] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  // uploading/fileInputRef удалены вместе с UI замены фона.
   const hostessUrl = `${window.location.origin}/hostess`;
 
   useEffect(() => {
@@ -340,7 +339,6 @@ function SettingsModal({ onClose }) {
         setEventStarts(!!data.event_starts);
         setCodeLimit(data.code_limit ?? 0);
         setQrCaptionText(data.qr_caption_text ?? '');
-        setQrBgUrl(data.qr_bg_url ?? '');
         setRaffleHidden(!!data.raffle_hidden);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
@@ -369,33 +367,15 @@ function SettingsModal({ onClose }) {
   const handleSave = async () => {
     setSaving(true); setSaved(false);
     try {
+      // qr_bg_url больше не пишем — фон фиксированный, см. server/assets/qr-template.png.
       await api.put('/api/events/settings', {
         code_limit: Number(codeLimit),
         qr_caption_text: qrCaptionText,
-        qr_bg_url: qrBgUrl,
       });
       setSaved(true); setTimeout(() => setSaved(false), 2000);
     } catch (e) { alert('Ошибка: ' + e.message); }
     finally { setSaving(false); }
   };
-
-  const handleBgUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const res = await api.post('/api/upload', { data: reader.result });
-        const data = await res.json();
-        if (data.url) setQrBgUrl(data.url);
-        setUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (e) { alert('Ошибка загрузки: ' + e.message); setUploading(false); }
-  };
-
-  const handleRemoveBg = () => setQrBgUrl('');
 
   const handleToggleRaffle = async () => {
     setSavingRaffle(true);
@@ -445,21 +425,9 @@ function SettingsModal({ onClose }) {
 
                 {/* Caption + Save — below preview */}
                 <div className="ew-qr-editor-controls ew-qr-editor-controls--below">
-                  <div className="ew-qr-editor-field">
-                    <label>Фоновое изображение</label>
-                    <div className="ew-qr-bg-actions">
-                      <button className="ew-qr-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                        <Upload size={14} /> {uploading ? 'Загрузка...' : qrBgUrl ? 'Заменить фон' : 'Загрузить фон'}
-                      </button>
-                      {qrBgUrl && (
-                        <button className="ew-qr-remove-bg-btn" onClick={handleRemoveBg}>
-                          <X size={14} /> По умолчанию
-                        </button>
-                      )}
-                    </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
-                    {qrBgUrl ? <span className="ew-qr-bg-hint">Кастомный фон загружен</span> : <span className="ew-qr-bg-hint">Используется шаблон Winline Partners</span>}
-                  </div>
+                  {/* Фоновое изображение — захардкожено в репозитории
+                      (server/assets/qr-template.png). UI замены убран,
+                      чтобы оператор случайно не сломал брендирование. */}
 
                   <div className="ew-qr-editor-field">
                     <label>Текст под QR-кодом</label>
