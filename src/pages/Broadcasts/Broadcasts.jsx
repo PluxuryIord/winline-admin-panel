@@ -591,8 +591,14 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
         </div>
       </div>
       {sendResult && (
-        <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : 'bc-send-result--ok'}`}>
-          {sendResult.error ? <><AlertCircle size={16} /> {sendResult.error}</> : <><CheckCircle size={16} /> Отправлено: {sendResult.success} из {sendResult.total}</>}
+        <div className={`bc-send-result ${sendResult.error ? 'bc-send-result--error' : sendResult._queued ? 'bc-send-result--queued' : 'bc-send-result--ok'}`}>
+          {sendResult.error ? (
+            <><AlertCircle size={16} /> {sendResult.error}</>
+          ) : sendResult._queued ? (
+            <><Clock size={16} /> Идёт рассылка: доставлено {sendResult.success ?? 0} из {sendResult.total ?? '—'}{sendResult._retrying > 0 ? `, в очереди ${sendResult._retrying}` : ''}…</>
+          ) : (
+            <><CheckCircle size={16} /> Доставлено: {sendResult.success} из {sendResult.total}</>
+          )}
         </div>
       )}
 
@@ -1451,14 +1457,47 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         setSendResult({ error: 'Ответ задержался. Проверьте «Историю» — рассылка скорее всего прошла.' });
         resetCompose();
       } else {
-        setSendResult(data);
+        setSendResult({ ...data, _queued: !!data.queued });
         resetCompose();
         onSendResult?.(data);
+        // Если рассылка стартовала в фоне (status='queued'), поллим прогресс
+        // пока он не станет 'completed'.
+        if (data?.queued && data?.id) {
+          pollBroadcastProgress(data.id);
+        }
       }
     } catch (err) {
       setSendResult({ error: err.message });
     }
     setSending(false);
+  };
+
+  // Опрос прогресса асинхронной рассылки. Останавливается когда статус
+  // 'completed' либо страница ушла. setSendResult обновляется в каждом тике.
+  const pollBroadcastProgress = async (broadcastId) => {
+    const tick = async () => {
+      try {
+        const r = await api.get(`/api/broadcasts/${broadcastId}/progress`);
+        if (!r.ok) return false;
+        const p = await r.json();
+        setSendResult(prev => ({
+          ...(prev || {}),
+          _queued: p.status !== 'completed',
+          total: p.total,
+          success: p.sent,
+          failed: p.permanent_fail,
+          _retrying: p.retrying + p.pending + p.sending,
+          status: p.status === 'completed' ? (p.sent > 0 ? 'published' : 'failed') : 'queued',
+        }));
+        return p.status !== 'completed';
+      } catch {
+        return false;
+      }
+    };
+    // Первый запрос почти сразу, потом каждые 2 сек до завершения
+    while (await tick()) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
   };
 
   const [showTagDD, setShowTagDD] = useState(false);

@@ -748,73 +748,119 @@ router.post('/users', async (req, res, next) => {
       chatMessageText = `${MEDIA_PREFIX}${JSON.stringify(pollMedia)}\n`;
     }
 
-    for (const row of rows) {
-      try {
-        const data = await sendToChat(row.user_id, text?.trim() || '', media, poll, 'users', pollId);
-        results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: data.ok, error: data.description || null });
-        if (!data.ok) {
-          await markBlockedIfNeeded(row.user_id, data.description || '');
-        }
-        if (data.ok) {
-          successCount++;
-          // Save broadcast message to user's chat
-          try {
-            // Find existing chat or create new one
-            const [existingChats] = await dbPool.query(
-              'SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1',
-              [row.user_id]
-            );
-            let userChatId;
-            if (existingChats.length) {
-              userChatId = existingChats[0].id;
-            } else {
-              const [insertResult] = await dbPool.query(
-                'INSERT INTO wl_admin_chats (user_id) VALUES (?)',
-                [row.user_id]
-              );
-              userChatId = insertResult.insertId;
-            }
-            if (userChatId) {
-              await dbPool.query(
-                'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
-                [userChatId, 'admin', chatMessageText]
-              );
-            }
-          } catch (chatErr) {
-            console.warn(`[broadcasts] Failed to save to chat for user ${row.user_id}:`, chatErr.message);
-          }
-        }
-      } catch (err) {
-        results.push({ chatId: row.user_id, name: row.full_name || '', username: row.username || '', ok: false, error: err.message });
-        await markBlockedIfNeeded(row.user_id, err.message);
-      }
-      // Throttle: 1 msg/sec — safely under Telegram's per-chat and global limits
-      await new Promise(r => setTimeout(r, 1000));
-    }
+    // ── Persistent queue: создаём broadcast-запись + job'ы в очереди ───────
+    // Раньше: синхронный цикл с 1 sec/msg, при падении процесса часть юзеров
+    // не получала ничего. Теперь: создаём job'ы в БД, worker асинхронно их
+    // обрабатывает с retry-логикой и переживает рестарты.
 
-    // Limit results to avoid exceeding DB column size
-    const truncatedResults = results.slice(0, 100);
+    const broadcastText = poll
+      ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}`
+      : (text || '').trim();
+    const userName = req.user?.displayName || req.user?.username || 'admin';
 
-    let record;
+    // 1) Создаём запись в wl_admin_broadcasts (старая таблица истории).
+    //    success/failed по началу = 0/0/0, статус 'queued'. Workers будут
+    //    обновлять wl_broadcast_meta — а агрегаты в эту таблицу сольёт
+    //    refreshBroadcastFinalStatus при завершении.
+    let savedRecord;
     try {
-      record = await saveBroadcast({
-        text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'users', channels: [`Пользователи (${rows.length})`], channelIds: [],
-        total: rows.length, success: successCount, failed: rows.length - successCount, results: truncatedResults, media, pollId,
+      savedRecord = await saveBroadcast({
+        text: broadcastText,
+        type: 'users',
+        channels: [`Пользователи (${rows.length})`],
+        channelIds: [],
+        total: rows.length,
+        success: 0,
+        failed: 0,
+        results: [],
+        media,
+        pollId,
       });
     } catch (saveErr) {
       console.error('[broadcasts] saveBroadcast failed:', saveErr.message);
-      record = {
-        text: (text || '').substring(0, 200), type: 'users', channels: [`Пользователи (${rows.length})`],
-        total: rows.length, success: successCount, failed: rows.length - successCount,
-        // Бинарный статус: 'published' если хоть кому-то ушло, 'failed' если никому.
-        // Статус 'partial' больше не пишем — UI всё равно показывает его как «Доставлена».
-        date: new Date().toISOString(), status: successCount > 0 ? 'published' : 'failed',
-      };
+      return res.status(500).json({ error: 'Не удалось создать запись о рассылке: ' + saveErr.message });
     }
 
-    res.json(record);
+    // 2) Готовим payload для воркера — то что он отдаст в sendToChat
+    const payload = {
+      text: text?.trim() || '',
+      media: media || null,
+      poll: poll || null,
+      pollId: pollId || null,
+      chatMessageText,  // для записи в историю чата при успехе
+    };
+
+    // 3) Bulk enqueue
+    const { enqueueBroadcast } = await import('../services/broadcastQueue.js');
+    const jobs = rows.map(row => ({
+      chatId: row.user_id,
+      payload: {
+        ...payload,
+        recipientName: row.full_name || '',
+        recipientUsername: row.username || '',
+      },
+    }));
+    await enqueueBroadcast(savedRecord.id, jobs, broadcastText.substring(0, 200));
+
+    // 4) Возвращаем 202 — рассылка принята, обрабатывается асинхронно.
+    //    Фронт показывает прогресс через GET /api/broadcasts/:id/progress.
+    res.status(202).json({
+      ...savedRecord,
+      total: rows.length,
+      success: 0,
+      failed: 0,
+      status: 'queued',
+      queued: true,
+    });
   } catch (err) { next(err); }
 });
+
+// ── GET /api/broadcasts/:id/progress — live прогресс по persistent queue ──
+router.get('/:id/progress', async (req, res, next) => {
+  try {
+    const { getProgress } = await import('../services/broadcastQueue.js');
+    const progress = await getProgress(Number(req.params.id));
+    if (!progress) return res.status(404).json({ error: 'Not found' });
+    res.json(progress);
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/broadcasts/active — все рассылки в работе сейчас ────────────
+router.get('/active', async (req, res, next) => {
+  try {
+    const { listActive } = await import('../services/broadcastQueue.js');
+    res.json(await listActive());
+  } catch (err) { next(err); }
+});
+
+// ── Экспорт обработчика отправки для worker'а ────────────────────────────
+// Worker импортирует это и зовёт для каждого job'а.
+export async function workerSendOne(chatId, payload) {
+  const { text, media, poll, pollId, chatMessageText } = payload;
+  const result = await sendToChat(chatId, text || '', media, poll, 'users', pollId);
+  if (result?.ok && chatMessageText) {
+    // Сохраняем в историю чата (best-effort, non-blocking failures)
+    try {
+      const [existing] = await dbPool.query('SELECT id FROM wl_admin_chats WHERE user_id = ? LIMIT 1', [chatId]);
+      let chatRowId;
+      if (existing.length) {
+        chatRowId = existing[0].id;
+      } else {
+        const [ins] = await dbPool.query('INSERT INTO wl_admin_chats (user_id) VALUES (?)', [chatId]);
+        chatRowId = ins.insertId;
+      }
+      if (chatRowId) {
+        await dbPool.query(
+          'INSERT INTO wl_admin_chat_messages (chat_id, sender, text) VALUES (?, ?, ?)',
+          [chatRowId, 'admin', chatMessageText]
+        );
+      }
+    } catch (e) {
+      console.warn(`[broadcasts/worker] save-to-chat failed for ${chatId}: ${e.message}`);
+    }
+  }
+  return result;
+}
 
 router.get('/users/count', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });

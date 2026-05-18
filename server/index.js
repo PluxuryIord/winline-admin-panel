@@ -25,6 +25,17 @@ const server = app.listen(API_PORT, () => {
   console.log(`API server running on http://localhost:${API_PORT}`);
   startAuditLogRetention();
   cleanupDuplicateChats();
+  // Persistent-queue worker для рассылок пользователям. Идёт фоном внутри
+  // того же Node-процесса, опрашивает БД, шлёт батчами через TG с rate-limit.
+  (async () => {
+    try {
+      const { startBroadcastWorker } = await import('./services/broadcastWorker.js');
+      const { workerSendOne } = await import('./routes/broadcasts.js');
+      await startBroadcastWorker(workerSendOne);
+    } catch (e) {
+      console.error('[broadcast-worker] failed to start:', e.message);
+    }
+  })();
 });
 
 server.on('error', (err) => {
