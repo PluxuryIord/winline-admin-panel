@@ -3,7 +3,7 @@ import {
   QrCode, BarChart2, Settings, ExternalLink, Search,
   X, Copy, Check, Eye, Gift, ScanLine, Calendar,
   ChevronLeft, ChevronRight, Trash2, RefreshCw, Info,
-  ToggleLeft, ToggleRight, ImageIcon, BookOpen,
+  ToggleLeft, ToggleRight, ImageIcon, BookOpen, FilePlus,
 } from 'lucide-react';
 import { api } from '../../utils/api';
 import './EventWork.css';
@@ -566,6 +566,49 @@ function SpreadsheetButton() {
   );
 }
 
+function NewSheetButton() {
+  const [creating, setCreating] = useState(false);
+  const [activeSheet, setActiveSheet] = useState('');
+  useEffect(() => {
+    api.get('/api/scenarios/anketa-active-sheet').then(r => r.json()).then(d => {
+      if (d?.sheet) setActiveSheet(d.sheet);
+    }).catch(() => {});
+  }, []);
+  const handleCreate = async () => {
+    const today = new Date();
+    const dateStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+    const confirmMsg = activeSheet
+      ? `Создать новый лист анкеты на сегодня (${dateStr})?\n\nТекущий активный лист: «${activeSheet}». Бот переключится писать в новый.`
+      : `Создать лист анкеты на сегодня (${dateStr})?`;
+    if (!confirm(confirmMsg)) return;
+    setCreating(true);
+    try {
+      const r = await api.post('/api/scenarios/new-anketa-sheet');
+      const d = await r.json();
+      if (!r.ok || !d.ok) {
+        alert('Не удалось создать лист: ' + (d.error || r.statusText));
+        return;
+      }
+      setActiveSheet(d.sheetTitle || dateStr);
+      alert(`✅ Создан лист «${d.sheetTitle}». Бот начнёт писать в него.`);
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+  return (
+    <button
+      className="ew-spreadsheet-btn"
+      onClick={handleCreate}
+      disabled={creating}
+      title={activeSheet ? `Активный лист: ${activeSheet}` : 'Создать новый лист на сегодня'}
+    >
+      <FilePlus size={16} /> {creating ? 'Создаём...' : 'Новый лист'}
+    </button>
+  );
+}
+
 export default function EventWork() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -588,6 +631,7 @@ export default function EventWork() {
           >
             <BookOpen size={16} /> Сценарий 3
           </a>
+          <NewSheetButton />
           <SpreadsheetButton />
           <button className="ew-settings-btn" onClick={() => setSettingsOpen(true)}>
             <Settings size={18} /> Настройки
