@@ -106,7 +106,6 @@ export default function RaffleV2() {
     return (
       (t.ticket_code || '').toLowerCase().includes(s) ||
       String(t.ticket_number).includes(s) ||
-      (t.email || '').toLowerCase().includes(s) ||
       (t.full_name || '').toLowerCase().includes(s) ||
       (t.rl_full_name || '').toLowerCase().includes(s) ||
       (t.username || '').toLowerCase().includes(s) ||
@@ -161,7 +160,6 @@ export default function RaffleV2() {
                   <th>№</th>
                   <th>Ticket code</th>
                   <th>Пользователь</th>
-                  <th>Email</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,7 +173,6 @@ export default function RaffleV2() {
                         {w.username && <span className="ew-user-username">@{w.username}</span>}
                       </div>
                     </td>
-                    <td>{w.email}</td>
                   </tr>
                 ))}
               </tbody>
@@ -245,7 +242,7 @@ export default function RaffleV2() {
           <Search size={16} style={{ alignSelf: 'center', opacity: 0.6 }} />
           <input
             type="text"
-            placeholder="Поиск по коду, имени, email…"
+            placeholder="Поиск по коду, имени…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="ew-settings-input"
@@ -261,16 +258,15 @@ export default function RaffleV2() {
               <th>№</th>
               <th>Ticket code</th>
               <th>Пользователь</th>
-              <th>Email</th>
               <th>Создан</th>
               <th>Победитель</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="ew-table-empty">Загрузка...</td></tr>
+              <tr><td colSpan={5} className="ew-table-empty">Загрузка...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="ew-table-empty">Билетов пока нет.</td></tr>
+              <tr><td colSpan={5} className="ew-table-empty">Билетов пока нет.</td></tr>
             ) : filtered.map(t => (
               <tr key={t.id}>
                 <td>{t.ticket_number}</td>
@@ -281,7 +277,6 @@ export default function RaffleV2() {
                     {t.username && <span className="ew-user-username">@{t.username}</span>}
                   </div>
                 </td>
-                <td>{t.email}</td>
                 <td className="ew-td-date">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                 <td>{t.is_winner ? <span className="ew-status-badge used">🏆 Победитель</span> : '—'}</td>
               </tr>
