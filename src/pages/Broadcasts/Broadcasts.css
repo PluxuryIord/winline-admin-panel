@@ -3137,7 +3137,12 @@ input[type="checkbox"]:checked {
 }
 .bc-bulk-delete:hover { background: #b53d3d; }
 
-.bc-col-check { width: 36px; text-align: center; padding: 0 8px; }
-.bc-col-check input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+.broadcasts-table th.bc-col-check,
+.broadcasts-table td.bc-col-check {
+  width: 36px;
+  text-align: center;
+  padding: 0 8px;
+}
+.bc-col-check input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; vertical-align: middle; }
 .broadcasts-row--selected { background: rgba(255, 120, 90, 0.06); }
 .broadcasts-row--selected:hover { background: rgba(255, 120, 90, 0.1); }
