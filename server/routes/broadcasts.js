@@ -688,6 +688,25 @@ router.delete('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/bulk-delete', async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids)
+      ? Array.from(new Set(req.body.ids.map(Number).filter(Number.isFinite)))
+      : [];
+    if (!ids.length) return res.status(400).json({ error: 'ids required' });
+    const placeholders = ids.map(() => '?').join(',');
+    const [result] = await dbPool.query(
+      `DELETE FROM wl_admin_broadcasts WHERE id IN (${placeholders})`, ids,
+    );
+    try {
+      await dbPool.query(
+        `DELETE FROM wl_admin_broadcast_texts WHERE broadcast_id IN (${placeholders})`, ids,
+      );
+    } catch {}
+    res.json({ success: true, deleted: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
 // ===================== РАССЫЛКА ПОЛЬЗОВАТЕЛЯМ =====================
 
 router.post('/users', async (req, res, next) => {

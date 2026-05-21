@@ -2370,6 +2370,8 @@ export default function Broadcasts() {
   const [deliveryModal, setDeliveryModal] = useState(null);
   const [textModal, setTextModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null); // draft object when editing
   const [toast, setToast] = useState(null); // { message, type: 'success'|'error' }
@@ -2467,7 +2469,26 @@ export default function Broadcasts() {
     const res = await api.delete(`/api/broadcasts/${deleteModal}`);
     if (!res.ok) throw new Error(`Ошибка ${res.status}`);
     setBroadcasts(prev => prev.filter(b => b.id !== deleteModal));
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(deleteModal); return n; });
     setDeleteModal(null);
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) { setBulkDeleteOpen(false); return; }
+    const res = await api.post('/api/broadcasts/bulk-delete', { ids });
+    if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+    setBroadcasts(prev => prev.filter(b => !selectedIds.has(b.id)));
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
   };
 
   const handleSaveDraft = async (body, resetCb) => {
@@ -2654,10 +2675,43 @@ export default function Broadcasts() {
           </div>
         </div>
 
+        {selectedIds.size > 0 && (
+          <div className="bc-bulk-bar">
+            <span className="bc-bulk-count">Выбрано: <b>{selectedIds.size}</b></span>
+            <button className="bc-bulk-clear" onClick={() => setSelectedIds(new Set())}>Снять выделение</button>
+            <button className="bc-bulk-delete" onClick={() => setBulkDeleteOpen(true)}>
+              <Trash2 size={14} /> Удалить выбранные
+            </button>
+          </div>
+        )}
+
         <div className="broadcasts-table-wrap">
           <table className="broadcasts-table">
             <thead>
               <tr>
+                <th className="bc-col-check">
+                  <input
+                    type="checkbox"
+                    aria-label="Выделить все на странице"
+                    checked={paginatedFiltered.length > 0 && paginatedFiltered.every(b => selectedIds.has(b.id))}
+                    ref={el => {
+                      if (!el) return;
+                      const some = paginatedFiltered.some(b => selectedIds.has(b.id));
+                      const all = paginatedFiltered.length > 0 && paginatedFiltered.every(b => selectedIds.has(b.id));
+                      el.indeterminate = some && !all;
+                    }}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedIds(prev => {
+                        const next = new Set(prev);
+                        for (const b of paginatedFiltered) {
+                          if (checked) next.add(b.id); else next.delete(b.id);
+                        }
+                        return next;
+                      });
+                    }}
+                  />
+                </th>
                 <th>Текст</th>
                 <th>Получатели</th>
                 <th>Статус</th>
@@ -2667,9 +2721,17 @@ export default function Broadcasts() {
             </thead>
             <tbody>
               {paginatedFiltered.length === 0 ? (
-                <tr><td colSpan={5} className="broadcasts-empty">Рассылок пока нет</td></tr>
+                <tr><td colSpan={6} className="broadcasts-empty">Рассылок пока нет</td></tr>
               ) : paginatedFiltered.map(b => (
-                <tr key={b.id} className="broadcasts-row">
+                <tr key={b.id} className={`broadcasts-row${selectedIds.has(b.id) ? ' broadcasts-row--selected' : ''}`}>
+                  <td className="bc-col-check">
+                    <input
+                      type="checkbox"
+                      aria-label="Выделить строку"
+                      checked={selectedIds.has(b.id)}
+                      onChange={() => toggleSelect(b.id)}
+                    />
+                  </td>
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
                     <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal({ text: b.text || '', media: b.media || null })} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
@@ -2724,6 +2786,15 @@ export default function Broadcasts() {
           isConfirm
           onConfirm={handleDeleteBroadcast}
           onCancel={() => setDeleteModal(null)}
+        />
+      )}
+
+      {bulkDeleteOpen && (
+        <PromptModal
+          title={`Удалить выбранные записи (${selectedIds.size})?`}
+          isConfirm
+          onConfirm={handleBulkDelete}
+          onCancel={() => setBulkDeleteOpen(false)}
         />
       )}
 
