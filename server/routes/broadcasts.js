@@ -589,6 +589,25 @@ router.get('/', async (req, res, next) => {
       } catch {}
     }
 
+    // Async-флоу: рассылка лежит в persistent queue. Пока queue не завершилась
+    // (meta.status != 'completed'), wl_admin_broadcasts.status ещё содержит
+    // initial 'failed', но фактически идёт отправка. Перекрываем статус на
+    // 'queued', чтобы UI показывал «В процессе» с живым счётчиком.
+    // ENUM колонки status мы не трогаем (нет прав на ALTER) — синтезируем
+    // status здесь.
+    let inFlight = new Set();
+    if (broadcastIds.length) {
+      try {
+        const [metas] = await dbPool.query(
+          `SELECT broadcast_id FROM wl_broadcast_meta
+           WHERE broadcast_id IN (${broadcastIds.map(() => '?').join(',')})
+             AND status != 'completed'`,
+          broadcastIds
+        );
+        inFlight = new Set(metas.map(m => Number(m.broadcast_id)));
+      } catch {}
+    }
+
     const history = rows.map(r => ({
       id: r.id,
       text: r.full_text || r.text,
@@ -602,7 +621,7 @@ router.get('/', async (req, res, next) => {
       media: withMedia ? safeJsonParse(r.media_json, null) : null,
       pollId: pollMap[r.id] || null,
       date: r.date,
-      status: r.status,
+      status: inFlight.has(Number(r.id)) ? 'queued' : r.status,
     }));
 
     // Also fetch pending scheduled broadcasts
@@ -1511,16 +1530,12 @@ setInterval(async () => {
 
 async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media, pollId }, conn) {
   const db = conn || dbPool;
-  // Статусы:
-  //   • async-флоу (persistent queue): на момент INSERT мы знаем только total,
-  //     рассылка ещё не началась → 'queued'. refreshMeta перепишет на
-  //     'published'/'failed' когда worker всё разошлёт.
-  //   • sync-флоу (legacy): тут уже есть финальные счётчики, поэтому
-  //     «хоть кому-то ушло — Доставлена, иначе — Ошибка».
-  const isAsyncEnqueue = total > 0 && success === 0 && failed === 0;
-  const status = isAsyncEnqueue
-    ? 'queued'
-    : (success > 0 ? 'published' : 'failed');
+  // wl_admin_broadcasts.status — ENUM('published','partial','failed'); добавить
+  // 'queued' нет прав. Поэтому: при INSERT всегда пишем 'failed' (если nothing
+  // sent yet) или 'published' (если синхронный путь и хоть кому-то ушло).
+  // Состояние «в процессе» для async-флоу не хранится в этой колонке вообще —
+  // оно синтезируется на лету в GET-эндпоинтах из wl_broadcast_meta.status.
+  const status = success > 0 ? 'published' : 'failed';
   const withMedia = await checkMediaColumn();
 
   const baseCols = 'text, type, channels_json, channel_ids_json, total, success, failed, results_json, status';

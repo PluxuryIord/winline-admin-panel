@@ -244,23 +244,26 @@ export async function refreshMeta(broadcastId) {
     [total, agg.pending, agg.sending, agg.sent, agg.retrying, agg.permanent_fail, status, status, broadcastId]
   );
 
-  // Зеркалим живые счётчики в wl_admin_broadcasts, чтобы история в админке
-  // показывала реальное состояние. До этой правки status писался один раз
-  // в saveBroadcast (с success=0) и навсегда оставался 'failed', даже когда
-  // в фоне очередь успешно разослала. Теперь:
-  //   • пока stillPending > 0 — status='queued', цифры обновляются на лету
-  //   • когда всё доехало — status='published' (если хоть кому-то ушло) или
-  //     'failed' (если все 6 попыток провалились у всех получателей)
+  // Зеркалим живые счётчики (total/success/failed) в wl_admin_broadcasts —
+  // эти колонки INT, можем писать всегда. Статус (ENUM, без права ALTER) —
+  // ТОЛЬКО при завершении: 'published' если хоть кому-то ушло, иначе 'failed'.
+  // Пока stillPending > 0 — оставляем status какой был, а UI получает синтез
+  // 'queued' из этой meta-таблицы через GET-эндпоинт.
   try {
-    const adminStatus = (status === 'completed')
-      ? (agg.sent > 0 ? 'published' : 'failed')
-      : 'queued';
-    await dbPool.query(
-      `UPDATE wl_admin_broadcasts SET status=?, total=?, success=?, failed=? WHERE id=?`,
-      [adminStatus, total, agg.sent, agg.permanent_fail, broadcastId]
-    );
+    if (status === 'completed') {
+      const adminStatus = agg.sent > 0 ? 'published' : 'failed';
+      await dbPool.query(
+        `UPDATE wl_admin_broadcasts SET status=?, total=?, success=?, failed=? WHERE id=?`,
+        [adminStatus, total, agg.sent, agg.permanent_fail, broadcastId]
+      );
+    } else {
+      await dbPool.query(
+        `UPDATE wl_admin_broadcasts SET total=?, success=?, failed=? WHERE id=?`,
+        [total, agg.sent, agg.permanent_fail, broadcastId]
+      );
+    }
   } catch (e) {
-    // Не падаем: meta-таблица — основной источник истины, sync на история — best-effort.
+    // Не падаем: meta-таблица — основной источник истины, зеркало — best-effort.
     console.warn(`[broadcast-queue] mirror to wl_admin_broadcasts failed: ${e.message}`);
   }
 
