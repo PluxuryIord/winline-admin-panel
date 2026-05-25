@@ -2094,6 +2094,13 @@ input[type="checkbox"]:checked {
   color: #ef4444;
   font-size: 0.85rem;
 }
+.bc-delivery-pending {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #7dd3fc;
+  font-size: 0.85rem;
+}
 .bc-delivery-list {
   overflow-y: auto;
   padding: 8px 12px;
@@ -2121,6 +2128,10 @@ input[type="checkbox"]:checked {
   background: rgba(239, 68, 68, 0.06);
 }
 .bc-delivery-item--fail:hover { background: rgba(239, 68, 68, 0.1); }
+.bc-delivery-item--pending {
+  background: rgba(125, 211, 252, 0.06);
+}
+.bc-delivery-item--pending:hover { background: rgba(125, 211, 252, 0.1); }
 .bc-delivery-icon {
   display: inline-flex;
   align-items: center;
@@ -2128,6 +2139,14 @@ input[type="checkbox"]:checked {
 }
 .bc-delivery-item--ok .bc-delivery-icon { color: #2bb673; }
 .bc-delivery-item--fail .bc-delivery-icon { color: #ef4444; }
+.bc-delivery-item--pending .bc-delivery-icon { color: #7dd3fc; }
+.bc-delivery-attempts {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+}
 
 .bc-delivery-user-block {
   display: flex;

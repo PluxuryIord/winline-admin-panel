@@ -252,9 +252,39 @@ export async function refreshMeta(broadcastId) {
   try {
     if (status === 'completed') {
       const adminStatus = agg.sent > 0 ? 'published' : 'failed';
+      // Один раз на финише собираем поштучный итог из jobs и кладём
+      // в legacy-поле results_json. Это бэкап для истории: даже если
+      // запись из wl_broadcast_jobs позже удалят (cleanup, GDPR-запрос),
+      // в wl_admin_broadcasts останется снапшот «кому ушло / у кого
+      // ошибка». Модал «Получатели рассылки» сам предпочитает живой
+      // GET /recipients, но падает на results_json если jobs уже нет.
+      let resultsJson = '[]';
+      try {
+        const [jobs] = await dbPool.query(
+          `SELECT chat_id, status, last_error_code, last_error_msg
+           FROM wl_broadcast_jobs WHERE broadcast_id = ?`,
+          [broadcastId]
+        );
+        const results = jobs.map(j => {
+          const isOk = j.status === 'sent';
+          const errParts = [];
+          if (!isOk) {
+            if (j.last_error_code) errParts.push(String(j.last_error_code));
+            if (j.last_error_msg) errParts.push(j.last_error_msg);
+          }
+          return {
+            ok: isOk,
+            chatId: String(j.chat_id),
+            ...(errParts.length ? { error: errParts.join(': ') } : {}),
+          };
+        });
+        resultsJson = JSON.stringify(results);
+      } catch (e) {
+        console.warn(`[broadcast-queue] results snapshot build failed: ${e.message}`);
+      }
       await dbPool.query(
-        `UPDATE wl_admin_broadcasts SET status=?, total=?, success=?, failed=? WHERE id=?`,
-        [adminStatus, total, agg.sent, agg.permanent_fail, broadcastId]
+        `UPDATE wl_admin_broadcasts SET status=?, total=?, success=?, failed=?, results_json=? WHERE id=?`,
+        [adminStatus, total, agg.sent, agg.permanent_fail, resultsJson, broadcastId]
       );
     } else {
       await dbPool.query(

@@ -2362,6 +2362,112 @@ function LoadMoreTrigger({ onVisible }) {
   return <div ref={ref} style={{ height: 1 }} />;
 }
 
+/**
+ * Модал «Получатели рассылки» с live-обновлением.
+ *
+ * Раньше показывал b.results (массив из results_json). У async-флоу через
+ * persistent queue results_json пуст пока рассылка идёт — данные лежат
+ * поштучно в wl_broadcast_jobs. Теперь модал тянет их через новый
+ * GET /api/broadcasts/:id/recipients и поллит раз в 2 сек пока статус
+ * 'queued', чтобы видеть процесс в реальном времени.
+ *
+ * Fallback на b.results оставлен для совсем старых записей (до миграции
+ * на queue), где новой таблицы jobs ещё не существовало.
+ */
+function DeliveryModal({ broadcast, onClose }) {
+  const [recipients, setRecipients] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const isLive = broadcast.status === 'queued';
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const fetchOnce = async () => {
+      try {
+        const res = await api.get(`/api/broadcasts/${broadcast.id}/recipients`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setRecipients(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (e) {
+        if (cancelled) return;
+        // На старых рассылках до queue эндпоинт может вернуть пустой массив,
+        // что нормально. Сетевую ошибку показываем — пусть юзер видит причину.
+        setError(e.message || 'fetch failed');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchOnce();
+    if (isLive) {
+      timer = setInterval(fetchOnce, 2000);
+    }
+    return () => { cancelled = true; if (timer) clearInterval(timer); };
+  }, [broadcast.id, isLive]);
+
+  // Источник данных: live recipients из API > legacy b.results > пусто
+  const list = (recipients && recipients.length)
+    ? recipients
+    : (Array.isArray(broadcast.results) ? broadcast.results : []);
+
+  // Считаем агрегаты на лету — на queued рассылках summary из broadcast
+  // отстаёт от реальности на полтика worker'а.
+  const okCount = list.filter(r => r.ok).length;
+  const failCount = list.filter(r => !r.ok && r.status === 'permanent_fail').length;
+  const inFlight = list.filter(r => !r.ok && r.status !== 'permanent_fail').length;
+
+  return (
+    <div className="bc-delivery-overlay" onClick={onClose}>
+      <div className="bc-delivery-modal" onClick={e => e.stopPropagation()}>
+        <div className="bc-delivery-modal-header">
+          <h3>Получатели рассылки{isLive && <Loader size={14} className="spin" style={{ marginLeft: 8, verticalAlign: 'middle', opacity: 0.6 }} />}</h3>
+          <button className="bc-delivery-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="bc-delivery-summary">
+          <span className="bc-delivery-ok"><CheckCircle size={14} /> Доставлено: {okCount || broadcast.success || 0}</span>
+          <span className="bc-delivery-fail"><XCircle size={14} /> Ошибки: {failCount || broadcast.failed || 0}</span>
+          {inFlight > 0 && (
+            <span className="bc-delivery-pending"><Loader size={14} className="spin" /> В процессе: {inFlight}</span>
+          )}
+        </div>
+        <div className="bc-delivery-list">
+          {loading && !list.length && (
+            <div className="bc-delivery-empty"><Loader size={16} className="spin" /> Загружаем...</div>
+          )}
+          {!loading && error && !list.length && (
+            <div className="bc-delivery-empty">Ошибка: {error}</div>
+          )}
+          {list.map((r, i) => {
+            const itemClass = r.ok
+              ? 'bc-delivery-item--ok'
+              : (r.status === 'permanent_fail' ? 'bc-delivery-item--fail' : 'bc-delivery-item--pending');
+            const icon = r.ok
+              ? <CheckCircle size={14} />
+              : (r.status === 'permanent_fail' ? <XCircle size={14} /> : <Loader size={14} className="spin" />);
+            return (
+              <div key={i} className={`bc-delivery-item ${itemClass}`}>
+                <span className="bc-delivery-icon">{icon}</span>
+                <div className="bc-delivery-user-block">
+                  <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
+                  {r.username && <span className="bc-delivery-username">@{r.username}</span>}
+                  {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
+                  {r.attempts > 1 && <span className="bc-delivery-attempts">попытка {r.attempts}</span>}
+                </div>
+                {r.error && <span className="bc-delivery-error">{r.error}</span>}
+              </div>
+            );
+          })}
+          {!loading && !error && !list.length && (
+            <div className="bc-delivery-empty">Нет детальных данных</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Broadcasts() {
   const [openSection, setOpenSection] = useState('channels');
   const [broadcasts, setBroadcasts] = useState([]);
@@ -2844,34 +2950,7 @@ export default function Broadcasts() {
       )}
 
       {deliveryModal && (
-        <div className="bc-delivery-overlay" onClick={() => setDeliveryModal(null)}>
-          <div className="bc-delivery-modal" onClick={e => e.stopPropagation()}>
-            <div className="bc-delivery-modal-header">
-              <h3>Получатели рассылки</h3>
-              <button className="bc-delivery-close" onClick={() => setDeliveryModal(null)}><X size={18} /></button>
-            </div>
-            <div className="bc-delivery-summary">
-              <span className="bc-delivery-ok"><CheckCircle size={14} /> Доставлено: {deliveryModal.success}</span>
-              <span className="bc-delivery-fail"><XCircle size={14} /> Ошибки: {deliveryModal.failed}</span>
-            </div>
-            <div className="bc-delivery-list">
-              {(deliveryModal.results || []).map((r, i) => (
-                <div key={i} className={`bc-delivery-item ${r.ok ? 'bc-delivery-item--ok' : 'bc-delivery-item--fail'}`}>
-                  <span className="bc-delivery-icon">{r.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}</span>
-                  <div className="bc-delivery-user-block">
-                    <span className="bc-delivery-user-name">{r.name || r.chatId}</span>
-                    {r.username && <span className="bc-delivery-username">@{r.username}</span>}
-                    {!r.name && <span className="bc-delivery-user-id">{r.chatId}</span>}
-                  </div>
-                  {r.error && <span className="bc-delivery-error">{r.error}</span>}
-                </div>
-              ))}
-              {(!deliveryModal.results || deliveryModal.results.length === 0) && (
-                <div className="bc-delivery-empty">Нет детальных данных</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <DeliveryModal broadcast={deliveryModal} onClose={() => setDeliveryModal(null)} />
       )}
 
       {pollStatsModal && (

@@ -853,6 +853,50 @@ router.post('/users', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/broadcasts/:id/recipients — поштучный статус по получателям ──
+// Источник правды для модала «Получатели рассылки». До async-флоу детальные
+// результаты лежали в wl_admin_broadcasts.results_json — но persistent queue
+// держит их в wl_broadcast_jobs (по строке на (broadcast,chat)). Эндпоинт
+// делает LEFT JOIN с таблицей users чтобы вернуть имя/username, а не голый
+// chat_id. Дозвав модал в реал-тайме во время рассылки — пользователь видит
+// кому уже доехало, у кого ретраи, у кого финальный отказ от TG.
+router.get('/:id/recipients', async (req, res, next) => {
+  try {
+    const broadcastId = Number(req.params.id);
+    if (!broadcastId) return res.status(400).json({ error: 'Invalid broadcast id' });
+    const [rows] = await dbPool.query(
+      `SELECT j.chat_id, j.status, j.attempt_count, j.last_error_code, j.last_error_msg,
+              j.started_at, j.sent_at, j.next_retry_at,
+              u.full_name, u.username
+       FROM wl_broadcast_jobs j
+       LEFT JOIN users u ON u.user_id = j.chat_id
+       WHERE j.broadcast_id = ?
+       ORDER BY (j.status='sent') DESC, j.chat_id ASC`,
+      [broadcastId]
+    );
+    const recipients = rows.map(r => {
+      const isOk = r.status === 'sent';
+      const errParts = [];
+      if (!isOk) {
+        if (r.last_error_code) errParts.push(String(r.last_error_code));
+        if (r.last_error_msg) errParts.push(r.last_error_msg);
+      }
+      return {
+        chatId: String(r.chat_id),
+        name: r.full_name || null,
+        username: r.username || null,
+        ok: isOk,
+        status: r.status,                    // 'sent' | 'retrying' | 'pending' | 'sending' | 'permanent_fail'
+        attempts: Number(r.attempt_count || 0),
+        sentAt: r.sent_at,
+        nextRetryAt: r.next_retry_at,
+        ...(errParts.length ? { error: errParts.join(': ') } : {}),
+      };
+    });
+    res.json(recipients);
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/broadcasts/:id/progress — live прогресс по persistent queue ──
 router.get('/:id/progress', async (req, res, next) => {
   try {
