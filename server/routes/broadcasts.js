@@ -1511,10 +1511,16 @@ setInterval(async () => {
 
 async function saveBroadcast({ text, type, channels, channelIds, total, success, failed, results, media, pollId }, conn) {
   const db = conn || dbPool;
-  // Бинарный статус: если хоть кому-то ушло — «Доставлена», иначе — «Ошибка».
-  // Старый 'partial' (success > 0 && success < total) больше не используем
-  // — UI всё равно показывал его как доставлено. Один статус — одна реальность.
-  const status = success > 0 ? 'published' : 'failed';
+  // Статусы:
+  //   • async-флоу (persistent queue): на момент INSERT мы знаем только total,
+  //     рассылка ещё не началась → 'queued'. refreshMeta перепишет на
+  //     'published'/'failed' когда worker всё разошлёт.
+  //   • sync-флоу (legacy): тут уже есть финальные счётчики, поэтому
+  //     «хоть кому-то ушло — Доставлена, иначе — Ошибка».
+  const isAsyncEnqueue = total > 0 && success === 0 && failed === 0;
+  const status = isAsyncEnqueue
+    ? 'queued'
+    : (success > 0 ? 'published' : 'failed');
   const withMedia = await checkMediaColumn();
 
   const baseCols = 'text, type, channels_json, channel_ids_json, total, success, failed, results_json, status';

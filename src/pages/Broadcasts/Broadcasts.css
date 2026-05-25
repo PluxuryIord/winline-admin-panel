@@ -956,6 +956,11 @@ input[type="checkbox"]:checked {
   color: #6495ed;
   border: 1px solid rgba(100, 149, 237, 0.25);
 }
+.bc-status--queued {
+  background: rgba(125, 211, 252, 0.12);
+  color: #7dd3fc;
+  border: 1px solid rgba(125, 211, 252, 0.25);
+}
 
 /* ─── Channel/Group Comment ─── */
 .bc-comment-view {
