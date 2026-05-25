@@ -864,6 +864,10 @@ router.get('/:id/recipients', async (req, res, next) => {
   try {
     const broadcastId = Number(req.params.id);
     if (!broadcastId) return res.status(400).json({ error: 'Invalid broadcast id' });
+    // Заблокировавших бота юзеров (403 Forbidden / user is deactivated)
+    // не показываем — это не ошибка рассылки, отбрасываем по запросу
+    // пользователя, чтобы список был только из тех на кого «целились
+    // и кто реально мог получить или провалился по нашей вине».
     const [rows] = await dbPool.query(
       `SELECT j.chat_id, j.status, j.attempt_count, j.last_error_code, j.last_error_msg,
               j.started_at, j.sent_at, j.next_retry_at,
@@ -871,6 +875,7 @@ router.get('/:id/recipients', async (req, res, next) => {
        FROM wl_broadcast_jobs j
        LEFT JOIN users u ON u.user_id = j.chat_id
        WHERE j.broadcast_id = ?
+         AND NOT (j.status='permanent_fail' AND j.last_error_code=403)
        ORDER BY (j.status='sent') DESC, j.chat_id ASC`,
       [broadcastId]
     );

@@ -18,7 +18,14 @@
  */
 import dbPool from '../config/db.js';
 
-const RETRY_DELAYS_SEC = [0, 5, 30, 300, 1800, 7200]; // 6 попыток
+// Сжатый retry-график. Раньше было [0, 5, 30, 300, 1800, 7200] — 6 попыток
+// с финальным хвостом в 2 часа. На большой рассылке с временной
+// деградацией сети (например, relay лёг) это превращалось в 3-часовой
+// процесс. Новое расписание укладывает все попытки в ~5 минут:
+//   1 → 0s,  2 → +5s,  3 → +30s,  4 → +2min,  5 → +5min
+// После 5-й — permanent_fail. Меньше шансов «дотащить» при долгих
+// network glitches, зато финал предсказуем и быстр.
+const RETRY_DELAYS_SEC = [0, 5, 30, 120, 300];
 const MAX_ATTEMPTS = RETRY_DELAYS_SEC.length;
 
 // ── Bootstrap таблиц ────────────────────────────────────────────────────────
@@ -236,6 +243,19 @@ export async function refreshMeta(broadcastId) {
   const stillPending = agg.pending + agg.sending + agg.retrying;
   const status = stillPending === 0 ? 'completed' : 'running';
 
+  // Отдельно считаем «настоящих» ошибок vs заблокировавших бота юзеров.
+  // Логика: если юзер заблокировал бота (403) или удалён (deactivated) —
+  // это нормальное состояние, не наша ошибка, в счётчике «Ошибки» не
+  // показываем. last_error_code = 403 покрывает обе ситуации (TG возвращает
+  // 403 и для «bot was blocked», и для «user is deactivated»).
+  const [blockedRows] = await dbPool.query(
+    `SELECT COUNT(*) AS n FROM wl_broadcast_jobs
+     WHERE broadcast_id=? AND status='permanent_fail' AND last_error_code=403`,
+    [broadcastId]
+  );
+  const blockedCount = Number(blockedRows[0]?.n || 0);
+  const realFailed = agg.permanent_fail - blockedCount;
+
   await dbPool.query(
     `UPDATE wl_broadcast_meta
      SET total=?, pending=?, sending=?, sent=?, retrying=?, permanent_fail=?, status=?,
@@ -249,20 +269,22 @@ export async function refreshMeta(broadcastId) {
   // ТОЛЬКО при завершении: 'published' если хоть кому-то ушло, иначе 'failed'.
   // Пока stillPending > 0 — оставляем status какой был, а UI получает синтез
   // 'queued' из этой meta-таблицы через GET-эндпоинт.
+  //
+  // failed = ТОЛЬКО реальные провалы (не блок-by-user). Заблокировавшие бота
+  // юзеры — это не ошибка рассылки, мы их просто «забиваем», в UI они нигде
+  // не фигурируют. Total тоже не уменьшаем — он показывает «во сколько
+  // юзеров целились», а арифметика success+failed может не сходиться до
+  // total на количество blocked — это by design.
   try {
     if (status === 'completed') {
       const adminStatus = agg.sent > 0 ? 'published' : 'failed';
-      // Один раз на финише собираем поштучный итог из jobs и кладём
-      // в legacy-поле results_json. Это бэкап для истории: даже если
-      // запись из wl_broadcast_jobs позже удалят (cleanup, GDPR-запрос),
-      // в wl_admin_broadcasts останется снапшот «кому ушло / у кого
-      // ошибка». Модал «Получатели рассылки» сам предпочитает живой
-      // GET /recipients, но падает на results_json если jobs уже нет.
+      // Снапшот в results_json — только sent + real fails, без blocked.
       let resultsJson = '[]';
       try {
         const [jobs] = await dbPool.query(
           `SELECT chat_id, status, last_error_code, last_error_msg
-           FROM wl_broadcast_jobs WHERE broadcast_id = ?`,
+           FROM wl_broadcast_jobs WHERE broadcast_id = ?
+             AND NOT (status='permanent_fail' AND last_error_code=403)`,
           [broadcastId]
         );
         const results = jobs.map(j => {
@@ -284,12 +306,12 @@ export async function refreshMeta(broadcastId) {
       }
       await dbPool.query(
         `UPDATE wl_admin_broadcasts SET status=?, total=?, success=?, failed=?, results_json=? WHERE id=?`,
-        [adminStatus, total, agg.sent, agg.permanent_fail, resultsJson, broadcastId]
+        [adminStatus, total, agg.sent, realFailed, resultsJson, broadcastId]
       );
     } else {
       await dbPool.query(
         `UPDATE wl_admin_broadcasts SET total=?, success=?, failed=? WHERE id=?`,
-        [total, agg.sent, agg.permanent_fail, broadcastId]
+        [total, agg.sent, realFailed, broadcastId]
       );
     }
   } catch (e) {
