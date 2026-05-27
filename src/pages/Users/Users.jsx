@@ -104,10 +104,15 @@ export default function Users() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Все уникальные теги — загружаем с сервера
+  // Все уникальные теги — загружаем с сервера. Системные (__-префикс,
+  // например __no_raffle__) фильтруем — фильтровать по ним из админки
+  // не нужно, это служебные маркеры бота.
   const [allTags, setAllTags] = useState([]);
   const loadTags = useCallback(() => {
-    api.get('/api/users/all-tags').then(r => r.json()).then(setAllTags).catch(() => {});
+    api.get('/api/users/all-tags')
+      .then(r => r.json())
+      .then(list => setAllTags((Array.isArray(list) ? list : []).filter(t => !t.startsWith('__'))))
+      .catch(() => {});
   }, []);
   useEffect(() => { loadTags(); }, [loadTags]);
 
