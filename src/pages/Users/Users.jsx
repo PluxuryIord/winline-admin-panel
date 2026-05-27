@@ -506,7 +506,10 @@ export default function Users() {
 
                 <td>
                   <div className="tags-wrapper">
-                    {(user.tags || []).map(tag => (
+                    {/* Системные теги (префикс __, например __no_raffle__)
+                        не показываем — это служебные маркеры бота, админу
+                        они в общем списке не нужны. */}
+                    {(user.tags || []).filter(t => !t.startsWith('__')).map(tag => (
                       <span
                         key={tag}
                         className={`tag-badge${filterTags.includes(tag) ? ' tag-active' : ''}`}

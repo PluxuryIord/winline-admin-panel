@@ -288,9 +288,10 @@ export default function UserProfile() {
               </h1>
             )}
 
-            {/* Теги */}
+            {/* Теги. Скрываем системные (префикс __ — например __no_raffle__),
+                они нужны только боту для логики флоу. */}
             <div className="profile-tags-row">
-              {tags.map(tag => (
+              {tags.filter(t => !t.startsWith('__')).map(tag => (
                 editingTag && editingTag.original === tag ? (
                   <span key={tag} className="profile-tag profile-tag--editing">
                     <input

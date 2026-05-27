@@ -524,7 +524,9 @@ export default function ChatView() {
               <div className="chatview-sidebar-section">
                 <h4 className="chatview-sidebar-title">Теги</h4>
                 <div className="chatview-tags-row">
-                  {tags.map(tag => (
+                  {/* Системные теги (префикс __) не показываем —
+                      это служебные маркеры бота (например __no_raffle__). */}
+                  {tags.filter(t => !t.startsWith('__')).map(tag => (
                     <span key={tag} className="chatview-tag-editable">
                       {tag}
                       <button className="chatview-tag-x" onClick={() => handleRemoveTag(tag)}><X size={11} /></button>
