@@ -1398,9 +1398,13 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
 
-  // Загрузка тегов
+  // Загрузка тегов. Системные (__-префикс, например __no_raffle__) в админке
+  // скрываем — это служебные маркеры бота, фильтр по ним делать незачем.
   useEffect(() => {
-    api.get('/api/broadcasts/users/tags').then(r => r.json()).then(setTags).catch(() => {});
+    api.get('/api/broadcasts/users/tags')
+      .then(r => r.json())
+      .then(list => setTags((Array.isArray(list) ? list : []).filter(t => !t.startsWith('__'))))
+      .catch(() => {});
   }, []);
 
   // Подсчёт по фильтрам — когда выбраны теги (включая или исключая)

@@ -1013,9 +1013,7 @@ router.get('/users/list', async (req, res, next) => {
 router.get('/users/tags', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
-    // Системные теги (префикс «__») в админке не показываем нигде, в т.ч. в
-    // фильтрах рассылок — пусть остаются служебными для бота.
-    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE LEFT(tag, 2) <> '__'");
+    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
     res.json(rows.map(r => r.tag).sort());
   } catch (err) { next(err); }
 });

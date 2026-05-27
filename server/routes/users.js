@@ -67,19 +67,12 @@ const EDITED_MARKER = '__edited__';
 // Все пользователи зарегистрированные до этой даты автоматически получают тег "Старый пользователь"
 const OLD_USER_CUTOFF = new Date('2026-03-18');
 
-// Системные теги — всё что начинается на «__». Это бот-only маркеры
-// (__edited__, __no_raffle__ и т.п.), админ-панель их нигде не показывает.
-// Фильтрация — на серверной стороне, чтобы клиент даже не получал их в API.
-function isSystemTag(t) {
-  return typeof t === 'string' && t.startsWith('__');
-}
-
 function buildTagsForUser(userId, tagsMap, editedIds, dateReg) {
   const uid = String(userId);
   // Собираем вручную назначенные теги
   let tags;
   if (tagsMap[uid]) {
-    tags = tagsMap[uid].filter(t => !isSystemTag(t));
+    tags = tagsMap[uid].filter(t => t !== EDITED_MARKER);
   } else if (editedIds.has(uid)) {
     tags = [];
   } else {
@@ -140,10 +133,9 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/users/all-tags — все уникальные теги из wl_admin_user_tags
-// Системные теги (префикс «__») не отдаём — они служебные для бота.
 router.get('/all-tags', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE LEFT(tag, 2) <> '__'");
+    const [rows] = await dbPool.query("SELECT DISTINCT tag FROM wl_admin_user_tags WHERE tag != '__edited__'");
     res.json(rows.map(r => r.tag).sort());
   } catch (err) { next(err); }
 });
@@ -324,31 +316,20 @@ router.put('/:id/tags', async (req, res, next) => {
     const { tags } = req.body;
     if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags must be an array' });
 
-    // На всякий случай отбрасываем системные теги из payload админа —
-    // их в админке не видно, ставить их вручную нельзя.
-    const cleanTags = tags.filter(t => typeof t === 'string' && !t.startsWith('__'));
-
-    // Capture old tags for audit (без системных и маркеров)
-    const [oldRows] = await dbPool.query('SELECT tag FROM wl_admin_user_tags WHERE user_id = ? AND tag != ? AND tag NOT LIKE ? AND LEFT(tag, 2) <> ?', [userId, EDITED_MARKER, `${COMMENT_PREFIX}%`, '__']);
+    // Capture old tags for audit
+    const [oldRows] = await dbPool.query('SELECT tag FROM wl_admin_user_tags WHERE user_id = ? AND tag != ? AND tag NOT LIKE ?', [userId, EDITED_MARKER, `${COMMENT_PREFIX}%`]);
     const oldTags = oldRows.map(r => r.tag);
 
-    // Удаляем старые НЕ-системные и НЕ-комментарии. Системные (__no_raffle__,
-    // __edited__) и комментарии (с префиксом COMMENT_PREFIX) оставляем —
-    // их ставит бот / отдельный flow.
-    await dbPool.query(
-      'DELETE FROM wl_admin_user_tags WHERE user_id = ? AND LEFT(tag, 2) <> ? AND tag NOT LIKE ?',
-      [userId, '__', `${COMMENT_PREFIX}%`]
-    );
+    // Удаляем все старые теги
+    await dbPool.query('DELETE FROM wl_admin_user_tags WHERE user_id = ?', [userId]);
 
     // Вставляем новые
-    if (cleanTags.length > 0) {
-      const values = cleanTags.map(t => [userId, t]);
+    if (tags.length > 0) {
+      const values = tags.map(t => [userId, t]);
       await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES ?', [values]);
     } else {
-      // Маркер что теги были отредактированы (пустые). Идемпотентно: если
-      // __edited__ уже есть — INSERT IGNORE на PK не даст дубля; если нет
-      // — добавится.
-      await dbPool.query('INSERT IGNORE INTO wl_admin_user_tags (user_id, tag) VALUES (?, ?)', [userId, EDITED_MARKER]);
+      // Маркер что теги были отредактированы (пустые)
+      await dbPool.query('INSERT INTO wl_admin_user_tags (user_id, tag) VALUES (?, ?)', [userId, EDITED_MARKER]);
     }
 
     const userName = req.user.displayName || req.user.username;
