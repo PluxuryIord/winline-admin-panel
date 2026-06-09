@@ -368,24 +368,20 @@ router.get('/channels', async (req, res, next) => {
 // одной выборкой LEFT JOIN'ит таблицы и группирует теги в массив.
 router.get('/channels/full', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query(
-      `SELECT c.id, c.chat_id AS chatId, c.title, c.added_at AS addedAt,
-              GROUP_CONCAT(t.tag ORDER BY t.tag SEPARATOR '\\u0001') AS tagsBlob
-       FROM wl_admin_channels c
-       LEFT JOIN wl_admin_channel_tags t ON t.chat_id = c.chat_id
-       GROUP BY c.id, c.chat_id, c.title, c.added_at
-       ORDER BY c.id ASC`
+    const [channels] = await dbPool.query(
+      'SELECT id, chat_id AS chatId, title, added_at AS addedAt FROM wl_admin_channels ORDER BY id ASC'
     );
-    // GROUP_CONCAT слипает теги через  (тег не может содержать управляющий
-    // символ — безопасный разделитель, в отличие от запятой/точки с запятой,
-    // которые могут попасть в название тега).
-    res.json(rows.map(r => ({
-      id: r.id,
-      chatId: r.chatId,
-      title: r.title,
-      addedAt: r.addedAt,
-      tags: r.tagsBlob ? r.tagsBlob.split('') : [],
-    })));
+    const [tagRows] = await dbPool.query(
+      `SELECT t.chat_id AS chatId, t.tag
+       FROM wl_admin_channel_tags t
+       INNER JOIN wl_admin_channels c ON c.chat_id = t.chat_id
+       ORDER BY t.tag ASC`
+    );
+    const tagMap = {};
+    for (const r of tagRows) {
+      (tagMap[r.chatId] = tagMap[r.chatId] || []).push(r.tag);
+    }
+    res.json(channels.map(c => ({ ...c, tags: tagMap[c.chatId] || [] })));
   } catch (err) { next(err); }
 });
 
@@ -482,13 +478,11 @@ router.get('/groups', async (req, res, next) => {
 // Аналог /channels/full для групп. См. комментарий выше про N+1 и ТСПУ.
 router.get('/groups/full', async (req, res, next) => {
   try {
-    const [rows] = await dbPool.query(`
+    const [groups] = await dbPool.query(`
       SELECT g.id, g.chat_id AS chatId, g.title, g.added_at AS addedAt,
-             IFNULL(a.approved, 1) AS approved,
-             GROUP_CONCAT(t.tag ORDER BY t.tag SEPARATOR '\\u0001') AS tagsBlob
+             IFNULL(a.approved, 1) AS approved
       FROM wl_admin_groups g
       LEFT JOIN wl_admin_groups_approved a ON a.chat_id = g.chat_id
-      LEFT JOIN wl_admin_group_tags t ON t.chat_id = g.chat_id
       WHERE NOT (
         g.chat_id NOT LIKE '-100%'
         AND EXISTS (
@@ -496,17 +490,19 @@ router.get('/groups/full', async (req, res, next) => {
           WHERE g2.chat_id LIKE '-100%' AND g2.title = g.title
         )
       )
-      GROUP BY g.id, g.chat_id, g.title, g.added_at, a.approved
       ORDER BY g.id ASC
     `);
-    res.json(rows.map(r => ({
-      id: r.id,
-      chatId: r.chatId,
-      title: r.title,
-      addedAt: r.addedAt,
-      approved: r.approved,
-      tags: r.tagsBlob ? r.tagsBlob.split('') : [],
-    })));
+    const [tagRows] = await dbPool.query(
+      `SELECT t.chat_id AS chatId, t.tag
+       FROM wl_admin_group_tags t
+       INNER JOIN wl_admin_groups g ON g.chat_id = t.chat_id
+       ORDER BY t.tag ASC`
+    );
+    const tagMap = {};
+    for (const r of tagRows) {
+      (tagMap[r.chatId] = tagMap[r.chatId] || []).push(r.tag);
+    }
+    res.json(groups.map(g => ({ ...g, tags: tagMap[g.chatId] || [] })));
   } catch (err) { next(err); }
 });
 
