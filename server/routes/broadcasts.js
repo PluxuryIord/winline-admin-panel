@@ -360,6 +360,35 @@ router.get('/channels', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── /channels/full — каналы + теги одним запросом ──────────────────────────
+// Раньше фронт делал N+1: сначала GET /channels (1 запрос), потом по
+// GET /channels/:chatId/tags на КАЖДЫЙ канал. При 150 каналах это 151
+// запрос. На стабильной сети норм, но при ТСПУ-замедлении каждый из
+// них шёл по 3-5 секунд → загрузка страницы 2+ минуты. Этот эндпоинт
+// одной выборкой LEFT JOIN'ит таблицы и группирует теги в массив.
+router.get('/channels/full', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(
+      `SELECT c.id, c.chat_id AS chatId, c.title, c.added_at AS addedAt,
+              GROUP_CONCAT(t.tag ORDER BY t.tag SEPARATOR '\\u0001') AS tagsBlob
+       FROM wl_admin_channels c
+       LEFT JOIN wl_admin_channel_tags t ON t.chat_id = c.chat_id
+       GROUP BY c.id, c.chat_id, c.title, c.added_at
+       ORDER BY c.id ASC`
+    );
+    // GROUP_CONCAT слипает теги через  (тег не может содержать управляющий
+    // символ — безопасный разделитель, в отличие от запятой/точки с запятой,
+    // которые могут попасть в название тега).
+    res.json(rows.map(r => ({
+      id: r.id,
+      chatId: r.chatId,
+      title: r.title,
+      addedAt: r.addedAt,
+      tags: r.tagsBlob ? r.tagsBlob.split('') : [],
+    })));
+  } catch (err) { next(err); }
+});
+
 router.post('/channels', async (req, res, next) => {
   try {
     const { chatId, title } = req.body;
@@ -446,6 +475,38 @@ router.get('/groups', async (req, res, next) => {
       ORDER BY g.id ASC
     `);
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// ── /groups/full — группы + теги одним запросом ─────────────────────────────
+// Аналог /channels/full для групп. См. комментарий выше про N+1 и ТСПУ.
+router.get('/groups/full', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(`
+      SELECT g.id, g.chat_id AS chatId, g.title, g.added_at AS addedAt,
+             IFNULL(a.approved, 1) AS approved,
+             GROUP_CONCAT(t.tag ORDER BY t.tag SEPARATOR '\\u0001') AS tagsBlob
+      FROM wl_admin_groups g
+      LEFT JOIN wl_admin_groups_approved a ON a.chat_id = g.chat_id
+      LEFT JOIN wl_admin_group_tags t ON t.chat_id = g.chat_id
+      WHERE NOT (
+        g.chat_id NOT LIKE '-100%'
+        AND EXISTS (
+          SELECT 1 FROM wl_admin_groups g2
+          WHERE g2.chat_id LIKE '-100%' AND g2.title = g.title
+        )
+      )
+      GROUP BY g.id, g.chat_id, g.title, g.added_at, a.approved
+      ORDER BY g.id ASC
+    `);
+    res.json(rows.map(r => ({
+      id: r.id,
+      chatId: r.chatId,
+      title: r.title,
+      addedAt: r.addedAt,
+      approved: r.approved,
+      tags: r.tagsBlob ? r.tagsBlob.split('') : [],
+    })));
   } catch (err) { next(err); }
 });
 

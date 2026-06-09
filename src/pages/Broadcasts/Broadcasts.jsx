@@ -1017,23 +1017,17 @@ function ChannelsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     api.get('/api/broadcasts/channel-tags').then(r => r.json()).then(setAllChannelTags).catch(() => {});
   }, []);
 
-  const loadChannelTagsMap = useCallback(async (chList) => {
-    const map = {};
-    await Promise.all(chList.map(async (ch) => {
-      try {
-        const res = await api.get(`/api/broadcasts/channels/${encodeURIComponent(ch.chatId)}/tags`);
-        map[ch.chatId] = await res.json();
-      } catch { map[ch.chatId] = []; }
-    }));
-    setChannelTagsMap(map);
-  }, []);
-
+  // Загружаем каналы вместе с тегами одним запросом через /channels/full.
+  // Раньше был N+1: 1 запрос за списком + N запросов за тегами каждого
+  // канала. При плохой сети (ТСПУ) это ломалось каскадом. Теперь — 1 запрос.
   const loadChannels = useCallback(() => {
-    api.get('/api/broadcasts/channels').then(r => r.json()).then(data => {
+    api.get('/api/broadcasts/channels/full').then(r => r.json()).then(data => {
       setChannels(data);
-      loadChannelTagsMap(data);
+      const map = {};
+      for (const ch of data) map[ch.chatId] = ch.tags || [];
+      setChannelTagsMap(map);
     }).catch(() => {});
-  }, [loadChannelTagsMap]);
+  }, []);
 
   const loadArchive = useCallback(() => {
     api.get('/api/broadcasts/channels/archive').then(r => r.json()).then(setArchived).catch(() => {});
@@ -1820,23 +1814,16 @@ function GroupsTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     api.get('/api/broadcasts/group-tags').then(r => r.json()).then(setAllGroupTags).catch(() => {});
   }, []);
 
-  const loadGroupTagsMap = useCallback(async (grList) => {
-    const map = {};
-    await Promise.all(grList.map(async (g) => {
-      try {
-        const res = await api.get(`/api/broadcasts/groups/${encodeURIComponent(g.chatId)}/tags`);
-        map[g.chatId] = await res.json();
-      } catch { map[g.chatId] = []; }
-    }));
-    setGroupTagsMap(map);
-  }, []);
-
+  // Загружаем группы вместе с тегами одним запросом через /groups/full —
+  // тот же паттерн что и для каналов. Решает N+1 при плохой сети.
   const loadGroups = useCallback(() => {
-    api.get('/api/broadcasts/groups').then(r => r.json()).then(data => {
+    api.get('/api/broadcasts/groups/full').then(r => r.json()).then(data => {
       setGroups(data);
-      loadGroupTagsMap(data);
+      const map = {};
+      for (const g of data) map[g.chatId] = g.tags || [];
+      setGroupTagsMap(map);
     }).catch(() => {});
-  }, [loadGroupTagsMap]);
+  }, []);
 
   const loadArchive = useCallback(() => {
     api.get('/api/broadcasts/groups/archive').then(r => r.json()).then(setArchived).catch(() => {});
