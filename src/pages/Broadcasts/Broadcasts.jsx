@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { sanitizeHtml } from '../../utils/sanitize.js';
+import { validateBroadcastContent, tgVisibleLength, TG_LIMITS } from '../../shared/telegramLimits.js';
 import PromptModal from '../KnowledgeBase/PromptModal';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
 import IosDatePicker from '../../components/UI/IosDatePicker';
@@ -316,6 +317,16 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
     return false;
   };
 
+  // Проверка лимитов Telegram (длина текста/подписи/опроса). Один и тот же
+  // валидатор, что и на бэкенде — фронт лишь подсвечивает и блокирует заранее.
+  const contentCheck = mode === 'text'
+    ? validateBroadcastContent({ text, media })
+    : mode === 'poll'
+      ? validateBroadcastContent({ poll: { question, options: pollOptions } })
+      : validateBroadcastContent({ poll: { question: quizQuestion, options: quizOptions } });
+  const textLimit = media ? TG_LIMITS.CAPTION : TG_LIMITS.TEXT;
+  const textLen = tgVisibleLength(text);
+
   const getComposeBody = () => {
     if (mode === 'text') {
       const body = {};
@@ -387,6 +398,9 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
             minRows={3}
           />
           <MediaAttach media={media} onChange={setMedia} />
+          <div className="bc-charcount" style={{ fontSize: 12, marginTop: 4, textAlign: 'right', color: textLen > textLimit ? '#e5484d' : 'var(--text-secondary, #8a8a8a)' }}>
+            {textLen} / {textLimit}{media ? ' (подпись к медиа)' : ''}
+          </div>
         </>
       )}
 
@@ -540,6 +554,12 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
         );
       })()}
 
+      {!contentCheck.ok && (
+        <div className="bc-send-result bc-send-result--error" style={{ marginTop: 8 }}>
+          <AlertCircle size={16} /> {contentCheck.error}
+        </div>
+      )}
+
       <div className="bc-compose-footer">
         <span className="bc-compose-hint">{hintText}</span>
         <div className="bc-compose-actions">
@@ -559,7 +579,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
           {scheduleMode ? (
             <button
               className="broadcasts-create-btn bc-schedule-send-btn"
-              disabled={sending || !(canSend && isValid()) || !scheduledAt}
+              disabled={sending || !(canSend && isValid()) || !scheduledAt || !contentCheck.ok}
               onClick={() => {
                 // Auto-correct: if scheduled time < now+2min, bump it
                 let finalSchedule = scheduledAt;
@@ -584,7 +604,7 @@ function ComposeBlock({ title, hintText, canSend, sending, sendResult, onSend, o
               <Clock size={16} /> Запланировать
             </button>
           ) : (
-            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid())} onClick={() => setConfirmSend(true)}>
+            <button className="broadcasts-create-btn" disabled={sending || !(canSend && isValid()) || !contentCheck.ok} onClick={() => setConfirmSend(true)}>
               {sending ? <Loader size={16} className="spin" /> : <Send size={16} />}
               {sending ? 'Отправка...' : 'Отправить'}
             </button>

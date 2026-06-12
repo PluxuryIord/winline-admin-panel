@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import TgHtmlEditor from '../../components/TgHtmlEditor/TgHtmlEditor';
+import { validateBroadcastContent, tgVisibleLength, TG_LIMITS } from '../../shared/telegramLimits.js';
 import './BroadcastEditor.css';
 
 /* ── метаданные типов ── */
@@ -375,6 +376,10 @@ export default function BroadcastEditor() {
       body.text = msgText;
     }
 
+    // Лимиты Telegram (длина текста/опроса)
+    const lenCheck = validateBroadcastContent({ text: body.text || '', poll: body.poll || null });
+    if (!lenCheck.ok) { alert(lenCheck.error); return; }
+
     setSending(true);
     setSendResult(null);
 
@@ -395,6 +400,12 @@ export default function BroadcastEditor() {
       setSending(false);
     }
   }, [type, buildText, selectedIds, question, pollOptions, quizOptions, correctIndex]);
+
+  // Проверка лимитов Telegram для подсветки счётчика и блокировки кнопки.
+  const isTextType = type === 'post' || type === 'contest';
+  const editorContentCheck = isTextType
+    ? validateBroadcastContent({ text })
+    : validateBroadcastContent({ poll: { question, options: (type === 'poll' ? pollOptions : quizOptions).map(o => o.text) } });
 
   // Успешная отправка — показываем результат
   if (sendResult?.success) {
@@ -465,6 +476,12 @@ export default function BroadcastEditor() {
             />
           )}
 
+          {isTextType && (
+            <div style={{ fontSize: 12, marginTop: 4, textAlign: 'right', color: tgVisibleLength(text) > TG_LIMITS.TEXT ? '#e5484d' : 'var(--text-secondary, #8a8a8a)' }}>
+              {tgVisibleLength(text)} / {TG_LIMITS.TEXT}
+            </div>
+          )}
+
           {/* Загрузка материалов */}
           <div className="be-upload-row">
             <button className="be-upload-btn">
@@ -494,6 +511,14 @@ export default function BroadcastEditor() {
         </div>
       )}
 
+      {/* Превышение лимитов Telegram */}
+      {!editorContentCheck.ok && (
+        <div className="be-send-error">
+          <AlertCircle size={16} />
+          <span>{editorContentCheck.error}</span>
+        </div>
+      )}
+
       {/* Подвал */}
       <div className="be-footer">
         <button className="be-draft-btn" onClick={() => navigate('/mailings')}>
@@ -502,7 +527,7 @@ export default function BroadcastEditor() {
         <button
           className="be-publish-btn"
           onClick={handlePublish}
-          disabled={sending || channelsLoading || !selectedIds.length}
+          disabled={sending || channelsLoading || !selectedIds.length || !editorContentCheck.ok}
         >
           {sending ? <Loader size={16} className="be-spin" /> : <Send size={16} />}
           {sending ? 'Отправка...' : 'Опубликовать'}

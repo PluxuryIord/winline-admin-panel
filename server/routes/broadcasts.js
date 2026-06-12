@@ -8,6 +8,7 @@ import { tgSend, tgSendMedia, tgSendPoll, tgRaw } from '../services/telegram.js'
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 import { logAudit } from '../services/auditLog.js';
 import { validateUploadedFile } from '../services/fileValidation.js';
+import { validateBroadcastContent } from '../../src/shared/telegramLimits.js';
 
 function isValidChatId(chatId) {
   const s = String(chatId);
@@ -592,6 +593,8 @@ router.post('/groups/send', async (req, res, next) => {
     const { text, groupIds, media, poll } = req.body;
     console.log('[broadcasts POST /groups/send] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
+    const lenCheck = validateBroadcastContent({ text, media, poll });
+    if (!lenCheck.ok) return res.status(400).json({ error: lenCheck.error });
     if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
 
     const results = [];
@@ -716,6 +719,8 @@ router.post('/', async (req, res, next) => {
     const { text, channelIds, media, poll } = req.body;
     console.log('[broadcasts POST /] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) { conn.release(); return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' }); }
+    const lenCheck = validateBroadcastContent({ text, media, poll });
+    if (!lenCheck.ok) { conn.release(); return res.status(400).json({ error: lenCheck.error }); }
     if (!channelIds?.length) { conn.release(); return res.status(400).json({ error: 'Выберите хотя бы один канал' }); }
 
     await conn.beginTransaction();
@@ -792,6 +797,8 @@ router.post('/users', async (req, res, next) => {
     const { text, filters, media, poll } = req.body;
     console.log('[broadcasts POST /users] body keys:', Object.keys(req.body), 'poll:', !!poll, 'text:', !!text?.trim(), 'media:', !!media);
     if (!text?.trim() && !media && !poll) return res.status(400).json({ error: 'Введите текст, прикрепите файл или создайте опрос' });
+    const lenCheck = validateBroadcastContent({ text, media, poll });
+    if (!lenCheck.ok) return res.status(400).json({ error: lenCheck.error });
 
     let where = ['u.user_id IS NOT NULL'];
     const params = [];
@@ -1406,6 +1413,9 @@ router.post('/drafts/:id/send', async (req, res, next) => {
     const poll = safeJsonParse(draft.poll_json, null);
     const targetFilter = safeJsonParse(draft.target_filter, null);
 
+    const lenCheck = validateBroadcastContent({ text, media, poll });
+    if (!lenCheck.ok) return res.status(400).json({ error: lenCheck.error });
+
     let record;
     if (draft.target_type === 'channels') {
       const channelIds = targetFilter?.channelIds || [];
@@ -1481,9 +1491,16 @@ router.post('/drafts/:id/schedule', async (req, res, next) => {
       return res.status(400).json({ error: 'Время отправки должно быть минимум на 2 минуты вперёд' });
     }
 
-    // Check draft exists
-    const [drafts] = await dbPool.query('SELECT id FROM wl_admin_broadcast_drafts WHERE id = ?', [draftId]);
+    // Check draft exists + валидируем контент, чтобы нельзя было запланировать
+    // рассылку, которая упрётся в лимиты Telegram при отправке.
+    const [drafts] = await dbPool.query('SELECT text, media_json, poll_json FROM wl_admin_broadcast_drafts WHERE id = ?', [draftId]);
     if (!drafts.length) return res.status(404).json({ error: 'Черновик не найден' });
+    const draftLenCheck = validateBroadcastContent({
+      text: drafts[0].text || '',
+      media: safeJsonParse(drafts[0].media_json, null),
+      poll: safeJsonParse(drafts[0].poll_json, null),
+    });
+    if (!draftLenCheck.ok) return res.status(400).json({ error: draftLenCheck.error });
 
     // Cancel any existing pending schedules for this draft
     await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'cancelled' WHERE draft_id = ? AND status = 'pending'`, [draftId]);
