@@ -2487,6 +2487,7 @@ export default function Broadcasts() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [deliveryModal, setDeliveryModal] = useState(null);
   const [textModal, setTextModal] = useState(null);
+  const [recipientsModal, setRecipientsModal] = useState(null);
   const [visibleCount, setVisibleCount] = useState(20);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -2886,7 +2887,23 @@ export default function Broadcasts() {
                     <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal({ text: b.text || '', media: b.media || null })} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media && !(b.media.mimeType || '').startsWith('image/') && !(b.media.mimeType || '').startsWith('video/') ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
-                    {(b.channels || []).join(', ') || '—'}
+                    {(() => {
+                      const recips = b.channels || [];
+                      if (!recips.length) return '—';
+                      // Пользователи уже хранятся компактным лейблом «Пользователи (N)» — показываем как есть.
+                      if (b.type === 'users') return recips.join(', ');
+                      // Группы/каналы хранят полный список имён — сворачиваем в компактный кликабельный лейбл.
+                      const label = b.type === 'groups' ? 'Группы' : b.type === 'channels' ? 'Каналы' : 'Получатели';
+                      return (
+                        <button
+                          className="bc-recipients-btn"
+                          onClick={() => setRecipientsModal({ title: label, items: recips })}
+                          title="Показать список получателей"
+                        >
+                          {label} ({recips.length})
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td>
                     <span className={`bc-status bc-status--${displayStatus(b.status)}`}>
@@ -2993,6 +3010,24 @@ export default function Broadcasts() {
 
       {deliveryModal && (
         <DeliveryModal broadcast={deliveryModal} onClose={() => setDeliveryModal(null)} />
+      )}
+
+      {recipientsModal && (
+        <div className="bc-text-modal-overlay" onClick={() => setRecipientsModal(null)}>
+          <div className="bc-text-modal" onClick={e => e.stopPropagation()}>
+            <div className="bc-text-modal-header">
+              <h4>{recipientsModal.title} ({recipientsModal.items.length})</h4>
+              <button onClick={() => setRecipientsModal(null)}><X size={16} /></button>
+            </div>
+            <div className="bc-text-modal-body">
+              <ol className="bc-recipients-list">
+                {recipientsModal.items.map((name, i) => (
+                  <li key={i}>{name}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
       )}
 
       {pollStatsModal && (
