@@ -190,6 +190,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
       full_text MEDIUMTEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    // Broadcast media (sidecar — the DB user has no ALTER right on wl_admin_broadcasts,
+    // so the media_json column can never be added there). Stores the attachment object
+    // {url, originalName, mimeType, size} so history can render photos/videos/files.
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_broadcast_media (
+      broadcast_id INT PRIMARY KEY,
+      media_json TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   } catch (err) {
     console.error('[broadcasts] Failed to create archive tables:', err.message);
   }
@@ -629,10 +637,11 @@ router.get('/', async (req, res, next) => {
   try {
     const withMedia = await checkMediaColumn();
     const cols = 'b.id, b.text, b.type, b.channels_json, b.channel_ids_json, b.total, b.success, b.failed, b.results_json, ' +
-      (withMedia ? 'b.media_json, ' : '') + 'b.status, b.created_at AS date, t.full_text';
+      (withMedia ? 'b.media_json, ' : '') + 'b.status, b.created_at AS date, t.full_text, m.media_json AS media_sidecar';
     const [rows] = await dbPool.query(
       `SELECT ${cols} FROM wl_admin_broadcasts b
        LEFT JOIN wl_admin_broadcast_texts t ON t.broadcast_id = b.id
+       LEFT JOIN wl_admin_broadcast_media m ON m.broadcast_id = b.id
        ORDER BY b.created_at DESC LIMIT 200`
     );
 
@@ -678,7 +687,7 @@ router.get('/', async (req, res, next) => {
       success: r.success,
       failed: r.failed,
       results: safeJsonParse(r.results_json, []),
-      media: withMedia ? safeJsonParse(r.media_json, null) : null,
+      media: safeJsonParse(r.media_sidecar, null) || (withMedia ? safeJsonParse(r.media_json, null) : null),
       pollId: pollMap[r.id] || null,
       date: r.date,
       status: inFlight.has(Number(r.id)) ? 'queued' : r.status,
@@ -765,6 +774,7 @@ router.delete('/:id', async (req, res, next) => {
     const [result] = await dbPool.query('DELETE FROM wl_admin_broadcasts WHERE id = ?', [bid]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
     try { await dbPool.query('DELETE FROM wl_admin_broadcast_texts WHERE broadcast_id = ?', [bid]); } catch {}
+    try { await dbPool.query('DELETE FROM wl_admin_broadcast_media WHERE broadcast_id = ?', [bid]); } catch {}
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -782,6 +792,9 @@ router.post('/bulk-delete', async (req, res, next) => {
     try {
       await dbPool.query(
         `DELETE FROM wl_admin_broadcast_texts WHERE broadcast_id IN (${placeholders})`, ids,
+      );
+      await dbPool.query(
+        `DELETE FROM wl_admin_broadcast_media WHERE broadcast_id IN (${placeholders})`, ids,
       );
     } catch {}
     res.json({ success: true, deleted: result.affectedRows });
@@ -1687,6 +1700,20 @@ async function saveBroadcast({ text, type, channels, channelIds, total, success,
       );
     } catch (err) {
       console.error('[broadcasts] save full text failed:', err.message);
+    }
+  }
+
+  // Persist media in the sidecar table (wl_admin_broadcasts has no media_json column —
+  // the DB user lacks ALTER, so the auto-migration above is a no-op on prod).
+  if (media) {
+    try {
+      await db.query(
+        `INSERT INTO wl_admin_broadcast_media (broadcast_id, media_json) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE media_json = VALUES(media_json)`,
+        [result.insertId, JSON.stringify(media)]
+      );
+    } catch (err) {
+      console.error('[broadcasts] save media failed:', err.message);
     }
   }
 
