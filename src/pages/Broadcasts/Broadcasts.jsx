@@ -2852,7 +2852,38 @@ export default function Broadcasts() {
                   </td>
                   <td className="bc-title-cell">
                     <span className="bc-type-badge">{TYPE_ICONS[b.type] || '📢'}</span>
-                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal({ text: b.text || '', media: b.media || null })} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
+                    {(() => {
+                      const mime = b.media?.mimeType || '';
+                      const isImg = mime.startsWith('image/');
+                      const isVid = mime.startsWith('video/');
+                      const openModal = () => setTextModal({ text: b.text || '', media: b.media || null });
+                      if (isImg) {
+                        return (
+                          <img
+                            src={b.media.url}
+                            alt={b.media.originalName || ''}
+                            className="bc-hist-thumb"
+                            loading="lazy"
+                            title="Нажмите для просмотра"
+                            onClick={openModal}
+                          />
+                        );
+                      }
+                      if (isVid) {
+                        return (
+                          <video
+                            src={b.media.url}
+                            className="bc-hist-thumb"
+                            preload="metadata"
+                            muted
+                            title="Нажмите для просмотра"
+                            onClick={openModal}
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
+                    <span className="bc-hist-text-wrap" title="Нажмите для просмотра" onClick={() => setTextModal({ text: b.text || '', media: b.media || null })} dangerouslySetInnerHTML={{ __html: sanitizeHtml((b.media && !(b.media.mimeType || '').startsWith('image/') && !(b.media.mimeType || '').startsWith('video/') ? `[${b.media.originalName}] ` : '') + renderTgHtml(b.text || '')) }} />
                   </td>
                   <td className="bc-channel">
                     {(b.channels || []).join(', ') || '—'}
