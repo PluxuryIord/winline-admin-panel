@@ -112,6 +112,18 @@ const SEED_DATA = {
         btn_logout: { label: '🚪 Выйти из аккаунта', action: 'callback:client_logout', locked: true },
       },
     },
+    client_calendar: {
+      title: 'Календарь мероприятий',
+      description: 'Календарь событий в главном меню (личные сообщения). Ссылку на Google-таблицу можно менять здесь — она НЕЗАВИСИМА от календаря в группе (group_calendar).',
+      messages: {
+        main_text: { label: 'Текст календаря', text: '<b>📅 Календарь</b>\n\nПерейдите по ссылке для просмотра актуального календаря.' },
+      },
+      buttons: {
+        _order: ['btn_link', 'btn_back'],
+        btn_link: { label: 'Открыть календарь', action: 'url:https://docs.google.com/spreadsheets/d/1zMg4sJlUUD2I-SPEUc7MRC6rRkbZHWpBju0vGlzNeIo/edit?gid=0#gid=0' },
+        btn_back: { label: '🔙 Меню', action: 'callback:client_back_menu', targetScreen: 'main_menu', locked: true },
+      },
+    },
     offer_page: {
       title: 'Информация по офферу',
       description: 'Детали оффера для партнёров',

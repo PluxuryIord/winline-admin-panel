@@ -181,19 +181,26 @@ function migrateData(data) {
     if (!main.buttons) main.buttons = { _order: [] };
     if (!Array.isArray(main.buttons._order)) main.buttons._order = [];
 
-    const ensureBtn = (key, label, action) => {
+    const ensureBtn = (key, label, action, targetScreen) => {
       // Skip if a button with this action already exists under any key
       for (const k of main.buttons._order) {
-        if (main.buttons[k]?.action === action) return;
+        if (main.buttons[k]?.action === action) {
+          // Patch targetScreen if it changed (e.g. calendar now has its own editable screen)
+          if (targetScreen && main.buttons[k].targetScreen !== targetScreen) {
+            main.buttons[k].targetScreen = targetScreen;
+            changed = true;
+          }
+          return;
+        }
       }
-      main.buttons[key] = { label, action };
+      main.buttons[key] = targetScreen ? { label, action, targetScreen } : { label, action };
       main.buttons._order.push(key);
       changed = true;
     };
 
     ensureBtn('btn_my_stats',     '📊 Моя статистика',           'callback:client_my_stats');
     ensureBtn('btn_ask_ai',       '❓ Спросить ИИ',              'callback:client_ask_ai');
-    ensureBtn('btn_calendar',     '📅 Календарь мероприятий',    'callback:client_calendar');
+    ensureBtn('btn_calendar',     '📅 Календарь мероприятий',    'callback:client_calendar', 'client_calendar');
     ensureBtn('btn_admin_menu',   '⚙️ Меню администратора',      'callback:admin_menu');
   }
 
