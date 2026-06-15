@@ -711,7 +711,6 @@ export default function NodeEditorPanel({
                           value={urlValue}
                           onChange={e => onUpdateButtonAction(key, `url:${e.target.value}`)}
                           placeholder="https://..."
-                          disabled={isStructureLocked}
                         />
                       </div>
                     ) : (
