@@ -723,15 +723,16 @@
   border-color: rgba(255, 126, 0, 0.55);
   background-color: rgba(255, 126, 0, 0.10);
 }
-.btn-chat-dot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-orange, #ff7e00);
-  box-shadow: 0 0 6px rgba(255, 126, 0, 0.7);
+.chat-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.active-chat-label {
+  font-size: 0.82rem;
+  color: #8a8a8a;
+  white-space: nowrap;
 }
 
 /* ─── Bulk selection ─── */

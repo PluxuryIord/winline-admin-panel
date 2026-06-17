@@ -527,15 +527,17 @@ export default function Users() {
                 </td>
 
                 <td>
-                  <button
-                    className={`btn-chat${user.hasUserChat ? ' btn-chat--active' : ''}`}
-                    onClick={() => handleOpenChat(user.id)}
-                    title={user.hasUserChat ? 'Пользователь писал боту в ЛС' : 'Открыть чат'}
-                  >
-                    <MessageSquare size={16} />
-                    Чат
-                    {user.hasUserChat && <span className="btn-chat-dot" />}
-                  </button>
+                  <div className="chat-cell">
+                    {user.hasUserChat && <span className="active-chat-label">активный чат</span>}
+                    <button
+                      className={`btn-chat${user.hasUserChat ? ' btn-chat--active' : ''}`}
+                      onClick={() => handleOpenChat(user.id)}
+                      title={user.hasUserChat ? 'Пользователь писал боту в ЛС' : 'Открыть чат'}
+                    >
+                      <MessageSquare size={16} />
+                      Чат
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
