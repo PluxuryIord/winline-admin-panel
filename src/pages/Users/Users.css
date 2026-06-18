@@ -690,14 +690,22 @@
     height: auto;
   }
 
-  /* Скрываем колонку с тегами — не помещается по ширине */
-  .winline-table td:nth-child(2) {
+  /* Колонки: [1] чекбокс, [2] имя+аватар, [3] теги, [4] кнопка чата.
+     На узком экране прячем теги (3) и отдаём всё место имени (2). */
+  .winline-table td:nth-child(3),
+  .winline-table th:nth-child(3) {
     display: none;
   }
 
   /* Имя пользователя занимает всё свободное место */
-  .winline-table td:first-child {
+  .winline-table td:nth-child(2) {
     width: 100%;
+  }
+
+  /* Чекбокс — узкий, не растягивается */
+  .winline-table td.cell-checkbox,
+  .winline-table th.cell-checkbox {
+    width: 44px;
   }
 
   /* Кнопка чата — прижата к правому краю, не растягивается */
