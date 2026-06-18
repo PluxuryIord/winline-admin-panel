@@ -7,6 +7,41 @@ import { WEBHOOK_SECRET, BOT_TOKEN, JWT_SECRET } from '../config/env.js';
 import { tgSend, tgSendMedia, tgSendMediaGroup } from '../services/telegram.js';
 import { uploadToS3, downloadBuffer } from '../services/s3.js';
 
+// Read-state for chats — server-side «непрочитано», ОБЩЕЕ для всех админов
+// (ключ только chat_id). Sidecar-таблица: у DB-юзера нет прав ALTER на
+// wl_admin_chats, поэтому отдельная таблица, а не колонка.
+(async () => {
+  try {
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS wl_admin_chat_reads (
+      chat_id INT PRIMARY KEY,
+      last_read_message_id INT NOT NULL DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  } catch (err) {
+    console.error('[chats] Failed to ensure wl_admin_chat_reads table:', err.message);
+  }
+})();
+
+// Advance the chat's read marker to `uptoMessageId` (or the chat's latest
+// message if omitted). Never moves backwards (GREATEST).
+async function markChatRead(chatId, uptoMessageId = null) {
+  let upto = uptoMessageId;
+  if (upto == null) {
+    const [[row]] = await dbPool.query(
+      'SELECT COALESCE(MAX(id), 0) AS m FROM wl_admin_chat_messages WHERE chat_id = ?',
+      [chatId]
+    );
+    upto = row.m;
+  }
+  await dbPool.query(
+    `INSERT INTO wl_admin_chat_reads (chat_id, last_read_message_id) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE
+       last_read_message_id = GREATEST(last_read_message_id, VALUES(last_read_message_id)),
+       updated_at = CURRENT_TIMESTAMP`,
+    [chatId, upto]
+  );
+}
+
 function verifyWebhook(req) {
   if (!WEBHOOK_SECRET) return false;
   const sig = req.headers['x-webhook-signature'];
@@ -321,6 +356,7 @@ router.get('/', async (req, res, next) => {
     const chatIds = chats.map(c => c.id);
 
     let messagesMap = {};
+    const lastUserMsgId = {}; // chat_id -> id последнего сообщения от пользователя
     if (chatIds.length) {
       const [msgs] = await dbPool.query(
         'SELECT id, chat_id, sender AS `from`, text, created_at AS time FROM wl_admin_chat_messages WHERE chat_id IN (?) ORDER BY created_at ASC',
@@ -329,7 +365,18 @@ router.get('/', async (req, res, next) => {
       for (const m of msgs) {
         if (!messagesMap[m.chat_id]) messagesMap[m.chat_id] = [];
         messagesMap[m.chat_id].push(unpackMessage(m));
+        if (m.from === 'user') lastUserMsgId[m.chat_id] = m.id; // ASC → последнее присваивание = max
       }
+    }
+
+    // Карта прочтений (общая для всех админов)
+    const readMap = {};
+    if (chatIds.length) {
+      const [reads] = await dbPool.query(
+        'SELECT chat_id, last_read_message_id FROM wl_admin_chat_reads WHERE chat_id IN (?)',
+        [chatIds]
+      );
+      for (const r of reads) readMap[r.chat_id] = r.last_read_message_id;
     }
 
     res.json(chats.map(c => ({
@@ -339,8 +386,35 @@ router.get('/', async (req, res, next) => {
       telegram: c.telegram || null,
       banned: !!c.banned,
       folderId: c.folderId || null,
+      unread: (lastUserMsgId[c.id] || 0) > (readMap[c.id] || 0),
       messages: messagesMap[c.id] || [],
     })));
+  } catch (err) { next(err); }
+});
+
+// GET /api/chats/unread — id чатов с непрочитанными сообщениями от пользователей.
+// Источник правды для индикатора (общий для всех админов, переживает оффлайн/перезагрузку).
+router.get('/unread', async (req, res, next) => {
+  try {
+    const [rows] = await dbPool.query(`
+      SELECT c.id AS chatId
+      FROM wl_admin_chats c
+      JOIN wl_admin_chat_messages m ON m.chat_id = c.id AND m.sender = 'user'
+      LEFT JOIN wl_admin_chat_reads r ON r.chat_id = c.id
+      GROUP BY c.id
+      HAVING MAX(m.id) > COALESCE(MAX(r.last_read_message_id), 0)
+    `);
+    res.json({ chatIds: rows.map(r => r.chatId) });
+  } catch (err) { next(err); }
+});
+
+// POST /api/chats/:id/read — отметить чат прочитанным (до последнего сообщения).
+router.post('/:id/read', async (req, res, next) => {
+  try {
+    const chatId = Number(req.params.id);
+    if (!Number.isFinite(chatId)) return res.status(400).json({ error: 'Bad chat id' });
+    await markChatRead(chatId);
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
@@ -442,6 +516,9 @@ router.post('/:id/messages', async (req, res, next) => {
       await markBlockedIfNeeded(userId, tgError);
     }
 
+    // Админ ответил → чат точно прочитан (двигаем отметку до его сообщения).
+    markChatRead(chatId, result.insertId).catch(() => {});
+
     // SSE push
     broadcast({
       type: 'new_message',
@@ -460,8 +537,10 @@ router.post('/:id/messages', async (req, res, next) => {
 // DELETE /api/chats/:id
 router.delete('/:id', async (req, res, next) => {
   try {
-    const [result] = await dbPool.query('DELETE FROM wl_admin_chats WHERE id = ?', [Number(req.params.id)]);
+    const chatId = Number(req.params.id);
+    const [result] = await dbPool.query('DELETE FROM wl_admin_chats WHERE id = ?', [chatId]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Not found' });
+    try { await dbPool.query('DELETE FROM wl_admin_chat_reads WHERE chat_id = ?', [chatId]); } catch {}
     res.json({ success: true });
   } catch (err) { next(err); }
 });

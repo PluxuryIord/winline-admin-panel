@@ -1,16 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { api } from '../utils/api';
 
 const UnreadContext = createContext({ unreadChats: new Set(), markRead: () => {}, hasUnread: false });
 
 export function UnreadProvider({ children }) {
-  const [unreadChats, setUnreadChats] = useState(() => {
-    // Restore from localStorage
-    try {
-      const saved = JSON.parse(localStorage.getItem('wl_unread_chats') || '[]');
-      return new Set(saved);
-    } catch { return new Set(); }
-  });
+  // Источник правды — сервер (общий для всех админов). Здесь только кэш для рендера.
+  const [unreadChats, setUnreadChats] = useState(new Set());
   const location = useLocation();
   const locationRef = useRef(location.pathname);
 
@@ -19,24 +15,33 @@ export function UnreadProvider({ children }) {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem('wl_unread_chats', JSON.stringify([...unreadChats]));
-  }, [unreadChats]);
+  // Подтянуть актуальный список непрочитанных с сервера.
+  const refreshUnread = useCallback(() => {
+    api.get('/api/chats/unread')
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.chatIds)) setUnreadChats(new Set(d.chatIds)); })
+      .catch(() => {});
+  }, []);
+
+  // Отметить чат прочитанным: на сервере (для всех админов) + локально.
+  const markRead = useCallback((chatId) => {
+    setUnreadChats(prev => {
+      if (!prev.has(chatId)) return prev;
+      const next = new Set(prev);
+      next.delete(chatId);
+      return next;
+    });
+    api.post(`/api/chats/${chatId}/read`).catch(() => {});
+  }, []);
+
+  // Первичная загрузка с сервера.
+  useEffect(() => { refreshUnread(); }, [refreshUnread]);
 
   // Mark chat as read when user opens it
   useEffect(() => {
     const match = location.pathname.match(/^\/chats\/(\d+)$/);
-    if (match) {
-      const chatId = Number(match[1]);
-      setUnreadChats(prev => {
-        if (!prev.has(chatId)) return prev;
-        const next = new Set(prev);
-        next.delete(chatId);
-        return next;
-      });
-    }
-  }, [location.pathname]);
+    if (match) markRead(Number(match[1]));
+  }, [location.pathname, markRead]);
 
   // Global SSE listener with reconnection
   useEffect(() => {
@@ -49,13 +54,21 @@ export function UnreadProvider({ children }) {
       // Cookie-based auth — wl_token cookie is sent automatically on same-origin
       es = new EventSource('/api/chats/stream', { withCredentials: true });
 
+      // На (пере)подключении синхронизируемся с сервером — закрывает пробел,
+      // если сообщения приходили, пока соединение было разорвано.
+      es.onopen = () => { refreshUnread(); };
+
       es.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
           if (data.type === 'new_message' && data.message?.from === 'user') {
             const chatId = data.chatId;
             const currentPath = locationRef.current;
-            if (currentPath === `/chats/${chatId}`) return;
+            if (currentPath === `/chats/${chatId}`) {
+              // Админ сейчас смотрит этот чат — двигаем отметку прочтения на сервере.
+              api.post(`/api/chats/${chatId}/read`).catch(() => {});
+              return;
+            }
 
             setUnreadChats(prev => {
               if (prev.has(chatId)) return prev;
@@ -82,16 +95,7 @@ export function UnreadProvider({ children }) {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (es) es.close();
     };
-  }, []);
-
-  const markRead = useCallback((chatId) => {
-    setUnreadChats(prev => {
-      if (!prev.has(chatId)) return prev;
-      const next = new Set(prev);
-      next.delete(chatId);
-      return next;
-    });
-  }, []);
+  }, [refreshUnread]);
 
   const hasUnread = unreadChats.size > 0;
 
