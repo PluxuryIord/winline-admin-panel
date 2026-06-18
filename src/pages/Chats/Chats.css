@@ -378,3 +378,35 @@
   border-color: rgba(255, 60, 60, 0.45);
   color: #fff;
 }
+
+/* --- АДАПТАЦИЯ ПОД МОБИЛУ --- */
+@media (max-width: 768px) {
+  .chats-container { gap: 14px; }
+
+  /* Шапка и переключатель вида — в столбик, кнопки на всю ширину */
+  .chats-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .chats-view-toggle { width: 100%; }
+  .chats-view-btn { flex: 1; justify-content: center; padding: 10px 12px; }
+
+  /* Папки — горизонтальная прокрутка вместо некрасивого переноса */
+  .chats-folders {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .chats-folders::-webkit-scrollbar { display: none; }
+  .chats-folder-tab,
+  .chats-folder-tab-wrap { flex: 0 0 auto; white-space: nowrap; }
+
+  /* Строка диалога — компактнее и с удобным тапом */
+  .chat-item { padding: 12px; gap: 12px; }
+  .chat-item-avatar { width: 44px; height: 44px; font-size: 1rem; }
+  .chat-item-name { font-size: 0.95rem; }
+  .chat-item-last { font-size: 0.8rem; }
+
+  /* На тач-экранах нет hover — действия над диалогом показываем всегда */
+  .chat-item-move,
+  .chat-item-delete { opacity: 1; }
+}

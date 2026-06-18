@@ -1165,6 +1165,26 @@
   .chatview-album--4 {
     height: 240px;
   }
+
+  /* Композер — крупнее тап-зоны, удобный ввод */
+  .chatview-composer {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  /* 16px не даёт iOS зумить страницу при фокусе на поле ввода */
+  .chatview-composer-input {
+    font-size: 16px;
+  }
+  .chatview-composer-btn,
+  .chatview-composer-send {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  /* Шапка чата компактнее */
+  .chatview-header {
+    padding: 10px 12px;
+  }
 }
 
 /* Polls */

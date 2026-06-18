@@ -1650,6 +1650,28 @@ input[type="checkbox"]:checked {
     width: 100%;
     justify-content: center;
   }
+
+  /* Блоки секций — компактнее по бокам */
+  .bc-section { padding: 14px; }
+
+  /* Вкладки Текст/Опрос/Викторина — на всю ширину строкой */
+  .bc-mode-tabs { width: 100%; }
+  .bc-mode-tab { flex: 1; justify-content: center; }
+
+  /* Футер композера — подпись и кнопки в столбик, кнопки на всю ширину */
+  .bc-compose-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .bc-compose-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .bc-compose-actions > * { width: 100%; justify-content: center; }
+  .bc-charcount { text-align: right; }
 }
 
 /* ===== MEDIA ATTACH ===== */
