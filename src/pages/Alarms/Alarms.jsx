@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Loader, Mail, Globe, Clock, XCircle, CheckCircle2, MousePointerClick,
-  Plus, Trash2, Check, AlertTriangle, ScrollText, RefreshCw, Info,
+  Plus, Trash2, Check, ScrollText, RefreshCw, Info,
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -324,13 +324,9 @@ export default function Alarms() {
       <h1 className="alarms-title">Триггерные алармы</h1>
 
       <div className="alarms-info">
-        <AlertTriangle size={18} />
+        <Info size={18} />
         <div>
-          Правила ниже задают <b>что и когда</b> отправлять. Рубильники безопасности — на стороне бота
-          (<code>.env</code>): <code>ALARMS_ENABLED</code> (общий выключатель), <code>ALARMS_DRY_RUN</code>
-          {' '}(сухой прогон — ничего не шлёт), <code>ALARM_TEST_CHAT_ID</code> (слать всё себе).
-          Пока бот в dry-run или выключен, реальных сообщений не будет. Алармы доходят только до партнёров,
-          которые <b>залогинены в боте</b>.
+          Тестовая страница, в разработке.
           {!canEdit && <div className="alarms-readonly">Только просмотр — редактирование доступно администраторам.</div>}
         </div>
       </div>
