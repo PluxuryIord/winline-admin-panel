@@ -176,6 +176,8 @@ import chatFoldersRouter from './routes/chatFolders.js';
 app.use('/api/chat-folders', chatFoldersRouter);
 import broadcastFoldersRouter from './routes/broadcastFolders.js';
 app.use('/api/broadcast-folders', broadcastFoldersRouter);
+import alarmsRouter from './routes/alarms.js';
+app.use('/api/alarms', alarmsRouter);
 
 // === Production: serve Vite build ===
 if (process.env.NODE_ENV === 'production') {

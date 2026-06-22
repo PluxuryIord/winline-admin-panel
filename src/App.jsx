@@ -22,6 +22,7 @@ import VersionHistory from './pages/VersionHistory/VersionHistory.jsx';
 import Broadcasts from './pages/Broadcasts/Broadcasts.jsx';
 import BroadcastNew from './pages/Broadcasts/BroadcastNew.jsx';
 import BroadcastEditor from './pages/Broadcasts/BroadcastEditor.jsx';
+import Alarms from './pages/Alarms/Alarms.jsx';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -65,6 +66,7 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="events" element={<EventWork />} />
           <Route path="raffles" element={<RaffleV2 />} />
+          <Route path="alarms" element={<Alarms />} />
           <Route path="admin-users" element={<AdminUsers />} />
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="version-history" element={<VersionHistory />} />

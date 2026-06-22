@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Users, MessageSquare, Send, BookOpen,
   Database, BarChart, Calendar, Trophy, LogOut, X,
-  Shield, FileText, History, ChevronsLeft, ChevronsRight
+  Shield, FileText, History, ChevronsLeft, ChevronsRight, Bell
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useUnread } from '../../contexts/UnreadContext.jsx';
@@ -34,6 +34,7 @@ export default function Sidebar({ isMobileMenuOpen, closeMobileMenu, collapsed, 
           { name: 'Аналитика', path: '/analytics', icon: <BarChart size={18} /> },
           { name: 'Работа на ивенте', path: '/events', icon: <Calendar size={18} /> },
           { name: 'Розыгрыши', path: '/raffles', icon: <Trophy size={18} /> },
+          { name: 'Алармы', path: '/alarms', icon: <Bell size={18} /> },
         ].map((item) => (
           <NavLink
             to={item.path}
