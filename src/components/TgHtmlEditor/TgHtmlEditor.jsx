@@ -47,7 +47,7 @@ export function tgHtmlToEditable(tgHtml) {
     '<img src="/emoji/$1.webp" data-emoji-id="$1" class="tg-emoji-inline" contenteditable="false" alt="emoji" />',
   );
   html = html.replace(
-    /&lt;tg-emoji emoji-id="(\d+)"&gt;[^<]*&lt;\/tg-emoji&gt;/g,
+    /&lt;tg-emoji emoji-id="(\d+)"&gt;[^&]*&lt;\/tg-emoji&gt;/g,
     '<img src="/emoji/$1.webp" data-emoji-id="$1" class="tg-emoji-inline" contenteditable="false" alt="emoji" />',
   );
 
