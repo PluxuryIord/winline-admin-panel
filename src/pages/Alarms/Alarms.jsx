@@ -7,45 +7,51 @@ import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import './Alarms.css';
 
-// Per-trigger UI metadata (server is the source of truth for values).
+// Per-trigger UI metadata. A trigger TYPE can hold several rules (a drip:
+// e.g. one message at 3 days, another at 7). The server is the source of truth.
 const TRIGGER_META = {
   email_unconfirmed: {
-    icon: Mail,
+    name: 'Email не подтверждён', icon: Mail, has_threshold: true,
     desc: 'Партнёр зарегистрировался, но не подтвердил email дольше указанного срока.',
     placeholders: ['{first_name}'],
   },
   no_site: {
-    icon: Globe,
+    name: 'Нет площадки', icon: Globe, has_threshold: true,
     desc: 'Партнёр зарегистрирован дольше срока, но не создал ни одной площадки.',
     placeholders: ['{first_name}'],
   },
   site_moderation: {
-    icon: Clock,
-    desc: 'Площадка висит на модерации (статус «на модерации») дольше указанного срока.',
+    name: 'Площадка на модерации', icon: Clock, has_threshold: true,
+    desc: 'Площадка висит на модерации дольше указанного срока.',
     placeholders: ['{first_name}', '{site_name}', '{site_url}'],
   },
   site_rejected: {
-    icon: XCircle,
+    name: 'Площадка отклонена', icon: XCircle, has_threshold: false,
     desc: 'Площадку только что отклонили. Срабатывает на сам факт перехода в «отклонена».',
     placeholders: ['{first_name}', '{reason}', '{site_name}'],
   },
   site_approved: {
-    icon: CheckCircle2,
+    name: 'Площадка одобрена', icon: CheckCircle2, has_threshold: false,
     desc: 'Площадку только что одобрили (модерация → активна).',
     placeholders: ['{first_name}', '{site_name}'],
   },
   no_clicks: {
-    icon: MousePointerClick,
+    name: 'Нет трафика', icon: MousePointerClick, has_threshold: true,
     desc: 'Есть активная площадка дольше срока, но кликов 0. ⚠️ Данные по кликам в зеркале неполные — возможны ложные срабатывания.',
     placeholders: ['{first_name}', '{site_name}', '{site_url}'],
   },
 };
+const TYPE_ORDER = [
+  'email_unconfirmed', 'no_site', 'site_moderation',
+  'site_rejected', 'site_approved', 'no_clicks',
+];
 
 const UNIT_OPTIONS = [
   { value: 'minutes', label: 'минут' },
   { value: 'hours', label: 'часов' },
   { value: 'days', label: 'дней' },
 ];
+const unitLabel = (u) => UNIT_OPTIONS.find((o) => o.value === u)?.label || u;
 
 function formatDate(d) {
   if (!d) return '—';
@@ -68,17 +74,14 @@ function Toggle({ checked, onChange, disabled }) {
   );
 }
 
-function RuleCard({ rule, canEdit, onSaved }) {
-  const meta = TRIGGER_META[rule.trigger_type] || {};
-  const Icon = meta.icon || Info;
-
+function RuleCard({ rule, meta, canEdit, onSaved, onDeleted }) {
   const [enabled, setEnabled] = useState(rule.enabled);
   const [thrValue, setThrValue] = useState(rule.threshold_value ?? '');
   const [thrUnit, setThrUnit] = useState(rule.threshold_unit || 'hours');
   const [message, setMessage] = useState(rule.message_text || '');
-  const [buttons, setButtons] = useState(rule.buttons || []);
   const [status, setStatus] = useState('idle'); // idle | saving | saved | error
   const [errMsg, setErrMsg] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   // Re-sync if parent reloads
   useEffect(() => {
@@ -86,15 +89,17 @@ function RuleCard({ rule, canEdit, onSaved }) {
     setThrValue(rule.threshold_value ?? '');
     setThrUnit(rule.threshold_unit || 'hours');
     setMessage(rule.message_text || '');
-    setButtons(rule.buttons || []);
   }, [rule]);
 
   const dirty =
     enabled !== rule.enabled ||
     String(thrValue) !== String(rule.threshold_value ?? '') ||
     thrUnit !== (rule.threshold_unit || 'hours') ||
-    message !== (rule.message_text || '') ||
-    JSON.stringify(buttons) !== JSON.stringify(rule.buttons || []);
+    message !== (rule.message_text || '');
+
+  const headLabel = rule.has_threshold
+    ? `Через ${thrValue || '—'} ${unitLabel(thrUnit)}`
+    : 'При событии';
 
   async function persist(patch) {
     setStatus('saving');
@@ -103,7 +108,6 @@ function RuleCard({ rule, canEdit, onSaved }) {
       const body = {
         enabled,
         message_text: message,
-        buttons,
         ...(rule.has_threshold ? { threshold_value: Number(thrValue), threshold_unit: thrUnit } : {}),
         ...patch,
       };
@@ -124,23 +128,28 @@ function RuleCard({ rule, canEdit, onSaved }) {
 
   function toggleEnabled(next) {
     setEnabled(next);
-    // toggle persists immediately (uses the currently edited content too)
     persist({ enabled: next });
   }
 
-  function updateButton(i, key, val) {
-    setButtons((bs) => bs.map((b, idx) => (idx === i ? { ...b, [key]: val } : b)));
+  async function remove() {
+    if (!window.confirm('Удалить это правило?')) return;
+    setDeleting(true);
+    try {
+      const res = await api.delete(`/api/alarms/${rule.id}`);
+      if (!res.ok) throw new Error('Не удалось удалить');
+      onDeleted(rule.id);
+    } catch (e) {
+      setErrMsg(e.message);
+      setStatus('error');
+      setDeleting(false);
+    }
   }
-  function addButton() { setButtons((bs) => [...bs, { text: '', url: '' }]); }
-  function removeButton(i) { setButtons((bs) => bs.filter((_, idx) => idx !== i)); }
 
   return (
     <div className={`alarm-card ${enabled ? 'enabled' : ''}`}>
       <div className="alarm-card-head">
-        <div className="alarm-card-icon"><Icon size={20} /></div>
         <div className="alarm-card-titles">
-          <div className="alarm-card-name">{rule.name}</div>
-          <div className="alarm-card-desc">{meta.desc}</div>
+          <div className="alarm-card-name">{headLabel}</div>
         </div>
         <Toggle checked={enabled} onChange={toggleEnabled} disabled={!canEdit} />
       </div>
@@ -181,46 +190,74 @@ function RuleCard({ rule, canEdit, onSaved }) {
             </div>
           )}
         </div>
+      </div>
 
-        <div className="alarm-field">
-          <label>Кнопки (необязательно)</label>
-          {buttons.map((b, i) => (
-            <div className="alarm-button-row" key={i}>
-              <input
-                placeholder="Текст кнопки" value={b.text}
-                onChange={(e) => updateButton(i, 'text', e.target.value)} disabled={!canEdit}
-              />
-              <input
-                placeholder="https://…" value={b.url}
-                onChange={(e) => updateButton(i, 'url', e.target.value)} disabled={!canEdit}
-              />
-              <button className="alarm-icon-btn danger" onClick={() => removeButton(i)} disabled={!canEdit} title="Удалить">
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ))}
+      <div className="alarm-card-foot">
+        {canEdit && (
+          <button className="alarm-delete-btn" onClick={remove} disabled={deleting} title="Удалить правило">
+            {deleting ? <Loader size={14} className="spin" /> : <><Trash2 size={14} /> Удалить</>}
+          </button>
+        )}
+        <div className="alarm-card-foot-right">
+          {status === 'error' && <span className="alarm-save-err">{errMsg}</span>}
+          {status === 'saved' && <span className="alarm-save-ok"><Check size={14} /> Сохранено</span>}
           {canEdit && (
-            <button className="alarm-add-btn" onClick={addButton}>
-              <Plus size={14} /> Добавить кнопку
+            <button
+              className="alarm-save-btn"
+              onClick={() => persist({})}
+              disabled={!dirty || status === 'saving'}
+            >
+              {status === 'saving' ? <Loader size={14} className="spin" /> : 'Сохранить'}
             </button>
           )}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="alarm-card-foot">
-        {status === 'error' && <span className="alarm-save-err">{errMsg}</span>}
-        {status === 'saved' && <span className="alarm-save-ok"><Check size={14} /> Сохранено</span>}
-        {canEdit && (
-          <button
-            className="alarm-save-btn"
-            onClick={() => persist({})}
-            disabled={!dirty || status === 'saving'}
-          >
-            {status === 'saving' ? <Loader size={14} className="spin" /> : 'Сохранить'}
-          </button>
+function TypeGroup({ type, rules, canEdit, onSaved, onDeleted, onAdded }) {
+  const meta = TRIGGER_META[type] || {};
+  const Icon = meta.icon || Info;
+  const [adding, setAdding] = useState(false);
+
+  async function addRule() {
+    setAdding(true);
+    try {
+      const res = await api.post('/api/alarms', { trigger_type: type });
+      if (res.ok) {
+        const data = await res.json();
+        onAdded(data.rule);
+      }
+    } catch { /* ignore */ } finally { setAdding(false); }
+  }
+
+  return (
+    <section className="alarm-type-group">
+      <div className="alarm-type-head">
+        <div className="alarm-type-icon"><Icon size={20} /></div>
+        <div className="alarm-type-titles">
+          <div className="alarm-type-name">{meta.name || type}</div>
+          <div className="alarm-type-desc">{meta.desc}</div>
+        </div>
+        <span className="alarm-type-count">{rules.length}</span>
+      </div>
+
+      <div className="alarm-type-rules">
+        {rules.map((r) => (
+          <RuleCard key={r.id} rule={r} meta={meta} canEdit={canEdit} onSaved={onSaved} onDeleted={onDeleted} />
+        ))}
+        {rules.length === 0 && (
+          <div className="alarm-type-empty">Правил нет — добавьте первое.</div>
         )}
       </div>
-    </div>
+
+      {canEdit && (
+        <button className="alarm-add-rule-btn" onClick={addRule} disabled={adding}>
+          {adding ? <Loader size={14} className="spin" /> : <><Plus size={15} /> Добавить правило</>}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -315,13 +352,14 @@ export default function Alarms() {
 
   useEffect(() => { fetchRules(); }, [fetchRules]);
 
-  function onRuleSaved(updated) {
+  const onRuleSaved = (updated) =>
     setRules((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
-  }
+  const onRuleAdded = (created) => setRules((rs) => [...rs, created]);
+  const onRuleDeleted = (id) => setRules((rs) => rs.filter((r) => r.id !== id));
 
   return (
     <div className="alarms-container">
-      <h1 className="alarms-title">Триггерные алармы</h1>
+      <h1 className="alarms-title">Алармы</h1>
 
       <div className="alarms-info">
         <Info size={18} />
@@ -334,9 +372,17 @@ export default function Alarms() {
       {loading ? (
         <div className="alarms-loading"><Loader size={26} className="spin" /></div>
       ) : (
-        <div className="alarms-grid">
-          {rules.map((r) => (
-            <RuleCard key={r.id} rule={r} canEdit={canEdit} onSaved={onRuleSaved} />
+        <div className="alarms-groups">
+          {TYPE_ORDER.map((type) => (
+            <TypeGroup
+              key={type}
+              type={type}
+              rules={rules.filter((r) => r.trigger_type === type)}
+              canEdit={canEdit}
+              onSaved={onRuleSaved}
+              onAdded={onRuleAdded}
+              onDeleted={onRuleDeleted}
+            />
           ))}
         </div>
       )}
