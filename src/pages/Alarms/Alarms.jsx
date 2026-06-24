@@ -127,6 +127,12 @@ function RuleCard({ rule, meta, canEdit, onSaved, onDeleted }) {
   }
 
   function toggleEnabled(next) {
+    // Enabling an alarm sends to REAL users — confirm. Disabling is silent.
+    if (next && !window.confirm(
+      `Включить «${meta.name || rule.trigger_type}»?\n\n⚠️ Сообщения по этому аларму начнут уходить РЕАЛЬНЫМ пользователям.`
+    )) {
+      return; // отменили — тумблер остаётся выключенным
+    }
     setEnabled(next);
     persist({ enabled: next });
   }
@@ -360,14 +366,6 @@ export default function Alarms() {
   return (
     <div className="alarms-container">
       <h1 className="alarms-title">Алармы</h1>
-
-      <div className="alarms-info">
-        <Info size={18} />
-        <div>
-          Тестовая страница, в разработке.
-          {!canEdit && <div className="alarms-readonly">Только просмотр — редактирование доступно администраторам.</div>}
-        </div>
-      </div>
 
       {loading ? (
         <div className="alarms-loading"><Loader size={26} className="spin" /></div>
