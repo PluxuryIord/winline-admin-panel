@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Calendar, RefreshCw, Download, ChevronDown, Loader,
-  Users, UserCheck, LogIn, Ban, MessageCircle, Send, Bot, Tag, TrendingUp, Filter,
+  Users, UserCheck, LogIn, Ban, MessageCircle, Send, Tag, TrendingUp, Filter,
 } from 'lucide-react';
 import './Analytics.css';
 
@@ -352,15 +352,11 @@ export default function Analytics() {
               <Stat label="Из них от юзеров" value={data.support.fromUsers} />
               <Stat label="Сообщений за период" value={data.support.periodMessages} tone="accent" />
             </Card>
-            <Card title="Рассылки" hint={<><Send size={13} /> две системы</>}>
-              <div className="an-sub-title"><Send size={13} /> Из панели</div>
-              <Stat label="Рассылок" value={data.broadcasts.panelCount} />
+            <Card title="Рассылки" hint={<><Send size={13} /> из панели · за период</>}>
+              <Stat label="Рассылок отправлено" value={data.broadcasts.panelCount} />
+              <Stat label="Всего получателей" value={data.broadcasts.panelRecipients} />
               <Stat label="Доставлено" value={data.broadcasts.panelDelivered} tone="ok" />
               <Stat label="Ошибок" value={data.broadcasts.panelFailed} tone="danger" />
-              <div className="an-sub-title" style={{ marginTop: 10 }}><Bot size={13} /> Из бота (пуши)</div>
-              <Stat label="Рассылок" value={data.broadcasts.botCount} />
-              <Stat label="Отправлено" value={data.broadcasts.botSent} tone="ok" />
-              <Stat label="Ошибок" value={data.broadcasts.botErrors} tone="danger" />
             </Card>
           </div>
 
