@@ -49,10 +49,27 @@ function Card({ title, hint, children, className }) {
   );
 }
 
-/* ── Horizontal bar list ──────────────────────────────────────────────────── */
-function BarList({ data, color = 'var(--color-orange)', empty = 'Нет данных' }) {
+/* ── Horizontal bar list (stacked = full labels on their own line) ────────── */
+function BarList({ data, color = 'var(--color-orange)', empty = 'Нет данных', stacked = false }) {
   if (!data?.length) return <div className="an-empty">{empty}</div>;
   const max = Math.max(...data.map((d) => d.count), 1);
+  if (stacked) {
+    return (
+      <div className="an-bars">
+        {data.map((d, i) => (
+          <div className="an-bar-stack" key={i}>
+            <div className="an-bar-stack-top">
+              <span className="an-bar-slabel">{d.label}</span>
+              <span className="an-bar-val">{ru(d.count)}</span>
+            </div>
+            <div className="an-bar-track">
+              <div className="an-bar-fill" style={{ width: `${(d.count / max) * 100}%`, background: color }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="an-bars">
       {data.map((d, i) => (
@@ -93,35 +110,49 @@ function Funnel({ data }) {
   );
 }
 
-/* ── Area chart (SVG) ─────────────────────────────────────────────────────── */
+/* ── Area chart: SVG area/line + HTML dots (round, не сплющены) + hover ────── */
 function AreaChart({ data }) {
+  const [hover, setHover] = useState(null);
   if (!data?.length) return <div className="an-empty">Нет данных за период</div>;
-  const W = 720, H = 200, P = 26;
   const max = Math.max(...data.map((d) => d.count), 1);
   const n = data.length;
-  const xx = (i) => P + (n === 1 ? (W - 2 * P) / 2 : (i * (W - 2 * P)) / (n - 1));
-  const yy = (v) => H - P - (v / max) * (H - 2 * P);
-  const line = data.map((d, i) => `${xx(i)},${yy(d.count)}`).join(' ');
-  const area = `${xx(0)},${H - P} ${line} ${xx(n - 1)},${H - P}`;
+  const xPct = (i) => (n === 1 ? 50 : (i / (n - 1)) * 100);
+  const yPct = (v) => (1 - v / max) * 100;
+  const line = data.map((d, i) => `${xPct(i)},${yPct(d.count)}`).join(' ');
+  const area = `0,100 ${line} 100,100`;
+  const ticks = [max, Math.round(max * 0.66), Math.round(max * 0.33), 0];
+  const step = Math.max(1, Math.ceil(n / 6));
   return (
-    <div className="an-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="an-area-svg">
-        <defs>
-          <linearGradient id="anFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-orange)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="var(--color-orange)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <line x1={P} y1={H - P} x2={W - P} y2={H - P} stroke="#2a2a3d" strokeWidth="1" />
-        <polygon points={area} fill="url(#anFill)" />
-        <polyline points={line} fill="none" stroke="var(--color-orange)" strokeWidth="2.5"
-          strokeLinejoin="round" strokeLinecap="round" />
-        {data.map((d, i) => <circle key={i} cx={xx(i)} cy={yy(d.count)} r="3" fill="var(--color-orange)" />)}
-      </svg>
-      <div className="an-area-axis">
-        <span>{data[0]?.date}</span>
-        <span className="an-area-max">макс {ru(max)}/период</span>
-        <span>{data[n - 1]?.date}</span>
+    <div className="an-chart2">
+      <div className="an-chart2-grid">
+        <div className="an-yaxis">{ticks.map((t, i) => <span key={i}>{ru(t)}</span>)}</div>
+        <div className="an-plot">
+          {ticks.map((_, i) => <div key={i} className="an-grid-line" style={{ top: `${(i / (ticks.length - 1)) * 100}%` }} />)}
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="an-chart2-svg">
+            <defs>
+              <linearGradient id="anFill2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-orange)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--color-orange)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <polygon points={area} fill="url(#anFill2)" />
+            <polyline points={line} fill="none" stroke="var(--color-orange)" strokeWidth="2"
+              vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+          </svg>
+          {data.map((d, i) => (
+            <div key={i} className="an-dot" style={{ left: `${xPct(i)}%`, top: `${yPct(d.count)}%` }}
+              onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
+          ))}
+          {hover != null && (
+            <div className="an-tip" style={{ left: `${xPct(hover)}%`, top: `${yPct(data[hover].count)}%` }}>
+              <b>{ru(data[hover].count)}</b><span>{data[hover].date}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="an-xaxis">
+        {data.map((d, i) => (i % step === 0 || i === n - 1)
+          ? <span key={i} style={{ left: `${xPct(i)}%` }}>{d.date}</span> : null)}
       </div>
     </div>
   );
@@ -335,7 +366,7 @@ export default function Analytics() {
 
           {/* Теги */}
           <Card title="Сегменты по тегам" hint={<><Tag size={13} /> wl_admin_user_tags</>}>
-            <BarList data={data.tags} color="#a06bff" empty="Тегов нет" />
+            <BarList data={data.tags} color="#a06bff" empty="Тегов нет" stacked />
           </Card>
         </>
       )}

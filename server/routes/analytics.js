@@ -118,9 +118,13 @@ router.get('/', async (req, res, next) => {
 
     // ── Block 7: tags ──────────────────────────────────────────────────────────
     const tagRows = await safe(
-      'SELECT tag AS label, COUNT(*) c FROM wl_admin_user_tags GROUP BY tag ORDER BY c DESC LIMIT 14',
+      'SELECT tag AS label, COUNT(*) c FROM wl_admin_user_tags GROUP BY tag ORDER BY c DESC LIMIT 40',
       [], []);
-    const tags = (tagRows || []).map(r => ({ label: String(r.label || ''), count: Number(r.c) || 0 }));
+    // Hide system tags (prefix «__», e.g. __no_raffle__).
+    const tags = (tagRows || [])
+      .map(r => ({ label: String(r.label || ''), count: Number(r.c) || 0 }))
+      .filter(t => t.label && !t.label.startsWith('__'))
+      .slice(0, 14);
 
     res.json({
       audience: { total, active, blocked, registered, guests, loggedIn, newUsers },

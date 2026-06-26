@@ -303,6 +303,10 @@
 .an-bar-track { height: 18px; background: #1b1b28; border-radius: 6px; overflow: hidden; }
 .an-bar-fill { height: 100%; border-radius: 6px; min-width: 3px; transition: width .5s ease; }
 .an-bar-val { font-size: .82rem; color: #fff; font-weight: 600; text-align: right; }
+/* stacked variant — полное название тега на своей строке, не обрезается */
+.an-bar-stack { display: flex; flex-direction: column; gap: 5px; }
+.an-bar-stack-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.an-bar-slabel { font-size: .82rem; color: rgba(255,255,255,.82); word-break: break-word; line-height: 1.3; }
 
 /* Funnel */
 .an-funnel { display: flex; flex-direction: column; gap: 14px; }
@@ -314,11 +318,26 @@
 .an-funnel-bar { height: 22px; border-radius: 7px;
   background: linear-gradient(90deg, var(--color-orange), #ffae5c); transition: width .5s ease; }
 
-/* Area chart */
-.an-chart { display: flex; flex-direction: column; gap: 6px; }
-.an-area-svg { width: 100%; height: 200px; display: block; }
-.an-area-axis { display: flex; justify-content: space-between; font-size: .72rem; color: rgba(255,255,255,.4); padding: 0 4px; }
-.an-area-max { color: var(--color-orange); }
+/* Area chart v2 — круглые точки (HTML), тултип по наведению, шкала */
+.an-chart2 { display: flex; flex-direction: column; }
+.an-chart2-grid { display: flex; gap: 8px; }
+.an-yaxis { width: 40px; height: 210px; flex-shrink: 0; display: flex; flex-direction: column;
+  justify-content: space-between; align-items: flex-end; font-size: .72rem; color: rgba(255,255,255,.4); }
+.an-plot { flex: 1; height: 210px; position: relative; }
+.an-grid-line { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,.06); }
+.an-chart2-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.an-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--color-orange); border: 2px solid var(--color-panel);
+  transform: translate(-50%, -50%); cursor: pointer; transition: transform .12s; }
+.an-dot:hover { transform: translate(-50%, -50%) scale(1.5); }
+.an-tip { position: absolute; transform: translate(-50%, -150%); background: #0c0c16;
+  border: 1px solid #2f2f48; border-radius: 9px; padding: 5px 11px; white-space: nowrap;
+  pointer-events: none; z-index: 6; display: flex; flex-direction: column; align-items: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.55); }
+.an-tip b { color: #fff; font-size: .9rem; font-weight: 700; }
+.an-tip span { color: rgba(255,255,255,.5); font-size: .7rem; }
+.an-xaxis { position: relative; height: 16px; margin-top: 7px; margin-left: 48px; }
+.an-xaxis span { position: absolute; transform: translateX(-50%); font-size: .7rem; color: rgba(255,255,255,.4); white-space: nowrap; }
 
 /* Donut */
 .an-donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
