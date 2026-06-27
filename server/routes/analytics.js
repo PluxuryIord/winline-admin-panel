@@ -126,6 +126,13 @@ router.get('/', async (req, res, next) => {
       .filter(t => t.label && !t.label.startsWith('__'))
       .slice(0, 14);
 
+    // ── Main-menu button clicks (written by the bot's MenuClickTracker) ────────
+    const menuRows = await safe(
+      'SELECT action, label, clicks FROM wl_menu_clicks ORDER BY clicks DESC', [], []);
+    const menuClicks = (menuRows || []).map(r => ({
+      label: String(r.label || r.action || ''), count: Number(r.clicks) || 0,
+    }));
+
     res.json({
       audience: { total, active, blocked, registered, guests, loggedIn, newUsers },
       growth,
@@ -146,6 +153,7 @@ router.get('/', async (req, res, next) => {
         botErrors: Number(al?.[0]?.err) || 0,
       },
       tags,
+      menuClicks,
     });
   } catch (err) { next(err); }
 });

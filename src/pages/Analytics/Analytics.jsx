@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Calendar, RefreshCw, Download, ChevronDown, Loader,
-  Users, UserCheck, LogIn, Ban, MessageCircle, Send, Tag, TrendingUp, Filter,
+  Users, UserCheck, LogIn, Ban, MessageCircle, Send, Tag, TrendingUp, Filter, MousePointerClick,
 } from 'lucide-react';
 import './Analytics.css';
 
@@ -16,7 +16,7 @@ const EMPTY = {
   growth: [], segments: { role: [], traffic: [], phoneFilled: 0, nameFilled: 0 },
   funnel: [], support: { chats: 0, messages: 0, fromUsers: 0, periodMessages: 0 },
   broadcasts: { panelCount: 0, panelRecipients: 0, panelDelivered: 0, panelFailed: 0, botCount: 0, botSent: 0, botErrors: 0 },
-  tags: [],
+  tags: [], menuClicks: [],
 };
 
 const ru = (n) => Number(n || 0).toLocaleString('ru-RU');
@@ -359,6 +359,12 @@ export default function Analytics() {
               <Stat label="Ошибок" value={data.broadcasts.panelFailed} tone="danger" />
             </Card>
           </div>
+
+          {/* Нажатия кнопок главного меню */}
+          <Card title="Нажатия кнопок главного меню" hint={<><MousePointerClick size={13} /> всего за всё время</>}>
+            <BarList data={data.menuClicks} color="#4a8cff" stacked
+              empty="Пока пусто — счётчики начинают копиться с момента деплоя бота" />
+          </Card>
 
           {/* Теги */}
           <Card title="Сегменты по тегам" hint={<><Tag size={13} /> wl_admin_user_tags</>}>
