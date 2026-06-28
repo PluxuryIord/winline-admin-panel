@@ -2,6 +2,7 @@ import { Router } from 'express';
 import dbPool from '../config/db.js';
 import { logAudit } from '../services/auditLog.js';
 import requireAdmin from '../middleware/requireAdmin.js';
+import { BOT_API_URL, BOT_API_KEY } from '../config/env.js';
 
 const router = Router();
 
@@ -293,6 +294,32 @@ router.post('/reset-log', requireAdmin, async (req, res, next) => {
       `Сброс журнала алармов (${scope}): удалено ${affected}`, null, { scope });
     res.json({ ok: true, deleted: affected, scope });
   } catch (err) { next(err); }
+});
+
+// GET /api/alarms/counts — how many logged-in users currently match each rule.
+// The matching logic lives in the bot (it reads the wl_admon mirror), so we
+// proxy to its admin_api. Degrades gracefully (200 + `unavailable`) when the bot
+// is down so the page still renders — counts just don't appear. ?force=1 skips
+// the bot-side cache. The walk over the whole audience can take a few seconds.
+router.get('/counts', async (req, res, next) => {
+  if (!BOT_API_URL) {
+    return res.json({ rules: {}, by_type: {}, audience: 0, unavailable: 'BOT_API_URL не задан' });
+  }
+  try {
+    const base = BOT_API_URL.replace(/\/$/, '');
+    const qs = req.query.force ? '?force=1' : '';
+    const r = await fetch(`${base}/alarms/counts${qs}`, {
+      headers: { ...(BOT_API_KEY ? { 'X-API-Key': BOT_API_KEY } : {}) },
+      signal: AbortSignal.timeout(45000),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return res.json({ rules: {}, by_type: {}, audience: 0, unavailable: data.error || `бот ответил ${r.status}` });
+    }
+    res.json(data);
+  } catch (e) {
+    res.json({ rules: {}, by_type: {}, audience: 0, unavailable: e.message });
+  }
 });
 
 export default router;

@@ -4,11 +4,36 @@
   margin: 0 auto;
 }
 
+.alarms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
 .alarms-title {
   font-size: 24px;
   font-weight: 700;
-  margin-bottom: 18px;
 }
+.alarms-counts-refresh {
+  background: #1c1c2a; border: 1px solid #2c2c40; border-radius: 8px; color: #c7c7d2;
+  padding: 8px 14px; font-size: 13px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.alarms-counts-refresh:hover { border-color: var(--color-orange); color: var(--color-orange); }
+.alarms-counts-refresh:disabled { opacity: .5; cursor: not-allowed; }
+
+.alarms-counts-summary {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 13px; color: #a9a9ba; margin-bottom: 20px;
+}
+.alarms-counts-summary svg { color: var(--color-orange); }
+.alarms-counts-summary b { color: var(--color-white); }
+.alarms-counts-warn {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: #d9c44b; margin-bottom: 20px;
+}
+.alarms-counts-warn svg { flex-shrink: 0; }
 
 .alarms-info {
   display: flex;
@@ -58,6 +83,13 @@
   display: inline-flex; align-items: center; justify-content: center;
   background: #1c1c2a; border-radius: 11px; color: #a9a9ba; font-size: 12px; font-weight: 600;
 }
+.alarm-type-total {
+  flex-shrink: 0; height: 22px; padding: 0 9px;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,126,0,.12); border: 1px solid rgba(255,126,0,.3);
+  border-radius: 11px; color: #ffb877; font-size: 12px; font-weight: 700;
+}
+.alarm-type-total svg { color: #ffb877; }
 
 .alarm-type-rules {
   display: grid;
@@ -98,6 +130,11 @@
 }
 .alarm-card-titles { flex: 1; min-width: 0; }
 .alarm-card-name { font-weight: 650; font-size: 15px; }
+.alarm-card-count {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 5px;
+  font-size: 12px; font-weight: 600; color: #ffb877;
+}
+.alarm-card-count svg { color: #ffb877; flex-shrink: 0; }
 .alarm-card-desc { font-size: 12px; color: #8b8b9b; line-height: 1.45; margin-top: 3px; }
 
 /* toggle */

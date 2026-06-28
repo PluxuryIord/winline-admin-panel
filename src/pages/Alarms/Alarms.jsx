@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Loader, Mail, Globe, Clock, XCircle, CheckCircle2, MousePointerClick,
-  Plus, Trash2, Check, ScrollText, RefreshCw, Info,
+  Plus, Trash2, Check, ScrollText, RefreshCw, Info, Users,
 } from 'lucide-react';
 import { api } from '../../utils/api.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -74,7 +74,7 @@ function Toggle({ checked, onChange, disabled }) {
   );
 }
 
-function RuleCard({ rule, meta, canEdit, onSaved, onDeleted }) {
+function RuleCard({ rule, meta, canEdit, onSaved, onDeleted, count }) {
   const [enabled, setEnabled] = useState(rule.enabled);
   const [thrValue, setThrValue] = useState(rule.threshold_value ?? '');
   const [thrUnit, setThrUnit] = useState(rule.threshold_unit || 'hours');
@@ -156,6 +156,17 @@ function RuleCard({ rule, meta, canEdit, onSaved, onDeleted }) {
       <div className="alarm-card-head">
         <div className="alarm-card-titles">
           <div className="alarm-card-name">{headLabel}</div>
+          {Number.isFinite(count) && (
+            <div
+              className="alarm-card-count"
+              title={rule.has_threshold
+                ? 'Сколько пользователей подходят под это правило прямо сейчас (живой подсчёт по аудитории бота)'
+                : 'Событийный триггер: число изменений статуса, ожидающих отправки прямо сейчас'}
+            >
+              <Users size={13} />
+              {rule.has_threshold ? `${count} чел. подходят` : `${count} в очереди`}
+            </div>
+          )}
         </div>
         <Toggle checked={enabled} onChange={toggleEnabled} disabled={!canEdit} />
       </div>
@@ -222,10 +233,11 @@ function RuleCard({ rule, meta, canEdit, onSaved, onDeleted }) {
   );
 }
 
-function TypeGroup({ type, rules, canEdit, onSaved, onDeleted, onAdded }) {
+function TypeGroup({ type, rules, canEdit, onSaved, onDeleted, onAdded, counts }) {
   const meta = TRIGGER_META[type] || {};
   const Icon = meta.icon || Info;
   const [adding, setAdding] = useState(false);
+  const typeTotal = counts?.by_type?.[type];
 
   async function addRule() {
     setAdding(true);
@@ -246,12 +258,21 @@ function TypeGroup({ type, rules, canEdit, onSaved, onDeleted, onAdded }) {
           <div className="alarm-type-name">{meta.name || type}</div>
           <div className="alarm-type-desc">{meta.desc}</div>
         </div>
+        {Number.isFinite(typeTotal) && (
+          <span className="alarm-type-total" title="Уникальных пользователей под этим триггером прямо сейчас">
+            <Users size={13} /> {typeTotal}
+          </span>
+        )}
         <span className="alarm-type-count">{rules.length}</span>
       </div>
 
       <div className="alarm-type-rules">
         {rules.map((r) => (
-          <RuleCard key={r.id} rule={r} meta={meta} canEdit={canEdit} onSaved={onSaved} onDeleted={onDeleted} />
+          <RuleCard
+            key={r.id} rule={r} meta={meta} canEdit={canEdit}
+            onSaved={onSaved} onDeleted={onDeleted}
+            count={counts?.rules?.[String(r.id)]}
+          />
         ))}
         {rules.length === 0 && (
           <div className="alarm-type-empty">Правил нет — добавьте первое.</div>
@@ -347,6 +368,8 @@ export default function Alarms() {
   const canEdit = user?.role === 'admin';
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState(null);       // { rules, by_type, audience, unavailable, cached }
+  const [countsLoading, setCountsLoading] = useState(false);
 
   const fetchRules = useCallback(async () => {
     setLoading(true);
@@ -356,7 +379,16 @@ export default function Alarms() {
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchRules(); }, [fetchRules]);
+  // Live audience sizing — proxied to the bot, can take a few seconds.
+  const fetchCounts = useCallback(async (force = false) => {
+    setCountsLoading(true);
+    try {
+      const res = await api.get(`/api/alarms/counts${force ? '?force=1' : ''}`);
+      if (res.ok) setCounts(await res.json());
+    } catch { /* ignore */ } finally { setCountsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchRules(); fetchCounts(); }, [fetchRules, fetchCounts]);
 
   const onRuleSaved = (updated) =>
     setRules((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
@@ -365,7 +397,30 @@ export default function Alarms() {
 
   return (
     <div className="alarms-container">
-      <h1 className="alarms-title">Алармы</h1>
+      <div className="alarms-head">
+        <h1 className="alarms-title">Алармы</h1>
+        <button
+          className="alarms-counts-refresh"
+          onClick={() => fetchCounts(true)}
+          disabled={countsLoading}
+          title="Заново посчитать, сколько пользователей подходит под каждый триггер"
+        >
+          <RefreshCw size={14} className={countsLoading ? 'spin' : ''} /> Пересчитать охват
+        </button>
+      </div>
+
+      {counts && !counts.unavailable && (
+        <div className="alarms-counts-summary">
+          <Users size={14} /> Аудитория бота: <b>{counts.audience}</b>.
+          Числа на карточках — сколько подходит под каждое правило прямо сейчас.
+          {countsLoading && <Loader size={13} className="spin" />}
+        </div>
+      )}
+      {counts?.unavailable && (
+        <div className="alarms-counts-warn">
+          <Info size={14} /> Счётчики охвата недоступны: {counts.unavailable}
+        </div>
+      )}
 
       {loading ? (
         <div className="alarms-loading"><Loader size={26} className="spin" /></div>
@@ -380,6 +435,7 @@ export default function Alarms() {
               onSaved={onRuleSaved}
               onAdded={onRuleAdded}
               onDeleted={onRuleDeleted}
+              counts={counts}
             />
           ))}
         </div>
