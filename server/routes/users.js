@@ -12,6 +12,7 @@ function mapUserRow(r, userTags, comment = '') {
     id: r.user_id,
     fullName: r.rl_full_name || r.full_name || '—',
     telegram: r.username ? `@${r.username}` : '—',
+    email: r.auth_email || '—',
     registrationDate: r.date_reg ? new Date(r.date_reg).toISOString().split('T')[0] : '—',
     banned: !!r.banned,
     role: r.role || '—',
@@ -33,6 +34,10 @@ const HAS_USER_CHAT_EXPR = `(EXISTS (
   WHERE c.user_id = u.user_id AND m.sender = 'user'
     AND m.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
 ))`;
+
+// Winline-email из user_auth (бот пишет туда при логине). Есть только у
+// залогинившихся (~495 из ~3700) — у остальных NULL → на фронте «—».
+const AUTH_EMAIL_EXPR = `(SELECT a.email FROM user_auth a WHERE a.user_id = u.user_id LIMIT 1)`;
 
 // Получить теги, комментарии и editedIds для массива user_id из MySQL (один запрос вместо двух)
 async function getTagsAndComments(userIds) {
@@ -120,7 +125,7 @@ router.get('/', async (req, res, next) => {
     const fromClause = `FROM users u ${tagJoin} ${where}`;
     const [[{ total }]] = await dbPool.query(`SELECT COUNT(*) as total ${fromClause}`, params);
     const [rows] = await dbPool.query(
-      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${HAS_USER_CHAT_EXPR} AS has_user_chat ${fromClause} ORDER BY u.date_reg DESC LIMIT ? OFFSET ?`,
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${AUTH_EMAIL_EXPR} AS auth_email, ${HAS_USER_CHAT_EXPR} AS has_user_chat ${fromClause} ORDER BY u.date_reg DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
@@ -296,7 +301,7 @@ router.get('/:id', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
     const [rows] = await dbPool.query(
-      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${HAS_USER_CHAT_EXPR} AS has_user_chat FROM users u WHERE u.user_id = ?`,
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${AUTH_EMAIL_EXPR} AS auth_email, ${HAS_USER_CHAT_EXPR} AS has_user_chat FROM users u WHERE u.user_id = ?`,
       [Number(req.params.id)]
     );
     if (!rows.length) return res.status(404).json({ error: 'Пользователь не найден' });

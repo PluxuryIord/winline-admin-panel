@@ -230,6 +230,7 @@ export default function UserProfile() {
     const lines = [
       `Пользователь: ${fullName}`,
       `Telegram: ${user.telegram}`,
+      `Email: ${user.email || '—'}`,
       `График: ${user.graph}`,
       `Дата регистрации: ${user.registrationDate}`,
       `Забанен: ${user.banned ? 'Да' : 'Нет'}`,
@@ -368,6 +369,14 @@ export default function UserProfile() {
             <div className="info-row">
               <span className="info-label">Telegram</span>
               <span className="info-value">{user.telegram}</span>
+            </div>
+
+            {/* Email из user_auth — есть только у залогинившихся в боте, read-only */}
+            <div className="info-row">
+              <span className="info-label">Email</span>
+              <span className="info-value" title="Winline-email, которым пользователь залогинился в боте">
+                {user.email || '—'}
+              </span>
             </div>
 
             {/* Редактируемые поля */}
