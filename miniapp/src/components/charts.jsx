@@ -5,6 +5,16 @@ import { useState } from 'react';
 
 const ru = (n) => Number(n || 0).toLocaleString('ru-RU');
 
+// Compact ruble sum for tight spots (the donut hole): 11 455 374 → «11,5 млн».
+// Full amounts stay in the legend rows next to it.
+function compactRub(n) {
+  const v = Number(n || 0);
+  const a = Math.abs(v);
+  if (a >= 1e6) return `${(v / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} млн`;
+  if (a >= 1e5) return `${Math.round(v / 1e3).toLocaleString('ru-RU')} тыс`;
+  return ru(v);
+}
+
 export function AreaChart({ data, valueKey = 'value', labelKey = 'label' }) {
   const [pick, setPick] = useState(null);
   if (!data?.length) return <div className="dim" style={{ padding: 20, textAlign: 'center' }}>Нет данных за период</div>;
@@ -71,8 +81,8 @@ export function Donut({ segments, centerLabel = 'всего', money = false }) {
           acc += frac;
           return el;
         })}
-        <text x="21" y="20.5" className="dn-num">{ru(total)}{money ? ' ₽' : ''}</text>
-        <text x="21" y="25" className="dn-cap">{centerLabel}</text>
+        <text x="21" y="20.5" className="dn-num">{money ? compactRub(total) : ru(total)}</text>
+        <text x="21" y="25" className="dn-cap">{money ? `₽ · ${centerLabel}` : centerLabel}</text>
       </svg>
       <div className="dn-legend">
         {segments.map((s, i) => (

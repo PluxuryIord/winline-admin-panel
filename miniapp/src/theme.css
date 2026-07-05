@@ -141,6 +141,27 @@ html, body {
 .kb-photo {
   width: 100%; border-radius: 12px; margin-bottom: 10px; display: block;
   border: 1px solid var(--c-border);
+  cursor: zoom-in;
+}
+
+/* fullscreen photo viewer */
+.lightbox {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(4, 4, 10, .95);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: calc(100vh - 40px);
+  object-fit: contain;
+  border-radius: 8px;
+}
+.lightbox-close {
+  position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 14px;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,.08); border: none; color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 
 /* stats */
