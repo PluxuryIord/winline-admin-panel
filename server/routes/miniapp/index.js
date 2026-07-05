@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import dbPool from '../../config/db.js';
+import authRouter from './auth.js';
 
 // Mini App API. Mounted PUBLIC (before the panel's JWT authMiddleware) — every
 // request here has already passed telegramInitData, so req.tgUser.id is the
@@ -7,6 +8,8 @@ import dbPool from '../../config/db.js';
 // bot / mini app with a partner email).
 
 const router = Router();
+
+router.use('/auth', authRouter);
 
 // Middleware for partner-only sections: resolves the user_auth email or 403s.
 export async function requireAuthorized(req, res, next) {

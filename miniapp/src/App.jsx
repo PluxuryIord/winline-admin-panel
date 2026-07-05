@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { initTelegram, setBackButton, isTelegram } from './lib/telegram.js';
 import { api, setExpiredHandler } from './lib/api.js';
 import Home from './sections/Home.jsx';
+import Login from './sections/Login.jsx';
+import Profile from './sections/Profile.jsx';
 
 // Section registry. Components are added phase by phase; a section without a
 // component renders the "coming soon" stub so the home grid stays complete.
 const SECTIONS = {
   home: { title: 'Winline Partners', component: Home },
+  login: { title: 'Вход', component: Login },
+  profile: { title: 'Профиль', component: Profile },
 };
 
 export default function App() {
