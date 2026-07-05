@@ -12,7 +12,7 @@ const TILES = [
   { id: 'offer', label: 'Офферы', icon: Gift, ready: true },
   { id: 'promo', label: 'Промо и ссылки', icon: Megaphone, ready: true },
   { id: 'socials', label: 'Соцсети', icon: Share2, ready: true },
-  { id: 'calendar', label: 'Календарь', icon: CalendarDays, ready: false },
+  { id: 'calendar', label: 'Календарь', icon: CalendarDays, ready: true },
   { id: 'chat', label: 'Чат с менеджером', icon: MessageCircle, ready: true },
 ];
 

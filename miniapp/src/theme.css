@@ -216,5 +216,26 @@ html, body {
 .dn-leg-label { color: var(--c-dim); flex: 1; }
 .dn-leg-val { font-weight: 700; white-space: nowrap; }
 
+/* calendar */
+.cal-card {
+  background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 10px;
+}
+.cal-card--past { opacity: .5; }
+.cal-date {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--c-orange-soft);
+  background: rgba(255,126,0,.12); border-radius: 8px; padding: 3px 9px; margin-bottom: 8px;
+}
+.cal-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
+.cal-field { font-size: 13px; color: var(--c-text); margin-top: 4px; line-height: 1.45; }
+.cal-field span { color: var(--c-dim); }
+.cal-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; margin-right: 8px;
+  background: var(--c-panel2); border: 1px solid var(--c-border); border-radius: 9px;
+  color: var(--c-orange-soft); font-family: inherit; font-size: 13px; font-weight: 600;
+  padding: 7px 12px; cursor: pointer;
+}
+
 .spin { animation: mspin 1s linear infinite; }
 @keyframes mspin { to { transform: rotate(360deg); } }

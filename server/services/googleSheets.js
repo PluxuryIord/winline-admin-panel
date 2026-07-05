@@ -5,7 +5,9 @@ let _sheets = null;
 
 function getSheets() {
   if (_sheets) return _sheets;
-  if (!GOOGLE_SERVICE_ACCOUNT || !GOOGLE_SPREADSHEET_ID) return null;
+  // Only the service account is required — the client can read ANY spreadsheet
+  // shared with it (e.g. the calendar), not just the anketa one.
+  if (!GOOGLE_SERVICE_ACCOUNT) return null;
 
   try {
     const creds = JSON.parse(GOOGLE_SERVICE_ACCOUNT);
@@ -37,7 +39,7 @@ export async function createAnketaSheet(answerColumns = []) {
   );
   const ANKETA_HEADERS = [...ANKETA_BASE_HEADERS, ...headerLabels];
   const sheets = getSheets();
-  if (!sheets) return null;
+  if (!sheets || !GOOGLE_SPREADSHEET_ID) return null;
 
   const now = new Date();
   const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
@@ -95,7 +97,7 @@ export async function createAnketaSheet(answerColumns = []) {
  */
 export async function createSheetForQuestions(questions) {
   const sheets = getSheets();
-  if (!sheets) return null;
+  if (!sheets || !GOOGLE_SPREADSHEET_ID) return null;
 
   const now = new Date();
   const dateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
@@ -140,4 +142,22 @@ export async function createSheetForQuestions(questions) {
 export function getSpreadsheetUrl() {
   if (!GOOGLE_SPREADSHEET_ID) return null;
   return `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}`;
+}
+
+/**
+ * Read raw values from ANY spreadsheet shared with the service account
+ * (used by the mini app calendar — its spreadsheet id comes from the
+ * client_calendar scenario screen, not from GOOGLE_SPREADSHEET_ID).
+ * Returns rows (array of arrays) or null when unconfigured/unreachable.
+ */
+export async function readSheetValues(spreadsheetId, range = 'A1:H300') {
+  const sheets = getSheets();
+  if (!sheets || !spreadsheetId) return null;
+  try {
+    const { data } = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+    return data.values || [];
+  } catch (err) {
+    console.warn('[googleSheets] readSheetValues failed:', err.message);
+    return null;
+  }
 }

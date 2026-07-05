@@ -7,6 +7,7 @@ import Profile from './sections/Profile.jsx';
 import Knowledge from './sections/Knowledge.jsx';
 import ContentScreen from './sections/ContentScreen.jsx';
 import Stats from './sections/Stats.jsx';
+import Calendar from './sections/Calendar.jsx';
 
 const OfferScreen = (p) => <ContentScreen {...p} screenId="offer_page" fallbackTitle="Информация по офферу" />;
 const PromoScreen = (p) => <ContentScreen {...p} screenId="promo_page" fallbackTitle="Актуальные крео и лендинги" />;
@@ -20,6 +21,7 @@ const SECTIONS = {
   profile: { title: 'Профиль', component: Profile },
   kb: { title: 'База знаний', component: Knowledge },
   stats: { title: 'Моя статистика', component: Stats },
+  calendar: { title: 'Календарь', component: Calendar },
   offer: { title: 'Офферы', component: OfferScreen },
   promo: { title: 'Промо', component: PromoScreen },
   socials: { title: 'Соцсети', component: SocialsScreen },
