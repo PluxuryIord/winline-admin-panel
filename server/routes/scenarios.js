@@ -1,10 +1,42 @@
 import { Router } from 'express';
 import dbPool from '../config/db.js';
-import { BOT_API_URL, BOT_API_KEY } from '../config/env.js';
+import { BOT_API_URL, BOT_API_KEY, MINIAPP_URL } from '../config/env.js';
 import { logAudit } from '../services/auditLog.js';
 import { createDailySnapshot } from '../services/snapshots.js';
 
 const router = Router();
+
+// ─── Mini App rollout migration (module load, NOT the GET handler) ──────────
+// Adds the «📱 Открыть приложение» web_app button to the EXISTING main_menu
+// screen. SEED auto-merge only adds missing screens (known pitfall), so an
+// explicit migration is required — and at module load so a deploy alone is
+// enough (the bot re-reads scenarios every ~3s; no panel page visit needed).
+// Gated by MINIAPP_URL env: unset → do nothing (don't ship a dead button
+// before the subdomain is live). Idempotent: re-runs only update a changed URL.
+(async () => {
+  if (!dbPool || !MINIAPP_URL) return;
+  try {
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
+    if (!rows.length) return; // not seeded yet — SEED_DATA already carries the button
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const menu = data?.screens?.main_menu;
+    if (!menu) return;
+    menu.buttons = menu.buttons || { _order: [] };
+    const action = `web_app:${MINIAPP_URL}`;
+    const existing = menu.buttons.btn_webapp;
+    if (existing && existing.action === action) return; // already in place
+    menu.buttons.btn_webapp = {
+      label: existing?.label || '📱 Открыть приложение',
+      action,
+      locked: true,
+    };
+    menu.buttons._order = ['btn_webapp', ...(menu.buttons._order || []).filter((k) => k !== 'btn_webapp')];
+    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
+    console.log(`[scenarios] migrate: main_menu btn_webapp → ${MINIAPP_URL}`);
+  } catch (e) {
+    console.warn('[scenarios] btn_webapp migration failed:', e.message);
+  }
+})();
 
 // ─── Notify bot to reload texts after save ──────────────────────────────────
 async function notifyBotReload() {
@@ -102,7 +134,8 @@ const SEED_DATA = {
       description: 'Меню авторизованного пользователя',
       messages: {},
       buttons: {
-        _order: ['btn_kb', 'btn_offer', 'btn_promo', 'btn_chat', 'btn_socials', 'btn_event', 'btn_logout'],
+        _order: ['btn_webapp', 'btn_kb', 'btn_offer', 'btn_promo', 'btn_chat', 'btn_socials', 'btn_event', 'btn_logout'],
+        btn_webapp: { label: '📱 Открыть приложение', action: 'web_app:https://app.winlinepartners.ru', locked: true },
         btn_kb: { label: 'База знаний', action: 'callback:client_knowledge_base', targetScreen: 'knowledge_base' },
         btn_offer: { label: 'Информация по офферу', action: 'callback:client_offers' },
         btn_promo: { label: 'Актуальные крео и лендинги', action: 'callback:client_promo' },

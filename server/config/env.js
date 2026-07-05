@@ -47,7 +47,9 @@ export const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || proj
 export const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || projectEnv.GOOGLE_SPREADSHEET_ID || '';
 
 // --- Telegram Mini App (app.winlinepartners.ru) ---
-export const MINIAPP_URL = process.env.MINIAPP_URL || projectEnv.MINIAPP_URL || 'https://app.winlinepartners.ru';
+// EMPTY until the subdomain is live: setting this env var is the rollout
+// switch — it triggers the main_menu btn_webapp migration in scenarios.js.
+export const MINIAPP_URL = (process.env.MINIAPP_URL || projectEnv.MINIAPP_URL || '').trim();
 // wl_admon mirror DB (same env var names as the bot's db_admon.py). Used by the
 // mini app login to check an email against the partner base. Optional — when
 // unset, login answers 503 mirror_unavailable but the rest of the app works.
