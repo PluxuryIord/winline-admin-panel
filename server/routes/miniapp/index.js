@@ -2,6 +2,7 @@ import { Router } from 'express';
 import dbPool from '../../config/db.js';
 import authRouter from './auth.js';
 import contentRouter from './content.js';
+import statsRouter from './stats.js';
 
 // Mini App API. Mounted PUBLIC (before the panel's JWT authMiddleware) — every
 // request here has already passed telegramInitData, so req.tgUser.id is the
@@ -12,6 +13,7 @@ const router = Router();
 
 router.use('/auth', authRouter);
 router.use('/content', contentRouter);
+router.use('/stats', statsRouter);
 
 // GET /api/miniapp/me — who am I (from validated initData) + auth state.
 router.get('/me', async (req, res, next) => {

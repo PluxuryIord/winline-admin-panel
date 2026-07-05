@@ -7,7 +7,7 @@ import { openTelegramLink } from '../lib/telegram.js';
 
 // Home grid. Sections unlock phase by phase — `ready:false` tiles show «скоро».
 const TILES = [
-  { id: 'stats', label: 'Моя статистика', icon: BarChart3, ready: false },
+  { id: 'stats', label: 'Моя статистика', icon: BarChart3, ready: true },
   { id: 'kb', label: 'База знаний', icon: BookOpen, ready: true },
   { id: 'offer', label: 'Офферы', icon: Gift, ready: true },
   { id: 'promo', label: 'Промо и ссылки', icon: Megaphone, ready: true },
