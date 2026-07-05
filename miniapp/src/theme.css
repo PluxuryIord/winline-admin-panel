@@ -111,5 +111,37 @@ html, body {
 }
 .field input:focus { border-color: var(--c-orange); }
 
+/* telegram-html text blocks */
+.tg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.tg-text a { color: var(--c-orange-soft); }
+.tg-text code {
+  background: var(--c-panel2); border-radius: 5px; padding: 1px 5px; font-size: 13px;
+}
+
+/* knowledge base */
+.kb-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left;
+  background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 12px;
+  color: var(--c-text); font-family: inherit; font-size: 14px; font-weight: 600;
+  padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+}
+.kb-row svg { color: var(--c-dim); flex-shrink: 0; }
+.kb-row:active { border-color: var(--c-orange); }
+.kb-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--c-dim); font-family: inherit;
+  font-size: 13px; cursor: pointer; padding: 0; margin-bottom: 12px;
+}
+.kb-photo {
+  width: 100%; border-radius: 12px; margin-bottom: 10px; display: block;
+  border: 1px solid var(--c-border);
+}
+
 .spin { animation: mspin 1s linear infinite; }
 @keyframes mspin { to { transform: rotate(360deg); } }

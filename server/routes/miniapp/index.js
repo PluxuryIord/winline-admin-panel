@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import dbPool from '../../config/db.js';
 import authRouter from './auth.js';
+import contentRouter from './content.js';
 
 // Mini App API. Mounted PUBLIC (before the panel's JWT authMiddleware) — every
 // request here has already passed telegramInitData, so req.tgUser.id is the
@@ -10,22 +11,7 @@ import authRouter from './auth.js';
 const router = Router();
 
 router.use('/auth', authRouter);
-
-// Middleware for partner-only sections: resolves the user_auth email or 403s.
-export async function requireAuthorized(req, res, next) {
-  try {
-    if (!dbPool) return res.status(503).json({ error: 'База данных недоступна' });
-    const [rows] = await dbPool.query(
-      'SELECT email FROM user_auth WHERE user_id = ? LIMIT 1',
-      [req.tgUser.id]
-    );
-    if (!rows.length || !rows[0].email) {
-      return res.status(403).json({ error: 'not_authorized' });
-    }
-    req.partnerEmail = String(rows[0].email).trim().toLowerCase();
-    next();
-  } catch (err) { next(err); }
-}
+router.use('/content', contentRouter);
 
 // GET /api/miniapp/me — who am I (from validated initData) + auth state.
 router.get('/me', async (req, res, next) => {

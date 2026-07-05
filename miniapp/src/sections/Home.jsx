@@ -1,21 +1,42 @@
+import { useState, useEffect } from 'react';
 import {
   BookOpen, Gift, Megaphone, MessageCircle, Share2, BarChart3, CalendarDays, User,
 } from 'lucide-react';
+import { api } from '../lib/api.js';
+import { openTelegramLink } from '../lib/telegram.js';
 
 // Home grid. Sections unlock phase by phase — `ready:false` tiles show «скоро».
 const TILES = [
-  { id: 'stats', label: 'Моя статистика', icon: BarChart3, ready: false, needsAuth: true },
-  { id: 'kb', label: 'База знаний', icon: BookOpen, ready: false, needsAuth: true },
-  { id: 'offer', label: 'Офферы', icon: Gift, ready: false, needsAuth: true },
-  { id: 'promo', label: 'Промо и ссылки', icon: Megaphone, ready: false, needsAuth: true },
-  { id: 'socials', label: 'Соцсети', icon: Share2, ready: false, needsAuth: true },
-  { id: 'calendar', label: 'Календарь', icon: CalendarDays, ready: false, needsAuth: true },
-  { id: 'chat', label: 'Чат с менеджером', icon: MessageCircle, ready: false, needsAuth: true },
+  { id: 'stats', label: 'Моя статистика', icon: BarChart3, ready: false },
+  { id: 'kb', label: 'База знаний', icon: BookOpen, ready: true },
+  { id: 'offer', label: 'Офферы', icon: Gift, ready: true },
+  { id: 'promo', label: 'Промо и ссылки', icon: Megaphone, ready: true },
+  { id: 'socials', label: 'Соцсети', icon: Share2, ready: true },
+  { id: 'calendar', label: 'Календарь', icon: CalendarDays, ready: false },
+  { id: 'chat', label: 'Чат с менеджером', icon: MessageCircle, ready: true },
 ];
 
 export default function Home({ me, navigate }) {
   const loading = me === null;
   const authorized = !!me?.authorized;
+  const [chatUrl, setChatUrl] = useState(null);
+
+  useEffect(() => {
+    if (!authorized) return;
+    let alive = true;
+    api.get('/content/links').then((res) => {
+      if (alive && res.ok) setChatUrl(res.data.chat_manager_url || null);
+    });
+    return () => { alive = false; };
+  }, [authorized]);
+
+  function onTile(id) {
+    if (id === 'chat') {
+      if (chatUrl) openTelegramLink(chatUrl);
+      return;
+    }
+    navigate(id);
+  }
 
   return (
     <div className="home">
@@ -44,19 +65,29 @@ export default function Home({ me, navigate }) {
       )}
 
       <div className="home-grid">
-        {TILES.map(({ id, label, icon: Icon, ready }) => (
-          <button
-            key={id}
-            className={`home-tile ${ready ? '' : 'home-tile--soon'}`}
-            onClick={() => ready && navigate(id)}
-            disabled={!ready}
-          >
-            <Icon size={22} />
-            <span>{label}</span>
-            {!ready && <em>скоро</em>}
-          </button>
-        ))}
+        {TILES.map(({ id, label, icon: Icon, ready }) => {
+          // Разделы требуют логина; чат — тоже (url приходит только авторизованным).
+          const enabled = ready && authorized && (id !== 'chat' || !!chatUrl);
+          return (
+            <button
+              key={id}
+              className={`home-tile ${ready ? '' : 'home-tile--soon'}`}
+              onClick={() => enabled && onTile(id)}
+              disabled={!enabled}
+            >
+              <Icon size={22} />
+              <span>{label}</span>
+              {!ready && <em>скоро</em>}
+            </button>
+          );
+        })}
       </div>
+
+      {!loading && !authorized && (
+        <p className="dim" style={{ fontSize: 12, marginTop: 14, lineHeight: 1.5 }}>
+          Разделы доступны после входа по email партнёра Winline.
+        </p>
+      )}
     </div>
   );
 }

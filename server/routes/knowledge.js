@@ -116,33 +116,39 @@ function buildSubtopics(data, parentKey) {
   return out;
 }
 
+/** Shared shaping: full article list (also consumed read-only by the Mini App). */
+export async function getPublicKnowledge() {
+  const { dbId, data } = await loadKB();
+  if (!data) return { dbId: null, articles: [] };
+
+  await ensureMeta(data, dbId);
+
+  const meta = data._meta;
+  const articles = [];
+  for (const key of meta.order) {
+    if (data[key] === undefined) continue;
+    const photoKey = getPhotoKey(key);
+    // Для legacy-ключей (postback_photo, report_photo и т.д.) проверяем оба варианта
+    const legacyPhotoKey = LEGACY_PHOTO_MAP[key];
+    const photoFileId = data[photoKey] || (legacyPhotoKey ? data[legacyPhotoKey] : null) || null;
+    const photoS3Url = data[`${photoKey}_s3`] || (legacyPhotoKey ? data[`${legacyPhotoKey}_s3`] : null) || null;
+    articles.push({
+      key,
+      title: meta.titles[key] || key,
+      content: data[key] || '',
+      photoKey,
+      photoFileId,
+      photoS3Url,
+      subtopics: buildSubtopics(data, key),
+    });
+  }
+  return { dbId, articles };
+}
+
 router.get('/', async (req, res, next) => {
   try {
-    const { dbId, data } = await loadKB();
-    if (!data) return res.json([]);
-
-    await ensureMeta(data, dbId);
-
-    const meta = data._meta;
-    const articles = [];
-    for (const key of meta.order) {
-      if (data[key] === undefined) continue;
-      const photoKey = getPhotoKey(key);
-      // Для legacy-ключей (postback_photo, report_photo и т.д.) проверяем оба варианта
-      const legacyPhotoKey = LEGACY_PHOTO_MAP[key];
-      const photoFileId = data[photoKey] || (legacyPhotoKey ? data[legacyPhotoKey] : null) || null;
-      const photoS3Url = data[`${photoKey}_s3`] || (legacyPhotoKey ? data[`${legacyPhotoKey}_s3`] : null) || null;
-      articles.push({
-        key,
-        title: meta.titles[key] || key,
-        content: data[key] || '',
-        photoKey,
-        photoFileId,
-        photoS3Url,
-        subtopics: buildSubtopics(data, key),
-      });
-    }
-
+    const { dbId, articles } = await getPublicKnowledge();
+    if (dbId === null) return res.json([]);
     res.json({ dbId, articles });
   } catch (err) { next(err); }
 });

@@ -4,6 +4,12 @@ import { api, setExpiredHandler } from './lib/api.js';
 import Home from './sections/Home.jsx';
 import Login from './sections/Login.jsx';
 import Profile from './sections/Profile.jsx';
+import Knowledge from './sections/Knowledge.jsx';
+import ContentScreen from './sections/ContentScreen.jsx';
+
+const OfferScreen = (p) => <ContentScreen {...p} screenId="offer_page" fallbackTitle="Информация по офферу" />;
+const PromoScreen = (p) => <ContentScreen {...p} screenId="promo_page" fallbackTitle="Актуальные крео и лендинги" />;
+const SocialsScreen = (p) => <ContentScreen {...p} screenId="socials_page" fallbackTitle="Наши соц. сети" />;
 
 // Section registry. Components are added phase by phase; a section without a
 // component renders the "coming soon" stub so the home grid stays complete.
@@ -11,6 +17,10 @@ const SECTIONS = {
   home: { title: 'Winline Partners', component: Home },
   login: { title: 'Вход', component: Login },
   profile: { title: 'Профиль', component: Profile },
+  kb: { title: 'База знаний', component: Knowledge },
+  offer: { title: 'Офферы', component: OfferScreen },
+  promo: { title: 'Промо', component: PromoScreen },
+  socials: { title: 'Соцсети', component: SocialsScreen },
 };
 
 export default function App() {
