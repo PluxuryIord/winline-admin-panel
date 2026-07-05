@@ -89,6 +89,25 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Mini App: общий лимит на юзера-IP + жёсткий на OTP-запросы.
+// ⚠️ Требует корректного real-ip за Cloudflare (nginx: real_ip_header CF-Connecting-IP),
+// иначе все юзеры делят несколько CF-IP и лимитеры душат всех разом.
+const miniappLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Слишком много запросов, попробуйте позже' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const miniappOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Слишком много попыток, попробуйте через 15 минут' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/verify-otp', loginLimiter);
 app.use('/api/broadcasts/groups/send', broadcastLimiter);
@@ -100,6 +119,9 @@ app.post('/api/snapshots', snapshotLimiter);
 app.put('/api/snapshots', snapshotLimiter);
 app.post('/api/broadcasts/upload', uploadLimiter);
 app.post('/api/knowledge/photo', uploadLimiter);
+app.use('/api/miniapp/auth/request-otp', miniappOtpLimiter);
+app.use('/api/miniapp/auth/verify-otp', miniappOtpLimiter);
+app.use('/api/miniapp', miniappLimiter);
 app.use('/api', apiLimiter);
 
 // === Security headers ===
@@ -136,6 +158,11 @@ app.use('/api/internal/event-raffle', raffleInternalRouter);
 // Публичный прокси фото KB (img src не может передать Bearer токен)
 import { knowledgePhotoProxy } from './routes/knowledge.js';
 app.get('/api/knowledge/photo/:fileId', knowledgePhotoProxy);
+
+// Mini App (Telegram WebApp): свой auth через подписанную initData, НЕ JWT панели.
+import telegramInitData from './middleware/telegramInitData.js';
+import miniappRouter from './routes/miniapp/index.js';
+app.use('/api/miniapp', telegramInitData, miniappRouter);
 
 // Публичные endpoints для хостес-страницы (без JWT)
 app.post('/api/events/scan', scanHandler);

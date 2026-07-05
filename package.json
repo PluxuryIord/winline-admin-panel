@@ -14,7 +14,9 @@
     "migrate": "node server/migrations/migrate.js",
     "migrate:data": "node server/migrations/migrate-data.js",
     "set-admin-email": "node server/scripts/set-admin-email.js",
-    "test-smtp": "node server/scripts/test-smtp.js"
+    "test-smtp": "node server/scripts/test-smtp.js",
+    "build:miniapp": "vite build --config vite.miniapp.config.js",
+    "dev:miniapp": "vite --config vite.miniapp.config.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1012.0",

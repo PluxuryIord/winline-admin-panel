@@ -46,6 +46,17 @@ export const BOT_API_KEY = process.env.BOT_API_KEY || projectEnv.BOT_API_KEY || 
 export const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT || projectEnv.GOOGLE_SERVICE_ACCOUNT || '';
 export const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || projectEnv.GOOGLE_SPREADSHEET_ID || '';
 
+// --- Telegram Mini App (app.winlinepartners.ru) ---
+export const MINIAPP_URL = process.env.MINIAPP_URL || projectEnv.MINIAPP_URL || 'https://app.winlinepartners.ru';
+// wl_admon mirror DB (same env var names as the bot's db_admon.py). Used by the
+// mini app login to check an email against the partner base. Optional — when
+// unset, login answers 503 mirror_unavailable but the rest of the app works.
+export const WL_ADMON_DB_HOST = process.env.WL_ADMON_DB_HOST || projectEnv.WL_ADMON_DB_HOST || '';
+export const WL_ADMON_DB_PORT = Number(process.env.WL_ADMON_DB_PORT || projectEnv.WL_ADMON_DB_PORT || 3306);
+export const WL_ADMON_DB_USER = process.env.WL_ADMON_DB_USER || projectEnv.WL_ADMON_DB_USER || '';
+export const WL_ADMON_DB_PASSWORD = process.env.WL_ADMON_DB_PASSWORD || projectEnv.WL_ADMON_DB_PASSWORD || '';
+export const WL_ADMON_DB_NAME = process.env.WL_ADMON_DB_NAME || projectEnv.WL_ADMON_DB_NAME || 'wl_admon';
+
 // --- SMTP (2FA OTP emails) ---
 export const SMTP_HOST = process.env.SMTP_HOST || projectEnv.SMTP_HOST || '';
 export const SMTP_PORT = Number(process.env.SMTP_PORT || projectEnv.SMTP_PORT || 465);
