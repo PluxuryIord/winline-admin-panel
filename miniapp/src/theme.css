@@ -237,25 +237,29 @@ html, body {
 .dn-leg-label { color: var(--c-dim); flex: 1; }
 .dn-leg-val { font-weight: 700; white-space: nowrap; }
 
-/* calendar */
-.cal-card {
+/* calendar (month grid → day sections) */
+.cal-day {
   background: var(--c-panel); border: 1px solid var(--c-border); border-radius: 14px;
-  padding: 14px 16px; margin-bottom: 10px;
+  padding: 12px 16px; margin-bottom: 8px;
+  scroll-margin-top: 12px;
 }
-.cal-card--past { opacity: .5; }
-.cal-date {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 700; color: var(--c-orange-soft);
-  background: rgba(255,126,0,.12); border-radius: 8px; padding: 3px 9px; margin-bottom: 8px;
+.cal-day--past { opacity: .45; }
+.cal-day--today { border-color: var(--c-orange); box-shadow: 0 0 0 1px rgba(255,126,0,.2); }
+.cal-day-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+.cal-day-num { font-size: 19px; font-weight: 800; color: var(--c-orange-soft); min-width: 26px; }
+.cal-day-wd { font-size: 12px; color: var(--c-dim); }
+.cal-today-badge {
+  margin-left: auto; font-size: 10px; font-weight: 700; color: var(--c-orange-soft);
+  background: rgba(255,126,0,.14); border-radius: 8px; padding: 2px 8px;
 }
-.cal-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
-.cal-field { font-size: 13px; color: var(--c-text); margin-top: 4px; line-height: 1.45; }
-.cal-field span { color: var(--c-dim); }
-.cal-link {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; margin-right: 8px;
-  background: var(--c-panel2); border: 1px solid var(--c-border); border-radius: 9px;
-  color: var(--c-orange-soft); font-family: inherit; font-size: 13px; font-weight: 600;
-  padding: 7px 12px; cursor: pointer;
+.cal-items { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.cal-items li {
+  position: relative; padding-left: 14px;
+  font-size: 13.5px; line-height: 1.45;
+}
+.cal-items li::before {
+  content: ''; position: absolute; left: 0; top: .52em;
+  width: 6px; height: 6px; border-radius: 2px; background: var(--c-orange);
 }
 
 .spin { animation: mspin 1s linear infinite; }

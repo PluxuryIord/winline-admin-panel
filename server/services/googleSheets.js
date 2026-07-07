@@ -161,3 +161,26 @@ export async function readSheetValues(spreadsheetId, range = 'A1:H300') {
     return null;
   }
 }
+
+/**
+ * Tab list of ANY spreadsheet: [{ title, index, sheetId }] in tab order.
+ * Lets callers address sheets by name explicitly (the calendar has one tab
+ * per month). Returns null when unconfigured/unreachable.
+ */
+export async function getSheetsMeta(spreadsheetId) {
+  const sheets = getSheets();
+  if (!sheets || !spreadsheetId) return null;
+  try {
+    const { data } = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets(properties(sheetId,title,index))',
+    });
+    return (data.sheets || [])
+      .map((s) => s.properties)
+      .sort((a, b) => (a.index || 0) - (b.index || 0))
+      .map(({ title, index, sheetId }) => ({ title, index, sheetId }));
+  } catch (err) {
+    console.warn('[googleSheets] getSheetsMeta failed:', err.message);
+    return null;
+  }
+}
