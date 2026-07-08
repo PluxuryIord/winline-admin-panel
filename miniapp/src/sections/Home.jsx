@@ -9,10 +9,10 @@ import { openTelegramLink } from '../lib/telegram.js';
 const TILES = [
   { id: 'stats', label: 'Моя статистика', icon: BarChart3, ready: true },
   { id: 'kb', label: 'База знаний', icon: BookOpen, ready: true },
-  { id: 'offer', label: 'Офферы', icon: Gift, ready: true },
-  { id: 'promo', label: 'Промо и ссылки', icon: Megaphone, ready: true },
-  { id: 'socials', label: 'Соцсети', icon: Share2, ready: true },
-  { id: 'calendar', label: 'Календарь', icon: CalendarDays, ready: true },
+  { id: 'offer', label: 'Информация по офферу', icon: Gift, ready: true },
+  { id: 'promo', label: 'Актуальные крео и лендинги', icon: Megaphone, ready: true },
+  { id: 'socials', label: 'Наши соцсети', icon: Share2, ready: true },
+  { id: 'calendar', label: 'Календарь мероприятий', icon: CalendarDays, ready: true },
   { id: 'chat', label: 'Чат с менеджером', icon: MessageCircle, ready: true },
 ];
 
