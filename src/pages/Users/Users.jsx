@@ -31,6 +31,7 @@ export default function Users() {
 
   // Export dropdown
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const exportRef = useRef(null);
   const sentinelRef = useRef(null);
 
@@ -219,20 +220,23 @@ export default function Users() {
     setDeleteTagModal(null);
   };
 
-  // Фильтрация и сортировка (клиентская, по загруженным)
-  const filteredAndSortedUsers = useMemo(() => {
-    let result = [...users];
-
-    if (sortConfig.key) {
+  // Сортировка (клиентская) — общая для таблицы и экспорта
+  const sortList = useCallback((list, cfg) => {
+    const result = [...list];
+    if (cfg.key) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+        if (a[cfg.key] < b[cfg.key]) return cfg.direction === 'asc' ? -1 : 1;
+        if (a[cfg.key] > b[cfg.key]) return cfg.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
-
     return result;
-  }, [users, sortConfig]);
+  }, []);
+
+  const filteredAndSortedUsers = useMemo(
+    () => sortList(users, sortConfig),
+    [users, sortConfig, sortList]
+  );
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -264,42 +268,63 @@ export default function Users() {
     }
   };
 
-  // Экспорт CSV
-  const exportCSV = (list) => {
-    const BOM = '\uFEFF';
-    const headers = ['ФИО', 'Telegram', 'Дата регистрации', 'Забанен', 'Теги'];
-    const rows = list.map(u => [
-      u.fullName,
-      u.telegram,
-      u.registrationDate,
-      u.banned ? 'Да' : 'Нет',
-      (u.tags || []).join('; ')
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
-    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+  // Экспорт — тянет с сервера ВСЕХ подходящих под текущие фильтры (страница
+  // со скроллом держит только загруженную часть) и сортирует как таблицу.
+  const fetchAllForExport = async () => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filterTags.length) params.set('tags', filterTags.join(','));
+    const res = await api.get(`/api/users/export?${params}`);
+    if (!res.ok) throw new Error('Не удалось выгрузить пользователей');
+    const data = await res.json();
+    return sortList(data.users || [], sortConfig);
+  };
+
+  const downloadBlob = (content, mime, filename) => {
+    const blob = new Blob(['\uFEFF' + content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'users.csv';
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const list = await fetchAllForExport();
+      const headers = ['ФИО', 'Telegram', 'Дата регистрации', 'Забанен', 'Теги'];
+      const rows = list.map(u => [
+        u.fullName,
+        u.telegram,
+        u.registrationDate,
+        u.banned ? 'Да' : 'Нет',
+        (u.tags || []).join('; ')
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+      downloadBlob(csv, 'text/csv;charset=utf-8', 'users.csv');
+    } catch (err) {
+      alert('Ошибка экспорта: ' + err.message);
+    }
+    setExporting(false);
     setShowExportDropdown(false);
   };
 
-  const handleExportExcel = () => exportCSV(filteredAndSortedUsers);
-  const handleExportTxt = () => {
-    const BOM = '\uFEFF';
-    const lines = filteredAndSortedUsers.map(u =>
-      `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${(u.tags || []).join(', ')}`
-    );
-    const txt = lines.join('\n');
-    const blob = new Blob([BOM + txt], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'users.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportTxt = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const list = await fetchAllForExport();
+      const txt = list.map(u =>
+        `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${(u.tags || []).join(', ')}`
+      ).join('\n');
+      downloadBlob(txt, 'text/plain;charset=utf-8', 'users.txt');
+    } catch (err) {
+      alert('Ошибка экспорта: ' + err.message);
+    }
+    setExporting(false);
     setShowExportDropdown(false);
   };
 
@@ -346,11 +371,11 @@ export default function Users() {
             </button>
             {showExportDropdown && (
               <div className="export-dropdown">
-                <div className="export-dropdown-item" onClick={handleExportExcel}>
-                  <Download size={14} /> Excel (CSV)
+                <div className="export-dropdown-item" onClick={handleExportExcel} style={exporting ? { opacity: .5, pointerEvents: 'none' } : undefined}>
+                  {exporting ? <Loader size={14} className="spinner" /> : <Download size={14} />} Excel (CSV)
                 </div>
-                <div className="export-dropdown-item" onClick={handleExportTxt}>
-                  <Download size={14} /> Текст (TXT)
+                <div className="export-dropdown-item" onClick={handleExportTxt} style={exporting ? { opacity: .5, pointerEvents: 'none' } : undefined}>
+                  {exporting ? <Loader size={14} className="spinner" /> : <Download size={14} />} Текст (TXT)
                 </div>
               </div>
             )}

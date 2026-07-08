@@ -145,6 +145,40 @@ router.get('/all-tags', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/users/export?search=&tags= — ВСЕ подходящие под фильтр строки без
+// пагинации (для выгрузки CSV/TXT; листинг со скроллом отдаёт страницами и
+// экспортировал только загруженное).
+router.get('/export', async (req, res, next) => {
+  if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
+  try {
+    const search = (req.query.search || '').trim();
+    const tags = (req.query.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+
+    const params = [];
+    let tagJoin = '';
+    if (tags.length) {
+      tagJoin = 'INNER JOIN (SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)) AS tf ON tf.user_id = u.user_id';
+      params.push(tags);
+    }
+    let where = '';
+    if (search) {
+      where = 'WHERE (u.full_name LIKE ? OR u.rl_full_name LIKE ? OR u.username LIKE ? OR EXISTS (SELECT 1 FROM wl_admin_user_tags ts WHERE ts.user_id = u.user_id AND ts.tag LIKE ?))';
+      const like = `%${search}%`;
+      params.push(like, like, like, like);
+    }
+
+    const [rows] = await dbPool.query(
+      `SELECT ${USER_COLUMNS.split(', ').map(c => `u.${c}`).join(', ')}, ${AUTH_EMAIL_EXPR} AS auth_email, ${HAS_USER_CHAT_EXPR} AS has_user_chat FROM users u ${tagJoin} ${where} ORDER BY u.date_reg DESC`,
+      params
+    );
+
+    const userIds = rows.map(r => r.user_id);
+    const { tags: tagsMap, comments: commentsMap, editedIds } = await getTagsAndComments(userIds);
+    const users = rows.map(r => mapUserRow(r, buildTagsForUser(r.user_id, tagsMap, editedIds, r.date_reg), commentsMap[String(r.user_id)] || ''));
+    res.json({ users, total: users.length });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/users/tags/rename — переименовать тег у всех носителей
 router.put('/tags/rename', requireAdmin, async (req, res, next) => {
   const { oldTag, newTag } = req.body;
