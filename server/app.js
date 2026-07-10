@@ -51,7 +51,9 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 минута
-  max: 500,
+  // Per-IP. Several office admins share one NAT IP, so the budget is pooled —
+  // keep it roomy (bursty page loads across users). Override via API_RATE_MAX.
+  max: Number(process.env.API_RATE_MAX) || 2000,
   message: { error: 'Слишком много запросов, попробуйте позже' },
   standardHeaders: true,
   legacyHeaders: false,
