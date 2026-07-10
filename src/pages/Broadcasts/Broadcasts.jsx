@@ -812,7 +812,15 @@ function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive,
   const [tagsLoading, setTagsLoading] = useState(true);
   const [tagSearch, setTagSearch] = useState('');
 
+  // ⚠️ Comment + tags load LAZILY — only when the menu is opened, once.
+  // Fetching on mount fired 2 requests per row × hundreds of groups on page
+  // load, blowing past the API rate limit (429) and breaking the session.
+  // A closed menu now makes zero per-row requests. Both values are used only
+  // inside the open dropdown, so nothing is shown before the first open.
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    if (!open || loaded) return;
+    setLoaded(true);
     api.get(`/api/broadcasts/${entityType}/${encodeURIComponent(chatId)}/comment`)
       .then(r => r.json())
       .then(data => { setComment(data.comment || ''); setCommentLoading(false); })
@@ -821,7 +829,7 @@ function ItemActionsMenu({ chatId, entityType, allTags, onTagsChange, onArchive,
       .then(r => r.json())
       .then(data => { setTags(data); setTagsLoading(false); })
       .catch(() => setTagsLoading(false));
-  }, [chatId, entityType]);
+  }, [open, loaded, chatId, entityType]);
 
   useEffect(() => {
     if (!open) return;
