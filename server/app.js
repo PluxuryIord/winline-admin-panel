@@ -212,9 +212,22 @@ if (process.env.NODE_ENV === 'production') {
   const indexHtml = path.join(distPath, 'index.html');
 
   if (fs.existsSync(indexHtml)) {
-    app.use(express.static(distPath));
+    // index.html must NOT be cached — otherwise browsers keep loading the old
+    // hashed JS bundle after a deploy (that's why a fix can look "not applied"
+    // until a hard refresh). Hashed assets under /assets/ never change, so cache
+    // them forever.
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    }));
     app.use((req, res, next) => {
       if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) return next();
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(indexHtml);
     });
     console.log('[prod] Serving dist from:', distPath);
