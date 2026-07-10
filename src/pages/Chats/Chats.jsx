@@ -66,10 +66,12 @@ export default function Chats() {
     let es = null;
     let reconnectTimer = null;
     let closed = false;
+    let backoff = 3000;
 
     function connect() {
       if (closed) return;
       es = new EventSource('/api/chats/stream', { withCredentials: true });
+      es.onopen = () => { backoff = 3000; };
       es.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
@@ -95,7 +97,8 @@ export default function Chats() {
       es.onerror = () => {
         es.close();
         if (!closed) {
-          reconnectTimer = setTimeout(connect, 3000);
+          reconnectTimer = setTimeout(connect, backoff);
+          backoff = Math.min(backoff * 2, 60000);
         }
       };
     }

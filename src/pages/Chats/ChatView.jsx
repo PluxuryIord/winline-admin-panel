@@ -201,8 +201,10 @@ export default function ChatView() {
   useEffect(() => {
     let es;
     let reconnectTimer;
+    let backoff = 3000;
     const connect = () => {
       es = new EventSource('/api/chats/stream', { withCredentials: true });
+      es.onopen = () => { backoff = 3000; };
       es.onmessage = (e) => {
         if (!e.data || e.data.startsWith(':')) return;
         try {
@@ -218,7 +220,8 @@ export default function ChatView() {
       };
       es.onerror = () => {
         es.close();
-        reconnectTimer = setTimeout(connect, 3000);
+        reconnectTimer = setTimeout(connect, backoff);
+        backoff = Math.min(backoff * 2, 60000);
       };
     };
     connect();

@@ -6,6 +6,13 @@ import dbPool from '../config/db.js';
 const profileCache = new Map();
 const CACHE_TTL = 60_000; // 60 seconds
 
+// Sliding session: while a user is active, reissue the cookie once it drops
+// below half its life, so active admins are never bounced to /login mid-work.
+// Idle sessions (no requests) still lapse at the 24h maxAge. Must match the
+// cookie options in routes/auth.js issueSessionCookie().
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const SESSION_REFRESH_UNDER_MS = 12 * 60 * 60 * 1000;
+
 function getCached(userId) {
   const entry = profileCache.get(userId);
   if (entry && Date.now() - entry.ts < CACHE_TTL) return entry;
@@ -85,6 +92,25 @@ export default async function authMiddleware(req, res, next) {
         return res.status(403).json({ error: 'Аккаунт деактивирован' });
       }
     }
+
+    // Sliding refresh — reissue the cookie when under half its life remains.
+    // Best-effort: a failure here must never break the request.
+    try {
+      if (payload.exp && (payload.exp * 1000 - Date.now()) < SESSION_REFRESH_UNDER_MS) {
+        const fresh = jwt.sign(
+          { id: req.user.id, username: req.user.username, role: req.user.role, displayName: req.user.displayName },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+        res.cookie('wl_token', fresh, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: SESSION_TTL_MS,
+          path: '/',
+        });
+      }
+    } catch { /* reissue is best-effort */ }
 
     next();
   } catch {

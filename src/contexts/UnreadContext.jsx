@@ -48,6 +48,7 @@ export function UnreadProvider({ children }) {
     let es = null;
     let reconnectTimer = null;
     let closed = false;
+    let backoff = 3000; // растёт при повторных отказах (напр. протухшая сессия)
 
     function connect() {
       if (closed) return;
@@ -56,7 +57,7 @@ export function UnreadProvider({ children }) {
 
       // На (пере)подключении синхронизируемся с сервером — закрывает пробел,
       // если сообщения приходили, пока соединение было разорвано.
-      es.onopen = () => { refreshUnread(); };
+      es.onopen = () => { backoff = 3000; refreshUnread(); };
 
       es.onmessage = (e) => {
         try {
@@ -83,7 +84,8 @@ export function UnreadProvider({ children }) {
       es.onerror = () => {
         es.close();
         if (!closed) {
-          reconnectTimer = setTimeout(connect, 3000);
+          reconnectTimer = setTimeout(connect, backoff);
+          backoff = Math.min(backoff * 2, 60000); // до 60с, чтобы не долбить 401
         }
       };
     }
