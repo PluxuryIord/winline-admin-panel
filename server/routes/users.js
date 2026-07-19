@@ -97,6 +97,32 @@ function buildTagsForUser(userId, tagsMap, editedIds, dateReg) {
 
 const USER_COLUMNS = 'user_id, full_name, username, date_reg, banned, rl_full_name, role, graph, phone_number, registered, personal_label, show_qr';
 
+// ── Фильтр по тегам: режим ИЛИ (любой из выбранных) или И (все сразу) ────────
+// Дедуп важен для режима «И»: число тегов должно совпасть с COUNT(DISTINCT tag).
+function parseTags(raw) {
+  return [...new Set(String(raw || '').split(',').map(t => t.trim()).filter(Boolean))];
+}
+
+function parseTagMode(raw) {
+  return raw === 'and' ? 'and' : 'or';
+}
+
+// Возвращает INNER JOIN, отбирающий user_id по тегам, и его параметры (в порядке
+// подстановки). mode==='and' → у юзера должны быть ВСЕ теги; иначе — любой (OR).
+function buildTagFilterJoin(tags, mode) {
+  if (!tags.length) return { clause: '', params: [] };
+  if (mode === 'and') {
+    return {
+      clause: 'INNER JOIN (SELECT user_id FROM wl_admin_user_tags WHERE tag IN (?) GROUP BY user_id HAVING COUNT(DISTINCT tag) = ?) AS tf ON tf.user_id = u.user_id',
+      params: [tags, tags.length],
+    };
+  }
+  return {
+    clause: 'INNER JOIN (SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)) AS tf ON tf.user_id = u.user_id',
+    params: [tags],
+  };
+}
+
 // GET /api/users?limit=50&offset=0&search=...
 router.get('/', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
@@ -105,15 +131,14 @@ router.get('/', async (req, res, next) => {
     const offset = Number(req.query.offset) || 0;
     const search = (req.query.search || '').trim();
 
-    const tags = (req.query.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const tags = parseTags(req.query.tags);
+    const tagMode = parseTagMode(req.query.tagMode);
 
     // Build params in SQL clause order: tagJoin params first, then where params
     const params = [];
-    let tagJoin = '';
-    if (tags.length) {
-      tagJoin = 'INNER JOIN (SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)) AS tf ON tf.user_id = u.user_id';
-      params.push(tags);
-    }
+    const tagFilter = buildTagFilterJoin(tags, tagMode);
+    const tagJoin = tagFilter.clause;
+    params.push(...tagFilter.params);
 
     let where = '';
     if (search) {
@@ -152,14 +177,13 @@ router.get('/export', async (req, res, next) => {
   if (!dbPool) return res.status(503).json({ error: 'База данных не подключена' });
   try {
     const search = (req.query.search || '').trim();
-    const tags = (req.query.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const tags = parseTags(req.query.tags);
+    const tagMode = parseTagMode(req.query.tagMode);
 
     const params = [];
-    let tagJoin = '';
-    if (tags.length) {
-      tagJoin = 'INNER JOIN (SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)) AS tf ON tf.user_id = u.user_id';
-      params.push(tags);
-    }
+    const tagFilter = buildTagFilterJoin(tags, tagMode);
+    const tagJoin = tagFilter.clause;
+    params.push(...tagFilter.params);
     let where = '';
     if (search) {
       where = 'WHERE (u.full_name LIKE ? OR u.rl_full_name LIKE ? OR u.username LIKE ? OR EXISTS (SELECT 1 FROM wl_admin_user_tags ts WHERE ts.user_id = u.user_id AND ts.tag LIKE ?))';
@@ -263,7 +287,8 @@ router.post('/tags/bulk', async (req, res, next) => {
 
 // POST /api/users/tags/bulk-all — добавить/удалить теги у всех юзеров по фильтру
 router.post('/tags/bulk-all', requireAdmin, async (req, res, next) => {
-  const { add = [], remove = [], filterTags = [] } = req.body || {};
+  const { add = [], remove = [], filterTags = [], tagMode: rawTagMode } = req.body || {};
+  const tagMode = parseTagMode(rawTagMode);
   const addTags = (Array.isArray(add) ? add : []).map(t => String(t || '').trim()).filter(Boolean);
   const removeTags = (Array.isArray(remove) ? remove : []).map(t => String(t || '').trim()).filter(Boolean);
   if (!addTags.length && !removeTags.length) {
@@ -276,10 +301,16 @@ router.post('/tags/bulk-all', requireAdmin, async (req, res, next) => {
 
     let ids;
     if (filterTags.length > 0) {
-      const [rows] = await conn.query(
-        'SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)',
-        [filterTags]
-      );
+      const uniqueFilterTags = [...new Set(filterTags.map(t => String(t || '').trim()).filter(Boolean))];
+      const [rows] = tagMode === 'and'
+        ? await conn.query(
+            'SELECT user_id FROM wl_admin_user_tags WHERE tag IN (?) GROUP BY user_id HAVING COUNT(DISTINCT tag) = ?',
+            [uniqueFilterTags, uniqueFilterTags.length]
+          )
+        : await conn.query(
+            'SELECT DISTINCT user_id FROM wl_admin_user_tags WHERE tag IN (?)',
+            [uniqueFilterTags]
+          );
       ids = rows.map(r => r.user_id);
     } else {
       const [rows] = await conn.query('SELECT user_id FROM users');

@@ -21,6 +21,8 @@ export default function Users() {
   // Фильтры
   const [filterTags, setFilterTags] = useState([]);  // [] = all
   const [tagSearch, setTagSearch] = useState('');
+  // Логика фильтра по тегам: 'or' = любой из выбранных, 'and' = все сразу
+  const [tagMode, setTagMode] = useState('or');
 
   // Сортировка
   const [sortConfig, setSortConfig] = useState({ key: 'registrationDate', direction: 'desc' });
@@ -42,7 +44,7 @@ export default function Users() {
   }, [search]);
 
   // Загрузка пользователей
-  const fetchUsers = useCallback(async (offset = 0, searchQuery = '', currentTags = []) => {
+  const fetchUsers = useCallback(async (offset = 0, searchQuery = '', currentTags = [], currentMode = 'or') => {
     try {
       const isAppend = offset > 0;
       if (!isAppend) setLoading(true);
@@ -50,7 +52,10 @@ export default function Users() {
 
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
       if (searchQuery) params.set('search', searchQuery);
-      if (currentTags.length > 0) params.set('tags', currentTags.join(','));
+      if (currentTags.length > 0) {
+        params.set('tags', currentTags.join(','));
+        if (currentMode === 'and') params.set('tagMode', 'and');
+      }
 
       const res = await api.get(`/api/users?${params}`);
       if (!res.ok) throw new Error(`Ошибка ${res.status}`);
@@ -71,10 +76,10 @@ export default function Users() {
     }
   }, []);
 
-  // Перезагрузка при смене поиска или тегов
+  // Перезагрузка при смене поиска, тегов или режима фильтра
   useEffect(() => {
-    fetchUsers(0, debouncedSearch, filterTags);
-  }, [debouncedSearch, filterTags, fetchUsers]);
+    fetchUsers(0, debouncedSearch, filterTags, tagMode);
+  }, [debouncedSearch, filterTags, tagMode, fetchUsers]);
 
   // Infinite scroll — IntersectionObserver
   useEffect(() => {
@@ -82,14 +87,14 @@ export default function Users() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          fetchUsers(users.length, debouncedSearch, filterTags);
+          fetchUsers(users.length, debouncedSearch, filterTags, tagMode);
         }
       },
       { rootMargin: '200px' }
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch, filterTags]);
+  }, [hasMore, loadingMore, loading, users.length, fetchUsers, debouncedSearch, filterTags, tagMode]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -141,7 +146,7 @@ export default function Users() {
         const newFilterTags = filterTags.includes(tagModal.tag) ? filterTags.map(t => t === tagModal.tag ? tagModal.newName.trim() : t) : filterTags;
         setFilterTags(newFilterTags);
         setUsers([]);
-        fetchUsers(0, debouncedSearch, newFilterTags);
+        fetchUsers(0, debouncedSearch, newFilterTags, tagMode);
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
     setTagModalSaving(false);
@@ -180,6 +185,7 @@ export default function Users() {
           add: bulkModal.mode === 'add' ? [tag] : [],
           remove: bulkModal.mode === 'remove' ? [tag] : [],
           filterTags,
+          tagMode,
         });
       } else {
         await api.post('/api/users/tags/bulk', body);
@@ -187,7 +193,7 @@ export default function Users() {
       loadTags();
       setBulkModal(null);
       clearSelection();
-      fetchUsers(0, debouncedSearch, filterTags);
+      fetchUsers(0, debouncedSearch, filterTags, tagMode);
     } catch (err) {
       alert('Ошибка: ' + err.message);
     }
@@ -212,7 +218,7 @@ export default function Users() {
       const data = await res.json();
       if (data.ok) {
         loadTags();
-        fetchUsers(0, debouncedSearch, filterTags);
+        fetchUsers(0, debouncedSearch, filterTags, tagMode);
         if (filterTags.includes(deleteTagModal)) setFilterTags(filterTags.filter(t => t !== deleteTagModal));
       }
     } catch (err) { alert('Ошибка: ' + err.message); }
@@ -255,6 +261,7 @@ export default function Users() {
   const resetFilters = () => {
     setSearch('');
     setFilterTags([]);
+    setTagMode('or');
     setSortConfig({ key: 'registrationDate', direction: 'desc' });
   };
 
@@ -273,7 +280,10 @@ export default function Users() {
   const fetchAllForExport = async () => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
-    if (filterTags.length) params.set('tags', filterTags.join(','));
+    if (filterTags.length) {
+      params.set('tags', filterTags.join(','));
+      if (tagMode === 'and') params.set('tagMode', 'and');
+    }
     const res = await api.get(`/api/users/export?${params}`);
     if (!res.ok) throw new Error('Не удалось выгрузить пользователей');
     const data = await res.json();
@@ -436,6 +446,22 @@ export default function Users() {
           </div>
           {filterTags.length > 0 && (
             <div className="tag-selected-chips">
+              {filterTags.length >= 2 && (
+                <div className="tag-mode-toggle" role="group" aria-label="Логика фильтра по тегам">
+                  <button
+                    type="button"
+                    className={`tag-mode-btn${tagMode === 'or' ? ' active' : ''}`}
+                    onClick={() => setTagMode('or')}
+                    title="Показать пользователей с любым из выбранных тегов"
+                  >ИЛИ</button>
+                  <button
+                    type="button"
+                    className={`tag-mode-btn${tagMode === 'and' ? ' active' : ''}`}
+                    onClick={() => setTagMode('and')}
+                    title="Показать только тех, у кого есть все выбранные теги"
+                  >И</button>
+                </div>
+              )}
               {filterTags.map(t => (
                 <span key={t} className="tag-selected-chip">
                   {t}

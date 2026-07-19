@@ -234,6 +234,39 @@
   color: var(--color-orange);
 }
 
+/* Переключатель логики фильтра по тегам: ИЛИ / И */
+.tag-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-right: 2px;
+}
+.tag-mode-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.tag-mode-btn:hover {
+  color: var(--color-white);
+  background: rgba(255, 255, 255, 0.06);
+}
+.tag-mode-btn.active {
+  background: rgba(255, 126, 0, 0.15);
+  color: var(--color-orange);
+}
+.tag-mode-btn + .tag-mode-btn {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .tag-filter-actions {
   display: none;
   gap: 2px;
