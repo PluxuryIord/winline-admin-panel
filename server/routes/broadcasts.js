@@ -1573,8 +1573,14 @@ router.delete('/scheduled/:id', async (req, res, next) => {
 
 // ===================== ПЛАНИРОВЩИК =====================
 
-// Check for pending scheduled broadcasts every 30 seconds
+// Check for pending scheduled broadcasts every 30 seconds.
+// Re-entrancy guard: отправка (124 группы / тысячи юзеров) идёт дольше 30с, а
+// setInterval не ждёт предыдущий колбэк — без флага тики накладываются и шлют
+// одну и ту же рассылку повторно.
+let schedulerTickRunning = false;
 setInterval(async () => {
+  if (schedulerTickRunning) return;
+  schedulerTickRunning = true;
   try {
     const [pending] = await dbPool.query(
       `SELECT s.id, s.draft_id FROM wl_admin_scheduled_broadcasts s
@@ -1593,6 +1599,19 @@ setInterval(async () => {
         const media = safeJsonParse(draft.media_json, null);
         const poll = safeJsonParse(draft.poll_json, null);
         const targetFilter = safeJsonParse(draft.target_filter, null);
+
+        // Атомарно застолбить строку перед отправкой: только один процесс/тик,
+        // выигравший переход 'pending'→'sent', реально шлёт. Остальные видят
+        // affectedRows=0 и выходят. Это и убирает дубли (нет прав на ALTER,
+        // поэтому клеймим существующим 'sent', а не отдельным 'sending').
+        const [claim] = await dbPool.query(
+          `UPDATE wl_admin_scheduled_broadcasts SET status = 'sent' WHERE id = ? AND status = 'pending'`,
+          [sched.id]
+        );
+        if (claim.affectedRows !== 1) {
+          console.log(`[scheduler] #${sched.id} уже обрабатывается другим тиком — пропуск`);
+          continue;
+        }
 
         if (draft.target_type === 'channels') {
           const channelIds = targetFilter?.channelIds || [];
@@ -1647,18 +1666,20 @@ setInterval(async () => {
           await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'users', channels: [`Пользователи (${users.length})`], channelIds: [], total: users.length, success, failed: users.length - success, results: results.slice(0, 100), media, pollId: schedPollId });
         }
 
-        // Mark as sent and delete draft
-        await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'sent' WHERE id = ?`, [sched.id]);
+        // Строка уже 'sent' (застолблена перед отправкой) — осталось убрать черновик.
         await dbPool.query('DELETE FROM wl_admin_broadcast_drafts WHERE id = ?', [sched.draft_id]);
         console.log(`[scheduler] Broadcast #${sched.id} sent successfully`);
       } catch (err) {
+        // Строка уже застолблена в 'sent' до отправки, поэтому повторно она НЕ
+        // подхватится (ретрая нет). Раньше здесь писали 'failed' — значения нет
+        // в ENUM('pending','sent','cancelled'), запись затирала статус мусором.
         console.error(`[scheduler] Failed to send broadcast #${sched.id}:`, err.message);
-        // Mark as failed to prevent infinite retry loop
-        await dbPool.query(`UPDATE wl_admin_scheduled_broadcasts SET status = 'failed' WHERE id = ?`, [sched.id]).catch(() => {});
       }
     }
   } catch (err) {
     // Silent fail for scheduler
+  } finally {
+    schedulerTickRunning = false;
   }
 }, 30000);
 
