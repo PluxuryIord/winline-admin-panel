@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { initTelegram, setBackButton, isTelegram } from './lib/telegram.js';
 import { api, setExpiredHandler } from './lib/api.js';
 import Home from './sections/Home.jsx';
@@ -49,10 +50,12 @@ export default function App() {
     fetchMe();
   }, [fetchMe]);
 
-  // Telegram back button mirrors the nav stack.
+  // We render our own in-app back button (works on every Telegram version,
+  // unlike the native WebApp BackButton which needs Telegram 6.1+), so keep
+  // the native one hidden.
   useEffect(() => {
-    setBackButton(stack.length > 1 ? goBack : null);
-  }, [stack.length, goBack]);
+    setBackButton(null);
+  }, []);
 
   if (expired) {
     return (
@@ -77,6 +80,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {stack.length > 1 && (
+        <button className="app-back" onClick={goBack}>
+          <ArrowLeft size={18} /> Назад
+        </button>
+      )}
       <Comp me={me} refreshMe={fetchMe} navigate={navigate} goBack={goBack} />
     </div>
   );

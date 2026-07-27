@@ -138,6 +138,13 @@ html, body {
   background: none; border: none; color: var(--c-dim); font-family: inherit;
   font-size: 13px; cursor: pointer; padding: 0; margin-bottom: 12px;
 }
+/* Own in-app back button (replaces the native Telegram BackButton) */
+.app-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--c-dim); font-family: inherit;
+  font-size: 14px; cursor: pointer; padding: 6px 0; margin-bottom: 6px;
+}
+.app-back:active { opacity: .6; }
 .kb-photo {
   width: 100%; border-radius: 12px; margin-bottom: 10px; display: block;
   border: 1px solid var(--c-border);
