@@ -80,7 +80,7 @@ export default function App() {
 
   return (
     <div className="app">
-      {stack.length > 1 && (
+      {stack.length > 1 && current !== 'kb' && (
         <button className="app-back" onClick={goBack}>
           <ArrowLeft size={18} /> Назад
         </button>

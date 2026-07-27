@@ -36,6 +36,19 @@ export function openLink(url) {
   else window.open(url, '_blank', 'noopener');
 }
 
+// Links inside dangerouslySetInnerHTML content are raw <a> tags: tapping one
+// navigates the mini-app webview itself (opens "inside" the app). Intercept the
+// click so it opens in the external browser instead (t.me → inside Telegram).
+export function handleHtmlLinkClick(e) {
+  const a = e.target?.closest?.('a');
+  if (!a) return;
+  const href = a.getAttribute('href');
+  if (!href) return;
+  e.preventDefault();
+  if (/^https:\/\/t\.me\//.test(href)) openTelegramLink(href);
+  else openLink(href);
+}
+
 export function haptic(type = 'light') {
   try { tg?.HapticFeedback?.impactOccurred(type); } catch { /* noop */ }
 }

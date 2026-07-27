@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader, ExternalLink } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { tgHtml } from '../lib/html.js';
-import { openTelegramLink } from '../lib/telegram.js';
+import { openLink, openTelegramLink, handleHtmlLinkClick } from '../lib/telegram.js';
 
 // Generic renderer for a bot scenario screen (offer_page / promo_page /
 // socials_page): sanitized Telegram-HTML texts + its url-buttons.
@@ -27,36 +27,24 @@ export default function ContentScreen({ screenId, fallbackTitle }) {
     <div>
       <h2 className="section-title">{screen.title || fallbackTitle}</h2>
       {screen.messages.map((m) => (
+        // onClick перехватывает тап по <a> внутри текста → внешний браузер,
+        // иначе сырой <a> увёл бы вебвью внутри мини-аппки.
         <div
           key={m.key}
           className="card tg-text"
+          onClick={handleHtmlLinkClick}
           dangerouslySetInnerHTML={{ __html: tgHtml(m.text) }}
         />
       ))}
       {screen.buttons.map((b) => (
-        // t.me → внутрь Telegram; остальное → якорь, который Telegram отдаёт
-        // во ВНЕШНИЙ браузер (как ссылки в тексте), а не во встроенный.
-        b.url.startsWith('https://t.me/') ? (
-          <button
-            key={b.key}
-            className="btn btn-primary"
-            style={{ marginBottom: 8 }}
-            onClick={() => openTelegramLink(b.url)}
-          >
-            {b.label} <ExternalLink size={15} />
-          </button>
-        ) : (
-          <a
-            key={b.key}
-            className="btn btn-primary"
-            style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-            href={b.url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {b.label} <ExternalLink size={15} />
-          </a>
-        )
+        <button
+          key={b.key}
+          className="btn btn-primary"
+          style={{ marginBottom: 8 }}
+          onClick={() => (b.url.startsWith('https://t.me/') ? openTelegramLink(b.url) : openLink(b.url))}
+        >
+          {b.label} <ExternalLink size={15} />
+        </button>
       ))}
     </div>
   );
