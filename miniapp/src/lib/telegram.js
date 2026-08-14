@@ -53,6 +53,14 @@ export function haptic(type = 'light') {
   try { tg?.HapticFeedback?.impactOccurred(type); } catch { /* noop */ }
 }
 
+// Native Telegram alert popup (single OK button). Falls back to browser alert
+// outside Telegram or on older clients without showAlert.
+export function showAlert(message) {
+  if (tg?.showAlert) tg.showAlert(message);
+  else if (tg?.showPopup) tg.showPopup({ message });
+  else if (typeof window !== 'undefined') window.alert(message);
+}
+
 // Back button: show while a callback is registered, hide when cleared.
 let backHandler = null;
 export function setBackButton(handler) {

@@ -87,6 +87,7 @@ html, body {
 .home-tile svg { color: var(--c-orange); }
 .home-tile:active { border-color: var(--c-orange); }
 .home-tile--soon { opacity: .45; cursor: default; }
+.home-tile--locked { opacity: .5; }
 .home-tile--soon em {
   position: absolute; top: 10px; right: 10px;
   font-style: normal; font-size: 10px; font-weight: 700;

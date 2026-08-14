@@ -3,7 +3,7 @@ import {
   BookOpen, Gift, Megaphone, MessageCircle, Share2, BarChart3, CalendarDays, User,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { openTelegramLink } from '../lib/telegram.js';
+import { openTelegramLink, showAlert } from '../lib/telegram.js';
 
 // Home grid. Sections unlock phase by phase — `ready:false` tiles show «скоро».
 const TILES = [
@@ -30,9 +30,15 @@ export default function Home({ me, navigate }) {
     return () => { alive = false; };
   }, [authorized]);
 
-  function onTile(id) {
+  function onTile(id, ready) {
+    if (!ready) { showAlert('Раздел скоро появится.'); return; }
+    if (!authorized) {
+      showAlert('Данный раздел доступен только для авторизованных партнёров.');
+      return;
+    }
     if (id === 'chat') {
       if (chatUrl) openTelegramLink(chatUrl);
+      else showAlert('Ссылка на чат ещё загружается, попробуйте через пару секунд.');
       return;
     }
     navigate(id);
@@ -66,14 +72,13 @@ export default function Home({ me, navigate }) {
 
       <div className="home-grid">
         {TILES.map(({ id, label, icon: Icon, ready }) => {
-          // Разделы требуют логина; чат — тоже (url приходит только авторизованным).
-          const enabled = ready && authorized && (id !== 'chat' || !!chatUrl);
+          // Плитки всегда кликабельны: если раздел недоступен (не залогинен /
+          // «скоро»), onTile покажет попап вместо перехода.
           return (
             <button
               key={id}
-              className={`home-tile ${ready ? '' : 'home-tile--soon'}`}
-              onClick={() => enabled && onTile(id)}
-              disabled={!enabled}
+              className={`home-tile ${ready ? '' : 'home-tile--soon'}${ready && !authorized ? ' home-tile--locked' : ''}`}
+              onClick={() => onTile(id, ready)}
             >
               <Icon size={22} />
               <span>{label}</span>
