@@ -38,7 +38,7 @@ export default function Calendar() {
 
   return (
     <div>
-      <h2 className="section-title">Календарь мероприятий</h2>
+      <h2 className="section-title">Календарь спортивных событий</h2>
 
       {data.months?.length > 1 && (
         <div className="st-presets" style={{ marginBottom: 14 }}>
