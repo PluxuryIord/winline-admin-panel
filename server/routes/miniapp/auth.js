@@ -84,23 +84,37 @@ router.post('/request-otp', async (req, res, next) => {
       return res.status(429).json({ error: 'cooldown', retry_after_sec: retryIn });
     }
 
-    // Partner check against the mirror (same rule as the bot: found + status 1).
-    if (!admonPool) {
-      return res.status(503).json({ error: 'mirror_unavailable', message: 'Проверка email временно недоступна, попробуйте позже' });
-    }
-    let partner;
-    try {
-      const [rows] = await admonPool.query(
-        'SELECT id, status FROM wl_admon_users WHERE LOWER(email) = ? LIMIT 1',
-        [email]
-      );
-      partner = rows[0];
-    } catch (e) {
-      console.warn('[miniapp/auth] mirror query failed:', e.message);
-      return res.status(503).json({ error: 'mirror_unavailable', message: 'Проверка email временно недоступна, попробуйте позже' });
+    // Partner check: mirror first (fast, covers everyone already synced), then a
+    // LIVE ADMON lookup via the bot for fresh registrations not yet in the daily
+    // users snapshot. `checked` = at least one source gave a definitive answer.
+    let partner = null;
+    let checked = false;
+    if (admonPool) {
+      try {
+        const [rows] = await admonPool.query(
+          'SELECT id, status FROM wl_admon_users WHERE LOWER(email) = ? LIMIT 1',
+          [email]
+        );
+        partner = rows[0] || null;
+        checked = true;
+      } catch (e) {
+        console.warn('[miniapp/auth] mirror query failed:', e.message);
+      }
     }
     if (!partner) {
-      return res.status(404).json({ error: 'email_not_found', message: 'Этот email не зарегистрирован на платформе' });
+      // Not in the mirror yet → ask the bot (mirror→live GraphQL fallback).
+      const live = await botApi('/partner/check', { email });
+      if (live.ok) {
+        checked = true;
+        if (live.data?.found) partner = { id: null, status: live.data.status };
+      } else {
+        console.warn('[miniapp/auth] live partner check failed:', live.status, live.data);
+      }
+    }
+    if (!partner) {
+      return checked
+        ? res.status(404).json({ error: 'email_not_found', message: 'Этот email не зарегистрирован на платформе' })
+        : res.status(503).json({ error: 'mirror_unavailable', message: 'Проверка email временно недоступна, попробуйте позже' });
     }
     if (partner.status !== null && partner.status !== undefined && Number(partner.status) !== 1) {
       return res.status(403).json({ error: 'account_blocked', message: 'Аккаунт на платформе заблокирован. Обратитесь в поддержку.' });
