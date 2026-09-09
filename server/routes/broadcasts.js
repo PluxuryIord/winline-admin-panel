@@ -109,6 +109,65 @@ broadcastWebhookRouter.post('/', async (req, res, next) => {
   }
 });
 
+/**
+ * Перенос записи группы на новый chat_id после апгрейда до супергруппы.
+ * Telegram меняет chat_id, старый умирает навсегда. Переносим аппрув и теги,
+ * удаляем мёртвые строки. Идемпотентно — безопасно звать повторно.
+ *
+ * Зовётся из двух мест:
+ *   1) вебхук от бота (служебное сообщение в момент миграции);
+ *   2) /groups/send, когда Telegram вернул migrate_to_chat_id в ошибке.
+ * Второй путь — страховка: вебхук одноразовый, и если бот в этот момент
+ * перезапускался (main.py делает DeleteWebhook(drop_pending_updates=True)),
+ * событие теряется навсегда и группа молча выпадает из всех рассылок.
+ */
+async function migrateGroupChat(oldId, newId, title) {
+  const oldStr = String(oldId);
+  const newStr = String(newId);
+
+  // Read old approval state (if any) so we can carry it over
+  const [appRows] = await dbPool.query(
+    'SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
+  const wasApproved = appRows.length ? !!appRows[0].approved : false;
+
+  // Ensure new group exists with correct title
+  const [newRows] = await dbPool.query('SELECT id FROM wl_admin_groups WHERE chat_id = ?', [newStr]);
+  if (newRows.length) {
+    if (title) {
+      await dbPool.query('UPDATE wl_admin_groups SET title = ? WHERE chat_id = ?', [title, newStr]);
+    }
+  } else {
+    const [oldRows] = await dbPool.query('SELECT title FROM wl_admin_groups WHERE chat_id = ?', [oldStr]);
+    await dbPool.query('INSERT INTO wl_admin_groups (chat_id, title) VALUES (?, ?)',
+      [newStr, title || oldRows[0]?.title || newStr]);
+  }
+
+  // Carry over approval if it was set
+  if (wasApproved) {
+    await dbPool.query(
+      `INSERT INTO wl_admin_groups_approved (chat_id, approved, approved_at) VALUES (?, 1, NOW())
+       ON DUPLICATE KEY UPDATE approved = 1, approved_at = NOW()`, [newStr]);
+  }
+
+  // Переносим теги — иначе группа выпадет из рассылок с фильтром по тегам,
+  // то есть починим id и получим ровно ту же тишину, только тише.
+  const [tagRows] = await dbPool.query(
+    'SELECT tag FROM wl_admin_group_tags WHERE chat_id = ?', [oldStr]);
+  if (tagRows.length) {
+    await dbPool.query('INSERT IGNORE INTO wl_admin_group_tags (chat_id, tag) VALUES ?',
+      [tagRows.map(t => [newStr, t.tag])]);
+    await dbPool.query('DELETE FROM wl_admin_group_tags WHERE chat_id = ?', [oldStr]);
+  }
+
+  // Drop old records — their chat no longer exists in Telegram
+  await dbPool.query('DELETE FROM wl_admin_groups WHERE chat_id = ?', [oldStr]);
+  await dbPool.query('DELETE FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
+  await dbPool.query('DELETE FROM wl_admin_groups_archive WHERE chat_id = ?', [oldStr]);
+
+  console.log(`[group-migrate] ${oldStr} → ${newStr} (approved=${wasApproved}, tags=${tagRows.length})`);
+  return { oldStr, newStr, wasApproved };
+}
+
 // Bot calls this when a regular group is upgraded to a supergroup.
 // Telegram changes the chat_id; without migration we end up with two records
 // (the old dead one + the new live one) and broadcasts may target either.
@@ -121,38 +180,7 @@ broadcastWebhookRouter.post('/groups/migrate', async (req, res, next) => {
     if (!old_id || !new_id) {
       return res.status(400).json({ error: 'old_id and new_id required' });
     }
-    const oldStr = String(old_id);
-    const newStr = String(new_id);
-
-    // Read old approval state (if any) so we can carry it over
-    const [appRows] = await dbPool.query(
-      'SELECT approved FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
-    const wasApproved = appRows.length ? !!appRows[0].approved : false;
-
-    // Ensure new group exists with correct title
-    const [newRows] = await dbPool.query('SELECT id FROM wl_admin_groups WHERE chat_id = ?', [newStr]);
-    if (newRows.length) {
-      if (title) {
-        await dbPool.query('UPDATE wl_admin_groups SET title = ? WHERE chat_id = ?', [title, newStr]);
-      }
-    } else {
-      await dbPool.query('INSERT INTO wl_admin_groups (chat_id, title) VALUES (?, ?)',
-        [newStr, title || newStr]);
-    }
-
-    // Carry over approval if it was set
-    if (wasApproved) {
-      await dbPool.query(
-        `INSERT INTO wl_admin_groups_approved (chat_id, approved, approved_at) VALUES (?, 1, NOW())
-         ON DUPLICATE KEY UPDATE approved = 1, approved_at = NOW()`, [newStr]);
-    }
-
-    // Drop old records — their chat no longer exists in Telegram
-    await dbPool.query('DELETE FROM wl_admin_groups WHERE chat_id = ?', [oldStr]);
-    await dbPool.query('DELETE FROM wl_admin_groups_approved WHERE chat_id = ?', [oldStr]);
-    await dbPool.query('DELETE FROM wl_admin_groups_archive WHERE chat_id = ?', [oldStr]);
-
-    console.log(`[group-migrate] ${oldStr} → ${newStr} (approved=${wasApproved})`);
+    const { oldStr, newStr } = await migrateGroupChat(old_id, new_id, title);
     res.json({ ok: true, old_id: oldStr, new_id: newStr });
   } catch (err) {
     console.error('[group-migrate] ERROR:', err.message);
@@ -335,6 +363,40 @@ async function sendToChat(chatId, text, media, poll, targetType, pollId) {
     }, text || '');
   }
   return tgSend(chatId, text);
+}
+
+/**
+ * Отправка в группу с авто-починкой апгрейда до супергруппы.
+ *
+ * Telegram на «group chat was upgraded to a supergroup chat» отдаёт новый
+ * chat_id прямо в error.parameters.migrate_to_chat_id. Раньше мы его
+ * выбрасывали — и группа падала в КАЖДОЙ следующей рассылке, потому что в
+ * wl_admin_groups оставался мёртвый id. Вебхук от бота ловит миграцию только
+ * в момент события и только если бот жив, так что это второй, надёжный путь.
+ *
+ * Возвращает готовую запись для results[]: при успешной миграции chatId уже
+ * новый, а старый лежит в migratedFrom.
+ */
+async function sendToGroupWithMigration(chatId, text, media, poll) {
+  let data = await sendToChat(chatId, text, media, poll, 'groups');
+
+  const newChatId = data?.parameters?.migrate_to_chat_id;
+  if (!data?.ok && newChatId) {
+    try {
+      await migrateGroupChat(chatId, newChatId, null);
+      data = await sendToChat(newChatId, text, media, poll, 'groups');
+      return {
+        chatId: String(newChatId),
+        ok: data.ok,
+        error: data.description || null,
+        migratedFrom: String(chatId),
+      };
+    } catch (migErr) {
+      console.error(`[groups/send] migrate ${chatId} → ${newChatId} failed:`, migErr.message);
+    }
+  }
+
+  return { chatId, ok: data.ok, error: data.description || null };
 }
 
 // ===================== ЗАГРУЗКА ФАЙЛОВ =====================
@@ -606,24 +668,28 @@ router.post('/groups/send', async (req, res, next) => {
     if (!groupIds?.length) return res.status(400).json({ error: 'Выберите хотя бы одну группу' });
 
     const results = [];
+    // old chat_id → new chat_id для групп, доехавших до супергруппы прямо сейчас
+    const migrated = new Map();
     for (const chatId of groupIds) {
       try {
-        const data = await sendToChat(chatId, text?.trim() || '', media, poll, 'groups');
-        results.push({ chatId, ok: data.ok, error: data.description || null });
+        const r = await sendToGroupWithMigration(chatId, text?.trim() || '', media, poll);
+        if (r.migratedFrom) migrated.set(r.migratedFrom, r.chatId);
+        results.push(r);
       } catch (err) {
         results.push({ chatId, ok: false, error: err.message });
       }
     }
 
     const success = results.filter(r => r.ok).length;
-    const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
-    const groupNames = groupIds.map(id => {
+    const finalIds = groupIds.map(id => migrated.get(String(id)) || String(id));
+    const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [finalIds]);
+    const groupNames = finalIds.map(id => {
       const g = groups.find(gr => String(gr.chat_id) === String(id));
       return g?.title || id;
     });
 
     const record = await saveBroadcast({
-      text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'groups', channels: groupNames, channelIds: groupIds,
+      text: poll ? `[${poll.type === 'quiz' ? 'Викторина' : 'Опрос'}] ${poll.question}` : (text || '').trim(), type: 'groups', channels: groupNames, channelIds: finalIds,
       total: groupIds.length, success, failed: groupIds.length - success, results, media,
     });
 
@@ -1446,14 +1512,20 @@ router.post('/drafts/:id/send', async (req, res, next) => {
       const groupIds = targetFilter?.groupIds || [];
       if (!groupIds.length) return res.status(400).json({ error: 'Нет групп для отправки' });
       const results = [];
+      const migrated = new Map();
       for (const chatId of groupIds) {
-        try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'groups'); results.push({ chatId, ok: d.ok, error: d.description || null }); }
+        try {
+          const r = await sendToGroupWithMigration(chatId, text.trim() || '', media, poll);
+          if (r.migratedFrom) migrated.set(r.migratedFrom, r.chatId);
+          results.push(r);
+        }
         catch (e) { results.push({ chatId, ok: false, error: e.message }); }
       }
       const success = results.filter(r => r.ok).length;
-      const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
-      const groupNames = groupIds.map(gid => { const g = groups.find(gr => String(gr.chat_id) === String(gid)); return g?.title || gid; });
-      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
+      const finalIds = groupIds.map(gid => migrated.get(String(gid)) || String(gid));
+      const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [finalIds]);
+      const groupNames = finalIds.map(gid => { const g = groups.find(gr => String(gr.chat_id) === String(gid)); return g?.title || gid; });
+      record = await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: finalIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
     } else if (draft.target_type === 'users') {
       const filters = targetFilter?.filters || {};
       let where = ['u.user_id IS NOT NULL'];
@@ -1630,14 +1702,20 @@ setInterval(async () => {
           const groupIds = targetFilter?.groupIds || [];
           if (groupIds.length) {
             const results = [];
+            const migrated = new Map();
             for (const chatId of groupIds) {
-              try { const d = await sendToChat(chatId, text.trim() || '', media, poll, 'groups'); results.push({ chatId, ok: d.ok }); }
+              try {
+                const r = await sendToGroupWithMigration(chatId, text.trim() || '', media, poll);
+                if (r.migratedFrom) migrated.set(r.migratedFrom, r.chatId);
+                results.push(r);
+              }
               catch (e) { results.push({ chatId, ok: false, error: e.message }); }
             }
             const success = results.filter(r => r.ok).length;
-            const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [groupIds.map(String)]);
-            const groupNames = groupIds.map(id => { const g = groups.find(gr => String(gr.chat_id) === String(id)); return g?.title || id; });
-            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: groupIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
+            const finalIds = groupIds.map(id => migrated.get(String(id)) || String(id));
+            const [groups] = await dbPool.query('SELECT chat_id, title FROM wl_admin_groups WHERE chat_id IN (?)', [finalIds]);
+            const groupNames = finalIds.map(id => { const g = groups.find(gr => String(gr.chat_id) === String(id)); return g?.title || id; });
+            await saveBroadcast({ text: poll ? `[Опрос] ${poll.question}` : text.trim(), type: 'groups', channels: groupNames, channelIds: finalIds, total: groupIds.length, success, failed: groupIds.length - success, results, media });
           }
         } else if (draft.target_type === 'users') {
           const filters = targetFilter?.filters || {};
