@@ -9,11 +9,30 @@ const ALLOWED_MIME_PREFIXES = [
   'text/',
 ];
 
+// Exact MIME types allowed on top of the prefixes above.
+// Офисные форматы (.docx/.xlsx/.pptx, ODF) — это ZIP-контейнеры, у них ЕСТЬ
+// магические байты, поэтому до fallback'а по расширению они не доходили и
+// отбивались как «Тип файла ... не разрешён». Перечисляем их явно.
+const ALLOWED_MIME_EXACT = new Set([
+  'application/pdf',
+  'application/rtf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // .docx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // .xlsx
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+  'application/vnd.oasis.opendocument.text',                                   // .odt
+  'application/vnd.oasis.opendocument.spreadsheet',                            // .ods
+  'application/vnd.oasis.opendocument.presentation',                           // .odp
+]);
+
+// Legacy Office (.doc/.xls/.ppt) детектится как application/x-cfb. Тот же
+// контейнер у .msi и прочей исполняемой всячины, поэтому пускаем CFB только
+// когда расширение реально офисное.
+const CFB_EXTENSIONS = new Set(['.doc', '.xls', '.ppt']);
+
 // Extensions allowed as fallback when magic bytes detection returns nothing
 // (plain text, csv, etc. have no magic bytes)
 const ALLOWED_EXTENSIONS = new Set([
   '.txt', '.csv', '.tsv', '.json', '.xml', '.html', '.md',
-  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
   '.pdf', '.rtf',
 ]);
 
@@ -22,12 +41,17 @@ const ALLOWED_EXTENSIONS = new Set([
  * Returns { ok: true } or { ok: false, reason: string }.
  */
 export async function validateUploadedFile(buffer, originalName) {
+  const ext = (originalName || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+
   // Check magic bytes
   const detected = await fileTypeFromBuffer(buffer);
 
   if (detected) {
     // Magic bytes detected — check if MIME is allowed
-    const allowed = ALLOWED_MIME_PREFIXES.some(prefix => detected.mime.startsWith(prefix));
+    const allowed =
+      ALLOWED_MIME_PREFIXES.some(prefix => detected.mime.startsWith(prefix)) ||
+      ALLOWED_MIME_EXACT.has(detected.mime) ||
+      (detected.mime === 'application/x-cfb' && ext && CFB_EXTENSIONS.has(ext));
     if (!allowed) {
       return { ok: false, reason: `Тип файла ${detected.mime} не разрешён` };
     }
@@ -35,7 +59,6 @@ export async function validateUploadedFile(buffer, originalName) {
   }
 
   // No magic bytes (text files, etc.) — check extension
-  const ext = (originalName || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
   if (ext && ALLOWED_EXTENSIONS.has(ext)) {
     return { ok: true, detectedMime: null };
   }
