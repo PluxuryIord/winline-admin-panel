@@ -275,6 +275,11 @@ export default function Users() {
     }
   };
 
+  // Системные теги (префикс __, например __no_raffle__ и __edited__) в UI
+  // скрыты везде, а в выгрузку раньше уезжали как обычные. Из-за этого один и
+  // тот же человек в панели выглядел бестеговым, а в CSV — теговым.
+  const visibleTags = (tags) => (tags || []).filter(t => !t.startsWith('__'));
+
   // Экспорт — тянет с сервера ВСЕХ подходящих под текущие фильтры (страница
   // со скроллом держит только загруженную часть) и сортирует как таблицу.
   const fetchAllForExport = async () => {
@@ -311,7 +316,7 @@ export default function Users() {
         u.telegram,
         u.registrationDate,
         u.banned ? 'Да' : 'Нет',
-        (u.tags || []).join('; ')
+        visibleTags(u.tags).join('; ')
       ]);
       const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
       downloadBlob(csv, 'text/csv;charset=utf-8', 'users.csv');
@@ -328,7 +333,7 @@ export default function Users() {
     try {
       const list = await fetchAllForExport();
       const txt = list.map(u =>
-        `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${(u.tags || []).join(', ')}`
+        `${u.fullName} | ${u.telegram} | ${u.registrationDate} | ${u.banned ? 'Забанен' : 'Активен'} | ${visibleTags(u.tags).join(', ')}`
       ).join('\n');
       downloadBlob(txt, 'text/plain;charset=utf-8', 'users.txt');
     } catch (err) {
