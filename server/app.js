@@ -113,7 +113,12 @@ const miniappOtpLimiter = rateLimit({
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/verify-otp', loginLimiter);
 app.use('/api/broadcasts/groups/send', broadcastLimiter);
-app.use('/api/broadcasts/users', broadcastLimiter);
+// ⚠️ Только POST (сама отправка). Раньше стояло app.use() по префиксу, и под
+// лимит в 10/мин попадали служебные GET'ы /users/count, /users/list, /users/tags.
+// Счётчик получателей дёргается на КАЖДЫЙ клик по тегу — выбор 10+ тегов
+// исчерпывал бюджет, count отдавал 429, панель показывала «Получателей: —»,
+// «Нет пользователей по фильтрам» и блокировала кнопку «Отправить».
+app.post('/api/broadcasts/users', broadcastLimiter);
 app.use('/api/broadcasts/drafts/:id/send', broadcastLimiter);
 app.post('/api/broadcasts', broadcastLimiter);
 app.use('/api/admin-users', adminOpsLimiter);

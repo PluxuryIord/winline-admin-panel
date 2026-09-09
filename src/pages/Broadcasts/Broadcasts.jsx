@@ -1419,6 +1419,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [excludedTags, setExcludedTags] = useState([]);
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
+  const [countError, setCountError] = useState(null);
 
   // Загрузка тегов. Системные (__-префикс, например __no_raffle__) в админке
   // скрываем — это служебные маркеры бота, фильтр по ним делать незачем.
@@ -1429,22 +1430,36 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
       .catch(() => {});
   }, []);
 
-  // Подсчёт по фильтрам — когда выбраны теги (включая или исключая)
+  // Подсчёт по фильтрам — когда выбраны теги (включая или исключая).
+  // Дебаунс обязателен: без него выбор 11 тегов = 11 запросов подряд.
   useEffect(() => {
     if (selectedTags.length === 0 && excludedTags.length === 0) {
       setUserCount(0);
+      setCountError(null);
       return;
     }
     setCountLoading(true);
+    setCountError(null);
     const params = new URLSearchParams();
     if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
     if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
 
-    api.get(`/api/broadcasts/users/count?${params}`)
-      .then(r => r.json())
-      .then(data => setUserCount(data.count))
-      .catch(() => setUserCount(null))
-      .finally(() => setCountLoading(false));
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.get(`/api/broadcasts/users/count?${params}`)
+        .then(async r => {
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || `Ошибка ${r.status}`);
+          return data;
+        })
+        .then(data => { if (!cancelled) setUserCount(data.count ?? null); })
+        // Сбой сети/лимита — это НЕ «нулевая выборка». Показываем причину,
+        // иначе выглядит как «нет пользователей по фильтрам» и сбивает с толку.
+        .catch(err => { if (!cancelled) { setUserCount(null); setCountError(err.message); } })
+        .finally(() => { if (!cancelled) setCountLoading(false); });
+    }, 400);
+
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [selectedTags, excludedTags]);
 
   const toggleTag = (tag) => {
@@ -1747,9 +1762,11 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         hintText={
           selectedTags.length === 0 && excludedTags.length === 0
             ? 'Выберите хотя бы один тег для включения или исключения'
-            : userCount != null && userCount > 0
-              ? `Будет отправлено ${userCount} пользователям`
-              : 'Нет пользователей по фильтрам'
+            : countError
+              ? `Не удалось посчитать получателей: ${countError}`
+              : userCount != null && userCount > 0
+                ? `Будет отправлено ${userCount} пользователям`
+                : 'Нет пользователей по фильтрам'
         }
         canSend={userCount > 0 && (selectedTags.length > 0 || excludedTags.length > 0)}
         sending={sending}
