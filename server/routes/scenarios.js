@@ -38,18 +38,21 @@ const router = Router();
   }
 })();
 
-// ─── Календарь в группе: перевод на актуальную Google-таблицу ───────────────
-// SEED-merge дозаливает только ОТСУТСТВУЮЩИЕ экраны, а group_calendar в БД
-// уже есть — со старой ссылкой. Отсюда явная миграция, на module load: деплоя
-// достаточно, заходить в раздел «Сценарии» не нужно (бот перечитывает
+// ─── Календарь: перевод всех экранов на актуальную Google-таблицу ──────────
+// SEED-merge дозаливает только ОТСУТСТВУЮЩИЕ экраны, а календарные экраны в
+// БД уже есть — со старыми ссылками. Отсюда явная миграция, на module load:
+// деплоя достаточно, заходить в «Сценарии» не нужно (бот перечитывает
 // сценарии каждые ~3с).
 //
-// Точечная и одноразовая: переписываем ТОЛЬКО известные старые значения.
-// Если ссылку потом поменяют руками в панели — миграция её не тронет.
-const GROUP_CALENDAR_URL = 'url:https://docs.google.com/spreadsheets/d/1-3zgTAEdvS3QYQIj6xtD1Ofpz3CPI8NB4ShdhXocnD8/edit?gid=1843973382#gid=1843973382';
-const GROUP_CALENDAR_STALE = [
-  'url:https://winline.tv/m/calendar',
+// Идём по ВСЕМ экранам, а не только по group_calendar: одна и та же таблица
+// была на нескольких (личка + группа), и заводить отдельную миграцию под
+// каждый — гарантированно забыть один. Правим только те кнопки, где стоит
+// известная старая ссылка; чужие URL не трогаем.
+const CALENDAR_URL = 'https://docs.google.com/spreadsheets/d/1-3zgTAEdvS3QYQIj6xtD1Ofpz3CPI8NB4ShdhXocnD8/edit?gid=1843973382#gid=1843973382';
+const CALENDAR_STALE = [
+  '1JlYqnsaGxmgsjCCu_85aEKbC5QhGKJmR-3UcGFcW8No',
   '1zMg4sJlUUD2I-SPEUc7MRC6rRkbZHWpBju0vGlzNeIo',
+  'winline.tv/m/calendar',
 ];
 
 (async () => {
@@ -58,21 +61,24 @@ const GROUP_CALENDAR_STALE = [
     const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
     if (!rows.length) return; // ещё не сидировано — SEED_DATA уже несёт новую ссылку
     const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-    const btn = data?.screens?.group_calendar?.buttons?.btn_link;
-    if (!btn) return;
-    if (btn.action === GROUP_CALENDAR_URL) return; // уже актуальная
-    if (!GROUP_CALENDAR_STALE.some((old) => String(btn.action || '').includes(old))) {
-      // Кто-то поставил свою ссылку — не трогаем, но говорим об этом в лог,
-      // чтобы «почему не обновилось» не превращалось в расследование.
-      console.log(`[scenarios] group_calendar: оставляю как есть → ${btn.action}`);
-      return;
+    const screens = data?.screens || {};
+    const changed = [];
+
+    for (const [screenId, screen] of Object.entries(screens)) {
+      for (const [btnId, btn] of Object.entries(screen?.buttons || {})) {
+        const action = btn && typeof btn === 'object' ? String(btn.action || '') : '';
+        if (!action.startsWith('url:')) continue;
+        if (!CALENDAR_STALE.some((stale) => action.includes(stale))) continue;
+        btn.action = `url:${CALENDAR_URL}`;
+        changed.push(`${screenId}.${btnId} (было ${action.slice(4)})`);
+      }
     }
-    const was = btn.action;
-    btn.action = GROUP_CALENDAR_URL;
+
+    if (!changed.length) return; // всё уже актуально либо стоят чужие ссылки
     await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
-    console.log(`[scenarios] migrate: group_calendar ${was} → ${GROUP_CALENDAR_URL}`);
+    for (const what of changed) console.log(`[scenarios] migrate: календарь → ${what}`);
   } catch (e) {
-    console.warn('[scenarios] group_calendar migration failed:', e.message);
+    console.warn('[scenarios] calendar migration failed:', e.message);
   }
 })();
 
@@ -191,7 +197,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_link', 'btn_back'],
-        btn_link: { label: 'Открыть календарь', action: 'url:https://docs.google.com/spreadsheets/d/1zMg4sJlUUD2I-SPEUc7MRC6rRkbZHWpBju0vGlzNeIo/edit?gid=0#gid=0' },
+        btn_link: { label: 'Открыть календарь', action: 'url:https://docs.google.com/spreadsheets/d/1-3zgTAEdvS3QYQIj6xtD1Ofpz3CPI8NB4ShdhXocnD8/edit?gid=1843973382#gid=1843973382' },
         btn_back: { label: '🔙 Меню', action: 'callback:client_back_menu', targetScreen: 'main_menu', locked: true },
       },
     },
