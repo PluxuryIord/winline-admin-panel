@@ -38,6 +38,44 @@ const router = Router();
   }
 })();
 
+// ─── Календарь в группе: перевод на актуальную Google-таблицу ───────────────
+// SEED-merge дозаливает только ОТСУТСТВУЮЩИЕ экраны, а group_calendar в БД
+// уже есть — со старой ссылкой. Отсюда явная миграция, на module load: деплоя
+// достаточно, заходить в раздел «Сценарии» не нужно (бот перечитывает
+// сценарии каждые ~3с).
+//
+// Точечная и одноразовая: переписываем ТОЛЬКО известные старые значения.
+// Если ссылку потом поменяют руками в панели — миграция её не тронет.
+const GROUP_CALENDAR_URL = 'url:https://docs.google.com/spreadsheets/d/1-3zgTAEdvS3QYQIj6xtD1Ofpz3CPI8NB4ShdhXocnD8/edit?gid=1843973382#gid=1843973382';
+const GROUP_CALENDAR_STALE = [
+  'url:https://winline.tv/m/calendar',
+  '1zMg4sJlUUD2I-SPEUc7MRC6rRkbZHWpBju0vGlzNeIo',
+];
+
+(async () => {
+  if (!dbPool) return;
+  try {
+    const [rows] = await dbPool.query("SELECT id, data FROM texts WHERE category = 'bot_scenarios' LIMIT 1");
+    if (!rows.length) return; // ещё не сидировано — SEED_DATA уже несёт новую ссылку
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const btn = data?.screens?.group_calendar?.buttons?.btn_link;
+    if (!btn) return;
+    if (btn.action === GROUP_CALENDAR_URL) return; // уже актуальная
+    if (!GROUP_CALENDAR_STALE.some((old) => String(btn.action || '').includes(old))) {
+      // Кто-то поставил свою ссылку — не трогаем, но говорим об этом в лог,
+      // чтобы «почему не обновилось» не превращалось в расследование.
+      console.log(`[scenarios] group_calendar: оставляю как есть → ${btn.action}`);
+      return;
+    }
+    const was = btn.action;
+    btn.action = GROUP_CALENDAR_URL;
+    await dbPool.query('UPDATE texts SET data = ? WHERE id = ?', [JSON.stringify(data), rows[0].id]);
+    console.log(`[scenarios] migrate: group_calendar ${was} → ${GROUP_CALENDAR_URL}`);
+  } catch (e) {
+    console.warn('[scenarios] group_calendar migration failed:', e.message);
+  }
+})();
+
 // ─── Notify bot to reload texts after save ──────────────────────────────────
 async function notifyBotReload() {
   if (!BOT_API_URL) return;
@@ -546,7 +584,7 @@ const SEED_DATA = {
       },
       buttons: {
         _order: ['btn_link', 'btn_back'],
-        btn_link: { label: 'Открыть календарь', action: 'url:https://winline.tv/m/calendar' },
+        btn_link: { label: 'Открыть календарь', action: 'url:https://docs.google.com/spreadsheets/d/1-3zgTAEdvS3QYQIj6xtD1Ofpz3CPI8NB4ShdhXocnD8/edit?gid=1843973382#gid=1843973382' },
         btn_back: { label: '🔙 Меню', action: 'callback:group_main_menu', targetScreen: 'group_menu' },
       },
     },
