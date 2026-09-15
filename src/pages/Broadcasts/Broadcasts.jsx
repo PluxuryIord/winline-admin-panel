@@ -1417,6 +1417,10 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   const [tags, setTags] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
   const [excludedTags, setExcludedTags] = useState([]);
+  // «Все пользователи» — отправка без фильтра по включающим тегам. Взаимно
+  // исключается с ними (выбрал тег — режим выключился), но с исключающими
+  // работает вместе: «всем, кроме таких-то».
+  const [allUsers, setAllUsers] = useState(false);
   const [userCount, setUserCount] = useState(null);
   const [countLoading, setCountLoading] = useState(false);
   const [countError, setCountError] = useState(null);
@@ -1433,7 +1437,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
   // Подсчёт по фильтрам — когда выбраны теги (включая или исключая).
   // Дебаунс обязателен: без него выбор 11 тегов = 11 запросов подряд.
   useEffect(() => {
-    if (selectedTags.length === 0 && excludedTags.length === 0) {
+    if (!allUsers && selectedTags.length === 0 && excludedTags.length === 0) {
       setUserCount(0);
       setCountError(null);
       return;
@@ -1441,7 +1445,8 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setCountLoading(true);
     setCountError(null);
     const params = new URLSearchParams();
-    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    // В режиме «все» теги не шлём вовсе — сервер без tags считает всю базу.
+    if (!allUsers && selectedTags.length > 0) params.set('tags', selectedTags.join(','));
     if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
 
     let cancelled = false;
@@ -1460,11 +1465,19 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     }, 400);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [selectedTags, excludedTags]);
+  }, [allUsers, selectedTags, excludedTags]);
 
   const toggleTag = (tag) => {
+    setAllUsers(false);
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
     setExcludedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const toggleAllUsers = () => {
+    setAllUsers(prev => {
+      if (!prev) setSelectedTags([]);
+      return !prev;
+    });
   };
 
   const toggleExcludeTag = (tag) => {
@@ -1485,7 +1498,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
     setSendResult(null);
     try {
       const filters = {};
-      if (selectedTags.length > 0) filters.tags = selectedTags;
+      if (!allUsers && selectedTags.length > 0) filters.tags = selectedTags;
       if (excludedTags.length > 0) filters.excludeTags = excludedTags;
 
       const body = { filters, ...composeBody };
@@ -1562,7 +1575,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
 
   const fetchRecipients = async (offset = 0) => {
     const params = new URLSearchParams();
-    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
+    if (!allUsers && selectedTags.length > 0) params.set('tags', selectedTags.join(','));
     if (excludedTags.length > 0) params.set('excludeTags', excludedTags.join(','));
     params.set('limit', RECIPIENTS_PAGE);
     params.set('offset', offset);
@@ -1616,7 +1629,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
         <div className="bc-tag-filter" ref={tagRef}>
           <button className="bc-tag-filter-btn" onClick={() => setShowTagDD(!showTagDD)}>
             <Tag size={14} />
-            <span>{selectedTags.length === 0 ? 'Включить теги' : `Включено: ${selectedTags.length}`}</span>
+            <span>{allUsers ? 'Все пользователи' : selectedTags.length === 0 ? 'Включить теги' : `Включено: ${selectedTags.length}`}</span>
             <ChevronDown size={14} className={`bc-tag-chevron ${showTagDD ? 'open' : ''}`} />
           </button>
           {showTagDD && (
@@ -1637,7 +1650,16 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
               )}
               <div className="bc-tag-options-list">
                 {(!tagSearch.trim()) && (
-                  <div className="bc-tag-option" onClick={() => { setSelectedTags([]); setTagSearch(''); }}>
+                  <label
+                    className={`bc-tag-option bc-tag-option--checkbox ${allUsers ? 'active' : ''}`}
+                    onClick={(e) => { e.preventDefault(); toggleAllUsers(); }}
+                  >
+                    <input type="checkbox" checked={allUsers} readOnly className="bc-tag-checkbox" />
+                    <span><b>Все пользователи</b></span>
+                  </label>
+                )}
+                {(!tagSearch.trim()) && (
+                  <div className="bc-tag-option" onClick={() => { setAllUsers(false); setSelectedTags([]); setTagSearch(''); }}>
                     Сбросить все
                   </div>
                 )}
@@ -1700,8 +1722,14 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
           )}
         </div>
 
-        {(selectedTags.length > 0 || excludedTags.length > 0) && (
+        {(allUsers || selectedTags.length > 0 || excludedTags.length > 0) && (
           <div className="bc-selected-tags">
+            {allUsers && (
+              <span className="bc-selected-tag-chip">
+                Все пользователи
+                <button className="bc-chip-remove" onClick={() => setAllUsers(false)}><X size={11} /></button>
+              </span>
+            )}
             {selectedTags.map(t => (
               <span key={`inc-${t}`} className="bc-selected-tag-chip">
                 {t}
@@ -1714,7 +1742,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 <button className="bc-chip-remove" onClick={() => removeExcludedTag(t)}><X size={11} /></button>
               </span>
             ))}
-            <button className="bc-clear-tags-btn" onClick={() => { setSelectedTags([]); setExcludedTags([]); }}>Сбросить</button>
+            <button className="bc-clear-tags-btn" onClick={() => { setAllUsers(false); setSelectedTags([]); setExcludedTags([]); }}>Сбросить</button>
           </div>
         )}
 
@@ -1760,7 +1788,7 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
       <ComposeBlock
         title="Рассылка пользователям бота"
         hintText={
-          selectedTags.length === 0 && excludedTags.length === 0
+          !allUsers && selectedTags.length === 0 && excludedTags.length === 0
             ? 'Выберите хотя бы один тег для включения или исключения'
             : countError
               ? `Не удалось посчитать получателей: ${countError}`
@@ -1768,14 +1796,14 @@ function UsersTab({ onSendResult, onSaveDraft, savingDraft, initialDraft }) {
                 ? `Будет отправлено ${userCount} пользователям`
                 : 'Нет пользователей по фильтрам'
         }
-        canSend={userCount > 0 && (selectedTags.length > 0 || excludedTags.length > 0)}
+        canSend={userCount > 0 && (allUsers || selectedTags.length > 0 || excludedTags.length > 0)}
         sending={sending}
         sendResult={sendResult}
         onSend={handleSend}
         targetType="users"
         onSaveDraft={(body, resetCb) => {
           const filters = {};
-          if (selectedTags.length > 0) filters.tags = selectedTags;
+          if (!allUsers && selectedTags.length > 0) filters.tags = selectedTags;
           if (excludedTags.length > 0) filters.excludeTags = excludedTags;
           onSaveDraft?.({ ...body, targetType: 'users', targetFilter: { filters } }, resetCb);
         }}
