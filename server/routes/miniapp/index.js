@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import dbPool from '../../config/db.js';
+import { MINIAPP_OTP_ENABLED } from '../../config/env.js';
 import authRouter from './auth.js';
 import contentRouter from './content.js';
 import statsRouter from './stats.js';
@@ -39,6 +40,7 @@ router.get('/me', async (req, res, next) => {
       authorized: !!email,
       email,
       name,
+      otp_required: MINIAPP_OTP_ENABLED,
       tg: {
         id: req.tgUser.id,
         first_name: req.tgUser.first_name || '',

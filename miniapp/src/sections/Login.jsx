@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader, Mail, KeyRound, Pencil } from 'lucide-react';
+import { Loader, Mail, KeyRound, Pencil, LogIn } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { setClosingConfirmation, haptic } from '../lib/telegram.js';
 
 // Email → OTP login. Mirrors the bot's auth flow, executed via /api/miniapp/auth/*.
-export default function Login({ refreshMe, goBack }) {
+export default function Login({ me, refreshMe, goBack }) {
+  const otpRequired = me?.otp_required !== false;
   const [step, setStep] = useState('email'); // email | code
   const [email, setEmail] = useState('');
   const [masked, setMasked] = useState('');
@@ -29,6 +30,13 @@ export default function Login({ refreshMe, goBack }) {
   async function requestOtp() {
     setBusy(true); setErr('');
     const res = await api.post('/auth/request-otp', { email: email.trim() });
+    if (res.ok && res.data.authorized) {
+      haptic('medium');
+      await refreshMe();
+      setBusy(false);
+      goBack();
+      return;
+    }
     setBusy(false);
     if (res.ok) {
       setMasked(res.data.masked_email || email);
@@ -69,7 +77,7 @@ export default function Login({ refreshMe, goBack }) {
         <>
           <p className="dim" style={{ marginBottom: 14, fontSize: 14, lineHeight: 1.5 }}>
             Введите email, указанный при регистрации на платформе Winline Partners.
-            Мы отправим на него код подтверждения.
+            {otpRequired && ' Мы отправим на него код подтверждения.'}
           </p>
           <div className="field">
             <label>Email</label>
@@ -84,7 +92,9 @@ export default function Login({ refreshMe, goBack }) {
             />
           </div>
           <button className="btn btn-primary" onClick={requestOtp} disabled={busy || !email.trim()}>
-            {busy ? <Loader size={17} className="spin" /> : <><Mail size={17} /> Получить код</>}
+            {busy ? <Loader size={17} className="spin" />
+              : otpRequired ? <><Mail size={17} /> Получить код</>
+              : <><LogIn size={17} /> Войти</>}
           </button>
         </>
       )}

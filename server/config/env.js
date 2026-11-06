@@ -70,6 +70,8 @@ export const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || projectEnv.SMTP_FROM
 
 // Set OTP_2FA=0 в .env чтобы выключить 2FA (нужно при первой раскатке, пока у админов нет email)
 export const OTP_2FA_ENABLED = String(process.env.OTP_2FA || projectEnv.OTP_2FA || '1') !== '0';
+// Set MINIAPP_OTP=0 в .env чтобы входить в мини-апп без кода из письма (только проверка email по базе партнёров)
+export const MINIAPP_OTP_ENABLED = String(process.env.MINIAPP_OTP || projectEnv.MINIAPP_OTP || '1') !== '0';
 
 // --- Resend (HTTPS-альтернатива SMTP, если хостинг режет 465/587) ---
 // MAIL_PROVIDER=resend — использовать Resend вместо SMTP.

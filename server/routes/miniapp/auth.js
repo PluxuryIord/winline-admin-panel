@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import dbPool from '../../config/db.js';
 import admonPool from '../../config/dbAdmon.js';
 import { sendOtpEmail, isMailerConfigured } from '../../lib/mailer.js';
-import { BOT_API_URL, BOT_API_KEY } from '../../config/env.js';
+import { BOT_API_URL, BOT_API_KEY, MINIAPP_OTP_ENABLED } from '../../config/env.js';
 
 // Mini App login: email → check against the wl_admon partner mirror → 6-digit
 // OTP to that email → verify → bot admin_api POST /auth writes user_auth and
@@ -62,6 +62,21 @@ async function botApi(path, body) {
   }
 }
 
+// The bot writes user_auth + refreshes the user's TG menu (single implementation
+// of "finalize auth", shared with the bot's own flow). Returns true on success,
+// otherwise has already sent the error response.
+async function finalizeLogin(res, email, tgUserId) {
+  const bot = await botApi('/auth', { email, user_id: tgUserId });
+  if (bot.ok) return true;
+  if (bot.status === 404) {
+    res.status(409).json({ error: 'not_partner', message: 'Email не найден среди партнёров' });
+  } else {
+    console.warn('[miniapp/auth] bot /auth failed:', bot.status, bot.data);
+    res.status(502).json({ error: 'bot_unavailable', message: 'Сервис авторизации недоступен, попробуйте позже' });
+  }
+  return false;
+}
+
 // POST /api/miniapp/auth/request-otp { email }
 router.post('/request-otp', async (req, res, next) => {
   try {
@@ -70,18 +85,20 @@ router.post('/request-otp', async (req, res, next) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'bad_email', message: 'Некорректный формат email' });
     }
-    if (!isMailerConfigured()) {
-      return res.status(503).json({ error: 'mailer_unavailable', message: 'Отправка кода временно недоступна' });
-    }
+    if (MINIAPP_OTP_ENABLED) {
+      if (!isMailerConfigured()) {
+        return res.status(503).json({ error: 'mailer_unavailable', message: 'Отправка кода временно недоступна' });
+      }
 
-    // Cooldown before hitting the mirror.
-    const [cd] = await dbPool.query(
-      'SELECT resend_after FROM wl_miniapp_otp WHERE tg_user_id = ? LIMIT 1',
-      [req.tgUser.id]
-    );
-    if (cd.length && new Date(cd[0].resend_after).getTime() > Date.now()) {
-      const retryIn = Math.ceil((new Date(cd[0].resend_after).getTime() - Date.now()) / 1000);
-      return res.status(429).json({ error: 'cooldown', retry_after_sec: retryIn });
+      // Cooldown before hitting the mirror.
+      const [cd] = await dbPool.query(
+        'SELECT resend_after FROM wl_miniapp_otp WHERE tg_user_id = ? LIMIT 1',
+        [req.tgUser.id]
+      );
+      if (cd.length && new Date(cd[0].resend_after).getTime() > Date.now()) {
+        const retryIn = Math.ceil((new Date(cd[0].resend_after).getTime() - Date.now()) / 1000);
+        return res.status(429).json({ error: 'cooldown', retry_after_sec: retryIn });
+      }
     }
 
     // Partner check: mirror first (fast, covers everyone already synced), then a
@@ -118,6 +135,11 @@ router.post('/request-otp', async (req, res, next) => {
     }
     if (partner.status !== null && partner.status !== undefined && Number(partner.status) !== 1) {
       return res.status(403).json({ error: 'account_blocked', message: 'Аккаунт на платформе заблокирован. Обратитесь в поддержку.' });
+    }
+
+    if (!MINIAPP_OTP_ENABLED) {
+      if (!(await finalizeLogin(res, email, req.tgUser.id))) return;
+      return res.json({ ok: true, authorized: true, email });
     }
 
     const code = genOtp();
@@ -175,16 +197,7 @@ router.post('/verify-otp', async (req, res, next) => {
       });
     }
 
-    // Code verified → the bot writes user_auth + refreshes the user's TG menu
-    // (single implementation of "finalize auth", shared with the bot's own flow).
-    const bot = await botApi('/auth', { email: otp.email, user_id: req.tgUser.id });
-    if (!bot.ok) {
-      if (bot.status === 404) {
-        return res.status(409).json({ error: 'not_partner', message: 'Email не найден среди партнёров' });
-      }
-      console.warn('[miniapp/auth] bot /auth failed:', bot.status, bot.data);
-      return res.status(502).json({ error: 'bot_unavailable', message: 'Сервис авторизации недоступен, попробуйте позже' });
-    }
+    if (!(await finalizeLogin(res, otp.email, req.tgUser.id))) return;
 
     await dbPool.query('DELETE FROM wl_miniapp_otp WHERE tg_user_id = ?', [req.tgUser.id]);
     res.json({ ok: true, email: otp.email });
